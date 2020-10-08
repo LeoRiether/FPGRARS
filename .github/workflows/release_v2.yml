@@ -28,7 +28,10 @@ jobs:
           use-cross: true
           command: build
           args: --release --target=${{ matrix.target }}
-      # - uses: johnwbyrd/update-release@v1
-      #     with:
-      #       token: ${{ secrets.GITHUB_TOKEN }}
-      #       files: 'target/release/fpgrars.* README.md LICENSE'
+
+      - name: Upload to release
+        uses: JasonEtco/upload-to-release@master
+        with:
+          args: target/release/fpgrars.exe target/release/fpgrars
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
