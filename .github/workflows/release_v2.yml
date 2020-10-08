@@ -38,3 +38,8 @@ jobs:
         with:
           name: my-artifact
           path: ${{ matrix.case.output }}
+      - name: Update release
+        uses: johnwbyrd/update-release@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: ${{ matrix.case.output }} LICENSE README.md
