@@ -15,9 +15,9 @@ jobs:
       matrix:
         case:
           - target: x86_64-pc-windows-gnu
-            output: target/release/fpgrars.exe
+            output: x86_64-pc-windows-gnu/release/fpgrars.exe
           - target: x86_64-unknown-linux-gnu
-            output: target/release/fpgrars
+            output: x86_64-unknown-linux-gnu/release/fpgrars
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -38,8 +38,10 @@ jobs:
         with:
           name: my-artifact
           path: ${{ matrix.case.output }}
-      - name: Update release
-        uses: johnwbyrd/update-release@v1
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          files: ${{ matrix.case.output }} LICENSE README.md
+          files: ${{ matrix.case.output }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
