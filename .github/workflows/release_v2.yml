@@ -1,4 +1,4 @@
-name: Release Binary
+name: Release v2
 
 on:
   release:
