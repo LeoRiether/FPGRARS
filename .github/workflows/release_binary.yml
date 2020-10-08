@@ -1,4 +1,5 @@
 # .github/workflows/release.yml
+name: Release Binary
 
 on:
   release:
