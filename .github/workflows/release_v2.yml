@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        # https://doc.rust-lang.org/nightly/rustc/platform-support.html
         case:
           - target: x86_64-pc-windows-gnu
             output: target/x86_64-pc-windows-gnu/release/fpgrars.exe

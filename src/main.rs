@@ -8,6 +8,8 @@ use pixel_canvas::{
 
 use glium::glutin;
 
+mod scancode;
+
 struct MyState {
     key_buffer: VecDeque<u8>,
 }
@@ -36,8 +38,8 @@ impl MyState {
                     },
                 ..
             } => {
-                dbg!(&key);
-                // state.key_buffer.push_back(
+                dbg!(scancode::to_ascii(*key) as char);
+                state.key_buffer.push_back(scancode::to_ascii(*key));
                 true
             }
 
@@ -47,11 +49,11 @@ impl MyState {
 }
 
 fn main() {
-    let canvas = Canvas::new(512, 512)
+    let canvas = Canvas::new(640, 480)
         .title("FPGRARS")
         .state(MyState::new())
-        .input(MyState::handle_input)
-        .render_on_change(true);
+        .input(MyState::handle_input);
+        // .render_on_change(true);
 
     #[cfg(debug_assertions)]
     let canvas = canvas.show_ms(true);
@@ -63,9 +65,9 @@ fn main() {
         for (y, row) in image.chunks_mut(width).enumerate() {
             for (x, pixel) in row.iter_mut().enumerate() {
                 *pixel = Color {
-                    r: (x * y) as u8,
+                    r: 255,
                     g: 0,
-                    b: (x * y) as u8,
+                    b: 0,
                 }
             }
         }
