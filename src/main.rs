@@ -1,75 +1,66 @@
-use std::collections::VecDeque;
-
-use pixel_canvas::{
-    canvas::CanvasInfo,
-    input::{Event, WindowEvent},
-    Canvas, Color,
-};
-
-use glium::glutin;
-
-mod scancode;
-
-struct MyState {
-    key_buffer: VecDeque<u8>,
-}
-
-impl MyState {
-    fn new() -> Self {
-        Self {
-            key_buffer: VecDeque::new(),
-        }
-    }
-
-    fn handle_input(info: &CanvasInfo, state: &mut MyState, event: &Event<()>) -> bool {
-        match event {
-            // Match a keypress with scancode "key"
-            Event::WindowEvent {
-                event:
-                    WindowEvent::KeyboardInput {
-                        input:
-                            glutin::event::KeyboardInput {
-                                state: glutin::event::ElementState::Pressed,
-                                scancode: key,
-                                ..
-                            },
-                        is_synthetic: false,
-                        ..
-                    },
-                ..
-            } => {
-                dbg!(scancode::to_ascii(*key) as char);
-                state.key_buffer.push_back(scancode::to_ascii(*key));
-                true
-            }
-
-            _ => false
-        }
-    }
-}
+use glfw::{Action, Context as _, Key, WindowEvent};
+use luminance_glfw::GlfwSurface;
+use luminance_windowing::{WindowDim, WindowOpt};
+use std::process::exit;
 
 fn main() {
-    let canvas = Canvas::new(640, 480)
-        .title("FPGRARS")
-        .state(MyState::new())
-        .input(MyState::handle_input);
-        // .render_on_change(true);
+    // our graphics surface
+    let dim = WindowDim::Windowed {
+        width: 960,
+        height: 540,
+    };
+    let surface = GlfwSurface::new_gl33("Hello, world!", WindowOpt::default().set_dim(dim));
 
-    #[cfg(debug_assertions)]
-    let canvas = canvas.show_ms(true);
+    match surface {
+        Ok(surface) => {
+            eprintln!("graphics surface created");
+            main_loop(surface);
+        }
 
-    // The canvas will render for you at up to 60fps.
-    canvas.render(|state, image| {
-        // Modify the `image` based on your state.
-        let width = image.width() as usize;
-        for (y, row) in image.chunks_mut(width).enumerate() {
-            for (x, pixel) in row.iter_mut().enumerate() {
-                *pixel = Color {
-                    r: 255,
-                    g: 0,
-                    b: 0,
+        Err(e) => {
+            eprintln!("cannot create graphics surface:\n{}", e);
+            exit(1);
+        }
+    }
+}
+
+fn main_loop(mut surface: GlfwSurface) {
+    let start_t = Instant::now();
+    let back_buffer = surface.back_buffer().unwrap();
+
+    'app: loop {
+        // handle events
+        surface.window.glfw.poll_events();
+        for (_, event) in surface.events_rx.try_iter() {
+            match event {
+                WindowEvent::Close | WindowEvent::Key(Key::Escape, _, Action::Release, _) => {
+                    break 'app
                 }
+                _ => (),
             }
         }
-    });
+
+        // get the current time and create a color based on the time
+        let t = start_t.elapsed().as_millis() as f32 * 1e-3;
+        let color = [t.cos(), t.sin(), 0.5, 1.];
+
+        let render = surface
+            .new_pipeline_gate()
+            .pipeline(
+                &back_buffer,
+                &PipelineState::default().set_clear_color(color),
+                |_, _| Ok(()),
+            )
+            .assume();
+
+        // swap buffer chains
+        if render.is_ok() {
+            surface.window.swap_buffers();
+        } else {
+            break 'app;
+        }
+
+        // swap buffer chains
+        surface.window.swap_buffers();
+    }
 }
