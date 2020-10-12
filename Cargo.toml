@@ -7,6 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-pixel-canvas = "0.2.1"
-glium = "0.26.0"
-
+pixel-canvas = { git = "https://github.com/LeoRiether/pixel-canvas", branch = "develop" }
+glium = "0.28.0"
+combine = "4.3.2"
