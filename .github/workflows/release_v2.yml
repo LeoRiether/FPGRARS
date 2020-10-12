@@ -36,6 +36,8 @@ jobs:
           use-cross: true
           command: build
           args: --release --target=${{ matrix.case.target }}
+      - name: Strip binary
+        run: strip ${{ matrix.case.output }}
       - name: Rename output
         run: mv ${{ matrix.case.output }} ${{ matrix.case.finalOutput }}
       - name: Release
