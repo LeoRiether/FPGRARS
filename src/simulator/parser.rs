@@ -1,1 +1,5 @@
-use combinator::*;
+use combine::*;
+
+pub enum Instruction {
+
+}

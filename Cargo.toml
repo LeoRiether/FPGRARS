@@ -10,3 +10,4 @@ edition = "2018"
 pixel-canvas = { git = "https://github.com/LeoRiether/pixel-canvas", branch = "develop" }
 glium = "0.28.0"
 combine = "4.3.2"
+num-traits = "0.2.12"

@@ -343,6 +343,7 @@ version = "0.1.0"
 dependencies = [
  "combine",
  "glium",
+ "num-traits 0.2.12",
  "pixel-canvas",
 ]
 
