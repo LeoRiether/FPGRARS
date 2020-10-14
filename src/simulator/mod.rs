@@ -81,6 +81,15 @@ impl Simulator {
 
         let to_1 = |b| if b { 1 } else { 0 };
 
+        macro_rules! branch {
+            ($cond:expr, $pc:expr, $label:expr) => {
+                if $cond {
+                    $pc = $label;
+                    continue;
+                }
+            };
+        }
+
         loop {
             match self.code[self.pc / 4] {
                 // Type R
@@ -144,13 +153,44 @@ impl Simulator {
                 ),
 
                 // Type SB + jumps
-                Bge(rs1, rs2, label) => {
-                    if self.get_reg::<i32>(rs1) >= self.get_reg::<i32>(rs2) {
-                        self.pc = label;
-                        continue;
-                    }
+                Beq(rs1, rs2, label) => branch!(
+                    self.get_reg::<i32>(rs1) == self.get_reg::<i32>(rs2),
+                    self.pc,
+                    label
+                ),
+                Bne(rs1, rs2, label) => branch!(
+                    self.get_reg::<i32>(rs1) != self.get_reg::<i32>(rs2),
+                    self.pc,
+                    label
+                ),
+                Blt(rs1, rs2, label) => branch!(
+                    self.get_reg::<i32>(rs1) < self.get_reg::<i32>(rs2),
+                    self.pc,
+                    label
+                ),
+                Bge(rs1, rs2, label) => branch!(
+                    self.get_reg::<i32>(rs1) >= self.get_reg::<i32>(rs2),
+                    self.pc,
+                    label
+                ),
+                Bltu(rs1, rs2, label) => branch!(
+                    self.get_reg::<u32>(rs1) < self.get_reg::<u32>(rs2),
+                    self.pc,
+                    label
+                ),
+                Bgeu(rs1, rs2, label) => branch!(
+                    self.get_reg::<u32>(rs1) >= self.get_reg::<u32>(rs2),
+                    self.pc,
+                    label
+                ),
+                Jalr(rd, rs1, imm) => {
+                    // This produces a weird result for `jalr s0 s0 label`. s0 is set to pc+4 before the jump occurs
+                    // so it works as a nop. Maybe this is correct, maybe it's not, but I'll copy the behavior seen in
+                    // RARS to be consistent.
+                    self.set_reg(rd, (self.pc + 4) as u32);
+                    self.pc = (self.get_reg::<i32>(rs1) + imm) as usize;
+                    continue;
                 }
-
                 Jal(rd, label) => {
                     self.set_reg(rd, (self.pc + 4) as u32);
                     self.pc = label;
