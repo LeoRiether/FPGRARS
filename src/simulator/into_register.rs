@@ -1,3 +1,7 @@
+///
+/// If a type implements IntoRegister, then we can store its bit regresentation
+/// in a 32-bit register as a u32
+///
 pub trait IntoRegister {
     fn into(self) -> u32;
 }

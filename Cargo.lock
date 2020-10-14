@@ -343,8 +343,9 @@ version = "0.1.0"
 dependencies = [
  "combine",
  "glium",
- "num-traits 0.2.12",
+ "lazy_static",
  "pixel-canvas",
+ "radix_trie",
 ]
 
 [[package]]
@@ -719,6 +720,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "nibble_vec"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62e678237a4c70c5f2b917cefd7d080dfbf800421f06e8a59d4e28ef5130fd9e"
+
+[[package]]
 name = "nix"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -896,6 +903,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa563d17ecb180e500da1cfd2b028310ac758de548efdd203e18f283af693f37"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "radix_trie"
+version = "0.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d2bfd80b28325215b837fc9459a49f632a80e52d9b134934160d586e4803dff"
+dependencies = [
+ "nibble_vec",
 ]
 
 [[package]]

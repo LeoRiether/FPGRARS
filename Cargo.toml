@@ -7,7 +7,11 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+lazy_static = "1.4.0"
+
 pixel-canvas = { git = "https://github.com/LeoRiether/pixel-canvas", branch = "develop" }
 glium = "0.28.0"
+
 combine = "4.3.2"
-num-traits = "0.2.12"
+
+radix_trie = "0.0.9"

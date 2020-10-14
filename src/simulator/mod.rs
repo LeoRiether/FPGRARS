@@ -1,7 +1,7 @@
-use std::sync::{Arc, Mutex};
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 const DATA_SIZE: usize = 128;
 const MMIO_SIZE: usize = 2 * 320 * 2 * 240 * 2 + 4;
@@ -10,6 +10,9 @@ pub mod parser;
 
 mod into_register;
 use into_register::*;
+
+mod register_names;
+use register_names::*;
 
 pub struct RegisterBank {
     registers: [u32; 32],
@@ -67,17 +70,19 @@ impl Simulator {
         }
     }
 
-    pub fn load_from_file<P: AsRef<Path>>(self, path: P) -> Result<Self, io::Error> {
-        let mut file = File::open(path)?;
-        let mut lines = io::BufReader::new(file).lines();
-
-        for line in lines {
-            let line = line?;
-            println!(">> {}", line);
-        }
-
+    pub fn load_from_file<P: AsRef<Path>>(mut self, path: P) -> Result<Self, parser::Error> {
+        let parser::Parsed { code, data } = parser::parse_file(path)?;
+        self.code = code;
+        self.memory.data = data;
+        self.memory.data.resize(DATA_SIZE, 0);
         Ok(self)
     }
 
-    pub fn run() { }
+    // pub fn run(&mut self) {
+    //     match self.code[self.pc] {
+    //         Add(rd, rs1, rs2) => self.register_bank.set_register(
+    //             self.register_bank.get_register(rs1) + self.register_bank.get_register(rs2),
+    //         ),
+    //     }
+    // }
 }
