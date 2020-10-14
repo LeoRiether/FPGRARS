@@ -1,6 +1,8 @@
-///
-/// Parses RISC-V code into code and data parts, so it can be used in the simulator module
-///
+//!
+//! Parses RISC-V code into code and data parts, so it can be used in the simulator module.
+//! We use a lot of mnemonics here, I'll try to link to a cheatsheet here later.
+//!
+
 use combine::*;
 use radix_trie::Trie;
 use std::fmt;
@@ -16,10 +18,11 @@ use register_names::*;
 #[derive(Debug)]
 pub enum Instruction {
     // Type R
-    Add(u8, u8, u8), // rd, rs1, rs2
+    /// rd, rs1, rs2
+    Add(u8, u8, u8),
     Sub(u8, u8, u8),
     Sll(u8, u8, u8),
-    Stl(u8, u8, u8),
+    Slt(u8, u8, u8),
     Sltu(u8, u8, u8),
     Xor(u8, u8, u8),
     Srl(u8, u8, u8),
@@ -34,32 +37,47 @@ pub enum Instruction {
 
     // Type I
     Ecall,
-    Lb(u8, i32, u8), // rd, imm, rs1
+    /// rd, imm, rs1
+    Lb(u8, i32, u8),
     Lh(u8, i32, u8),
     Lw(u8, i32, u8),
     Lbu(u8, i32, u8),
-    Addi(u8, u8, i32), // rd, rs1, imm
+    Lhu(u8, i32, u8),
+    Addi(u8, u8, i32), /// rd, rs1, imm
+    Slti(u8, u8, i32),
+    Sltiu(u8, u8, u32),
     Slli(u8, u8, i32),
+    Srli(u8, u8, i32),
     Srai(u8, u8, i32),
+    Ori(u8, u8, u32),
+    Andi(u8, u8, u32),
+    Xori(u8, u8, u32),
 
     // Type S
-    Sb(u8, i32, u8), // rs2, imm, rs1
+    /// rs2, imm, rs1
+    Sb(u8, i32, u8),
     Sh(u8, i32, u8),
     Sw(u8, i32, u8),
 
     // Type SB + jumps
+    /// rs1, rs2, label
     Beq(u8, u8, usize),
     Bne(u8, u8, usize),
     Blt(u8, u8, usize),
     Bge(u8, u8, usize),
     Bltu(u8, u8, usize),
     Bgeu(u8, u8, usize),
+    /// rd, rs1, imm
     Jalr(u8, u8, i32),
+    /// rd, label
     Jal(u8, usize),
 
     // Some pseudoinstructions
+    /// rd, imm
     Li(u8, i32),
+    /// rd, rs1
     Mv(u8, u8),
+    Ret,
 }
 
 /// Also giant enum that represents a single RISC-V instruction, but we save
@@ -180,15 +198,17 @@ where
         Li(9, 76800),
         Add(9, 9, 8),
         Bge(8, 9, 8 * 4),
-        Li(5, 0x3f),
+        Li(5, 0xf3),
         Sb(5, 0, 8),
         Addi(8, 8, 1),
         Jal(0, 3 * 4),
         Jal(0, 8 * 4), // main.stall
     ]);
 
-    code.push(Instruction::Li(17, 10)); // li a7 10
-    code.push(Instruction::Ecall);
+    code.extend(vec![
+        Instruction::Li(17, 10), // li a7 10
+        Instruction::Ecall,
+    ]);
 
     let data = ctx.data;
     Ok(Parsed { code, data })

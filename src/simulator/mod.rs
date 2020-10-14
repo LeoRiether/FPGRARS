@@ -1,5 +1,10 @@
-use std::fs::File;
-use std::io::{self, BufRead};
+//!
+//! Runs a given RISC-V program instruction by instruction.
+//!
+//! Implemented instructions can be found at [Instructions](./parser/enum.Instruction.html),
+//! and you can find how they're simulated at [Simulator::run](struct.Simulator.html#method.run)
+//!
+
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -195,7 +200,7 @@ impl Simulator {
                     // so it works as a nop. Maybe this is correct, maybe it's not, but I'll copy the behavior seen in
                     // RARS to be consistent.
                     self.set_reg(rd, (self.pc + 4) as u32);
-                    self.pc = (self.get_reg::<i32>(rs1) + imm) as usize;
+                    self.pc = (self.get_reg::<i32>(rs1) + imm) as usize & !1;
                     continue;
                 }
                 Jal(rd, label) => {
@@ -207,6 +212,10 @@ impl Simulator {
                 // Pseudoinstructions
                 Li(rd, imm) => self.set_reg(rd, imm),
                 Mv(rd, rs1) => self.registers[rd as usize] = self.registers[rs1 as usize],
+                Ret => {
+                    self.pc = self.registers[1] as usize;
+                    continue;
+                }
 
                 _ => unimplemented!(),
             }
