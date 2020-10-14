@@ -143,35 +143,15 @@ impl Simulator {
 
                 // Type I
                 Ecall => self.ecall(),
-                Addi(rd, rs1, imm) => {
-                    self.set_reg(rd, self.get_reg::<i32>(rs1) + imm)
-                }
-                Slli(rd, rs1, imm) => {
-                    self.set_reg(rd, self.get_reg::<i32>(rs1) << imm)
-                }
-                Slti(rd, rs1, imm) => self.set_reg(
-                    rd,
-                    to_1(self.get_reg::<i32>(rs1) < imm),
-                ),
-                Sltiu(rd, rs1, imm) => self.set_reg(
-                    rd,
-                    to_1(self.get_reg::<u32>(rs1) < imm),
-                ),
-                Xori(rd, rs1, imm) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) ^ imm)
-                }
-                Srli(rd, rs1, imm) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) >> imm)
-                }
-                Srai(rd, rs1, imm) => {
-                    self.set_reg(rd, self.get_reg::<i32>(rs1) >> imm)
-                }
-                Ori(rd, rs1, imm) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) | imm)
-                }
-                Andi(rd, rs1, imm) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) & imm)
-                }
+                Addi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) + imm),
+                Slli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) << imm),
+                Slti(rd, rs1, imm) => self.set_reg(rd, to_1(self.get_reg::<i32>(rs1) < imm)),
+                Sltiu(rd, rs1, imm) => self.set_reg(rd, to_1(self.get_reg::<u32>(rs1) < imm)),
+                Xori(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) ^ imm),
+                Srli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) >> imm),
+                Srai(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) >> imm),
+                Ori(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) | imm),
+                Andi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) & imm),
 
                 // Type S
                 Sb(rs2, imm, rs1) => self.memory.set_byte(
