@@ -2,7 +2,7 @@ use lazy_static::*;
 use radix_trie::Trie;
 
 lazy_static! {
-    pub static ref REG_TRIE: Trie<String, usize> = {
+    pub static ref REG_TRIE: Trie<String, u8> = {
         let mut trie = Trie::new();
 
         // Insert x-prefixed registers
@@ -17,7 +17,7 @@ lazy_static! {
             "t5", "t6",
         ];
         for (i, name) in names.into_iter().enumerate() {
-            trie.insert(name.to_string(), i);
+            trie.insert(name.to_string(), i as u8);
         }
 
         trie
@@ -25,7 +25,7 @@ lazy_static! {
 }
 
 lazy_static! {
-    pub static ref FLOAT_TRIE: Trie<String, usize> = {
+    pub static ref FLOAT_TRIE: Trie<String, u8> = {
         let mut trie = Trie::new();
 
         let names = vec![
@@ -34,7 +34,7 @@ lazy_static! {
             "fs8", "fs9", "fs10", "fs11", "ft9", "ft10", "ft11",
         ];
         for (i, name) in names.into_iter().enumerate() {
-            trie.insert(name.to_string(), i);
+            trie.insert(name.to_string(), i as u8);
         }
 
         trie

@@ -47,26 +47,25 @@ impl MyState {
     }
 }
 
+fn mmio_color_to_rgb(x: u8) -> Color {
+    let r = x & 0b111;
+    let g = (x>>3) & 0b111;
+    let b = x>>6;
+    Color {
+        r: r * 32,
+        g: g * 32,
+        b: b * 64,
+    }
+}
+
 pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
-    let canvas = Canvas::new(640, 480)
+    let canvas = Canvas::new(320, 240)
         .title("FPGRARS")
         .state(MyState::new())
         .input(MyState::handle_input);
 
     #[cfg(debug_assertions)]
     let canvas = canvas.show_ms(true);
-
-    use std::thread;
-    for delay in 1..=5 {
-        let mmio = mmio.clone();
-        thread::spawn(move || {
-            thread::sleep(std::time::Duration::from_secs(delay));
-            let mut mmio = mmio.lock().unwrap();
-            for pixel in mmio.iter_mut().take(640 * 480) {
-                *pixel = (delay * 255 / 5) as u8;
-            }
-        });
-    }
 
     // The canvas will render for you at up to 60fps.
     canvas.render(move |_state, image| {
@@ -76,7 +75,9 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
         for (i, pixel) in image.iter_mut().enumerate() {
             // let x = unsafe { *mmio.get_unchecked(i) };
             let x = mmio[i];
-            *pixel = Color { r: x, g: x, b: x }
+            if x != 0xC7 { // 0xC7 is "transparent"
+                *pixel = mmio_color_to_rgb(x);
+            }
         }
     });
 }
