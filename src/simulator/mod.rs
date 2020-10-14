@@ -4,7 +4,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 const DATA_SIZE: usize = 128;
-const MMIO_SIZE: usize = 2 * 320 * 2 * 240 * 2 + 4;
+const MMIO_SIZE: usize = 0x201000;
 const MMIO_START: usize = 0xff000000;
 
 pub mod parser;
@@ -78,11 +78,58 @@ impl Simulator {
 
     pub fn run(&mut self) {
         use parser::Instruction::*;
+
+        let to_1 = |b| if b { 1 } else { 0 };
+
         loop {
             match self.code[self.pc / 4] {
                 // Type R
                 Add(rd, rs1, rs2) => {
                     self.set_reg(rd, self.get_reg::<i32>(rs1) + self.get_reg::<i32>(rs2))
+                }
+                Sub(rd, rs1, rs2) => {
+                    self.set_reg(rd, self.get_reg::<i32>(rs1) - self.get_reg::<i32>(rs2))
+                }
+                Sll(rd, rs1, rs2) => {
+                    self.set_reg(rd, self.get_reg::<u32>(rs1) << self.get_reg::<i32>(rs2))
+                }
+                Stl(rd, rs1, rs2) => self.set_reg(
+                    rd,
+                    to_1(self.get_reg::<i32>(rs1) < self.get_reg::<i32>(rs2)),
+                ),
+                Sltu(rd, rs1, rs2) => self.set_reg(
+                    rd,
+                    to_1(self.get_reg::<u32>(rs1) < self.get_reg::<u32>(rs2)),
+                ),
+                Xor(rd, rs1, rs2) => {
+                    self.set_reg(rd, self.get_reg::<u32>(rs1) ^ self.get_reg::<u32>(rs2))
+                }
+                Srl(rd, rs1, rs2) => {
+                    self.set_reg(rd, self.get_reg::<u32>(rs1) >> self.get_reg::<i32>(rs2))
+                }
+                Sra(rd, rs1, rs2) => {
+                    self.set_reg(rd, self.get_reg::<i32>(rs1) >> self.get_reg::<i32>(rs2))
+                }
+                Or(rd, rs1, rs2) => {
+                    self.set_reg(rd, self.get_reg::<u32>(rs1) | self.get_reg::<u32>(rs2))
+                }
+                And(rd, rs1, rs2) => {
+                    self.set_reg(rd, self.get_reg::<u32>(rs1) & self.get_reg::<u32>(rs2))
+                }
+                Mul(rd, rs1, rs2) => {
+                    self.set_reg(rd, self.get_reg::<i32>(rs1) * self.get_reg::<i32>(rs2))
+                }
+                Div(rd, rs1, rs2) => {
+                    self.set_reg(rd, self.get_reg::<i32>(rs1) / self.get_reg::<i32>(rs2))
+                }
+                Divu(rd, rs1, rs2) => {
+                    self.set_reg(rd, self.get_reg::<u32>(rs1) / self.get_reg::<u32>(rs2))
+                }
+                Rem(rd, rs1, rs2) => {
+                    self.set_reg(rd, self.get_reg::<i32>(rs1) % self.get_reg::<i32>(rs2))
+                }
+                Remu(rd, rs1, rs2) => {
+                    self.set_reg(rd, self.get_reg::<u32>(rs1) % self.get_reg::<u32>(rs2))
                 }
 
                 // Type I
