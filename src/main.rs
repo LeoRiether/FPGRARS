@@ -23,15 +23,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sim = simulator::Simulator::new();
     let mmio = sim.memory.mmio.clone();
 
-    thread::spawn(move || {
-        let mut sim = sim.load_from_file("something.s".into()).unwrap();
+    thread::Builder::new()
+        .name("FPGRARS Simulator".into())
+        .spawn(move || {
+            let mut sim = sim.load_from_file("something.s".into()).unwrap();
 
-        for instruction in sim.code.iter() {
-            println!("{:?}", instruction);
-        }
+            for instruction in sim.code.iter() {
+                println!("{:?}", instruction);
+            }
 
-        sim.run();
-    });
+            sim.run();
+        })?;
 
     renderer::init(mmio);
 

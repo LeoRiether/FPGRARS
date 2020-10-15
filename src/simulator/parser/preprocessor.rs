@@ -1,4 +1,3 @@
-use nom::{character::complete::space0, sequence::preceded, AsBytes};
 use std::collections::VecDeque;
 
 use super::combinators::*;
@@ -32,9 +31,8 @@ impl<'a, I: Iterator<Item = String>> Iterator for Includer<'a, I> {
 
         let line = self.lines.next()?;
         if let Ok((_, file)) = include_directive(line.as_bytes()) {
-            let error = format!("Can't open file: {}", file);
-            self.inner =
-                Some(Box::new(file_lines(file).expect(&error)));
+            let error = format!("Can't open file: <{}>", file);
+            self.inner = Some(Box::new(file_lines(file).expect(&error)));
             Some(String::new())
         } else {
             Some(line)
@@ -78,15 +76,12 @@ impl<I: Iterator<Item = String>> Iterator for MacroParser<I> {
             return Some(line);
         }
 
-        let line = self.items.next()?;
-
-        Some(line.into())
+        self.items.next()
     }
 }
 
 pub trait MacroParseable<I: Iterator<Item = String>> {
-    /// Returns an iterator that defines macros when they're defined
-    /// and inlines them when they appear in the RISC-V code
+    /// Returns an iterator that inlines macros defined in the Strings
     fn parse_macros(self) -> MacroParser<I>;
 }
 

@@ -1,16 +1,12 @@
 use nom::{
     self,
     branch::alt,
-    bytes::complete::{escaped_transform, is_not, tag, take},
-    character::complete::{char as the_char, none_of, space0},
+    bytes::complete::{escaped_transform, is_not, tag},
+    character::complete::{char as the_char, space0},
     combinator::{map, value},
-    sequence::{delimited, preceded, tuple},
+    sequence::{delimited, tuple},
     IResult,
 };
-
-fn wtf(i: &[u8]) -> IResult<&[u8], &[u8]> {
-    Ok(("".as_bytes(), i))
-}
 
 fn transform_escaped_char(c: &[u8]) -> IResult<&[u8], &[u8]> {
     alt((
@@ -41,7 +37,10 @@ pub fn test_quoted_string() {
     );
     assert_eq!(
         quoted_string(r#""escape \"sequences\"\n parsed \t correctly""#.as_bytes()),
-        Ok(("".as_bytes(), "escape \"sequences\"\n parsed \t correctly".to_owned()))
+        Ok((
+            "".as_bytes(),
+            "escape \"sequences\"\n parsed \t correctly".to_owned()
+        ))
     );
 }
 

@@ -4,7 +4,6 @@
 //!
 
 use radix_trie::Trie;
-use std::fmt;
 
 mod register_names;
 use register_names as reg_names;
@@ -94,6 +93,7 @@ pub enum Instruction {
 /// consider a jump instruction that jumps to a label in the next line).
 ///
 /// We process the labels stored after the entire file has been parsed.
+#[allow(dead_code)]
 enum PreLabelInstruction {
     Beq(u8, u8, String),
     Bne(u8, u8, String),
@@ -122,19 +122,31 @@ enum Directive {
     Data,
 }
 
-pub trait LineParser {
+pub trait RISCVParser {
+    /// Parses an iterator of preprocessed lines and returns the instructions and
+    /// the data it parsed. Remember to preprocess the iterator before calling this,
+    /// as `parse_riscv` does not understand macros and includes.
+    /// ```
+    /// parse::file_lines("riscv.s".to_owned())?
+    ///     .parse_includes()
+    ///     .parse_macros()
+    ///     .parse_riscv(DATA_SIZE)?;
+    /// ```
+    ///
+    /// The `data_segment_size` parameter is the final size of the data segment, in bytes
     fn parse_riscv(self, data_segment_size: usize) -> ParseResult;
 }
 
-impl<I: Iterator<Item = String>> LineParser for I
+impl<I: Iterator<Item = String>> RISCVParser for I
 {
     fn parse_riscv(self, data_segment_size: usize) -> ParseResult {
-        let regmap = reg_names::regs();
-        let floatmap = reg_names::floats();
-        let statusmap = reg_names::status();
+        let _regmap = reg_names::regs();
+        let _floatmap = reg_names::floats();
+        let _statusmap = reg_names::status();
         let labels = Trie::<String, usize>::new();
 
-        let mut code = Vec::new();
+        let _directive = Directive::Text;
+        let code = Vec::new();
         let mut data = Vec::with_capacity(data_segment_size);
 
         for line in self {
@@ -147,6 +159,9 @@ impl<I: Iterator<Item = String>> LineParser for I
             .collect();
         let mut code = code?;
 
+        code.push(Instruction::Jal(0, code.len() * 4));
+
+        // If the program ever drops off bottom, we make an "exit" ecall and terminate execution
         code.extend(vec![
             Instruction::Li(17, 10), // li a7 10
             Instruction::Ecall,

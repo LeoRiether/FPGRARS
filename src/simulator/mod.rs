@@ -5,7 +5,6 @@
 //! and you can find how they're simulated at [Simulator::run](struct.Simulator.html#method.run)
 //!
 
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 const DATA_SIZE: usize = 2048; // TODO: this
@@ -13,7 +12,7 @@ const MMIO_SIZE: usize = 0x201000;
 const MMIO_START: usize = 0xff000000;
 
 pub mod parser;
-use parser::{LineParser, MacroParseable, Includable};
+use parser::{RISCVParser, MacroParseable, Includable};
 
 mod into_register;
 use into_register::*;
@@ -43,8 +42,8 @@ impl Memory {
 
 pub struct Simulator {
     registers: [u32; 32],
-    floats: [f32; 32],
-    status: Vec<u32>, // I'm not sure myself how many status register I'll use
+    _floats: [f32; 32],
+    _status: Vec<u32>, // I'm not sure myself how many status register I'll use
     pc: usize,
 
     pub memory: Memory,
@@ -55,8 +54,8 @@ impl Simulator {
     pub fn new() -> Self {
         Self {
             registers: [0; 32],
-            floats: [0.0; 32],
-            status: Vec::new(),
+            _floats: [0.0; 32],
+            _status: Vec::new(),
             pc: 0,
             memory: Memory::new(),
             code: Vec::new(),
