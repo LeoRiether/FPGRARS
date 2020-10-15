@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mmio = sim.memory.mmio.clone();
 
     thread::spawn(move || {
-        let mut sim = sim.load_from_file("something.s").unwrap();
+        let mut sim = sim.load_from_file("something.s".into()).unwrap();
 
         for instruction in sim.code.iter() {
             println!("{:?}", instruction);

@@ -1,20 +1,12 @@
+use nom::{character::complete::space0, sequence::preceded, AsBytes};
 use std::collections::VecDeque;
 
 use super::combinators::*;
 use super::util::*;
-use combine::{
-    self,
-    parser::{
-        char::{spaces, string},
-        sequence::between,
-        token,
-    },
-    Parser,
-};
 
 /// Generally created by calling [parse_includes](trait.Includable.html#method.parse_includes)
 /// on an iterator of Strings
-struct Includer<I>
+pub struct Includer<'a, I>
 where
     I: Iterator<Item = String>,
 {
@@ -22,10 +14,10 @@ where
 
     /// If we encounter an `.include "file"` in a line, we will create a includer
     /// for the file and consume it lazily. This includerwill be stored in `inner`
-    inner: Option<Box<dyn Iterator<Item = String>>>,
+    inner: Option<Box<dyn Iterator<Item = String> + 'a>>,
 }
 
-impl<I: Iterator<Item = String>> Iterator for Includer<I> {
+impl<'a, I: Iterator<Item = String>> Iterator for Includer<'a, I> {
     type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -38,39 +30,28 @@ impl<I: Iterator<Item = String>> Iterator for Includer<I> {
             }
         }
 
-        // Parse an `.include`
         let line = self.lines.next()?;
-        let line = line.as_str();
-        let line = spaces()
-            .with(remove_comment())
-            .parse(line)
-            .map(|(x, _): (String, _)| x).unwrap();
-
-        let mut include_parser = spaces()
-            .with(string(".include"))
-            .with(spaces())
-            .with(quoted_string());
-
-        let line = line.as_str();
-        if let Ok((file, _)) = include_parser.parse(line) {
-            self.inner = Some(Box::new(file_lines(file.as_ref()).unwrap()));
-            Some("".to_string()) // not sure this is ideal
+        if let Ok((_, file)) = include_directive(line.as_bytes()) {
+            let error = format!("Can't open file: {}", file);
+            self.inner =
+                Some(Box::new(file_lines(file).expect(&error)));
+            Some(String::new())
         } else {
-            Some(line.into())
+            Some(line)
         }
     }
 }
 
-pub trait Includable<I: Iterator<Item = String>> {
+pub trait Includable<'a, I: Iterator<Item = String>> {
     /// Returns an iterator over RISC-V lines that can process `.include "file"` directives
     /// and flatten all of the files into one stream.
     ///
     /// Also removes comments for some reason.
-    fn parse_includes(self) -> Includer<I>;
+    fn parse_includes(self) -> Includer<'a, I>;
 }
 
-impl<I: Iterator<Item = String>> Includable<I> for I {
-    fn parse_includes(self) -> Includer<I> {
+impl<'a, I: Iterator<Item = String>> Includable<'a, I> for I {
+    fn parse_includes(self) -> Includer<'a, I> {
         Includer {
             lines: self,
             inner: None,
@@ -80,7 +61,7 @@ impl<I: Iterator<Item = String>> Includable<I> for I {
 
 /// Generally created calling [parse_macros](trait.MacroParseable.html#method.parse_macros)
 /// on an iterator of Strings
-struct MacroParser<I>
+pub struct MacroParser<I>
 where
     I: Iterator<Item = String>,
 {

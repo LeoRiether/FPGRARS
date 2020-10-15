@@ -3,7 +3,6 @@
 //! We use a lot of mnemonics here, I'll try to link to a cheatsheet here later.
 //!
 
-use combine::*;
 use radix_trie::Trie;
 use std::fmt;
 

@@ -74,7 +74,7 @@ impl Simulator {
         }
     }
 
-    pub fn load_from_file<P: AsRef<Path>>(mut self, path: P) -> Result<Self, parser::Error> {
+    pub fn load_from_file(mut self, path: String) -> Result<Self, parser::Error> {
         let parser::Parsed { code, data } = parser::file_lines(path)?
             .parse_includes()
             .parse_macros()
