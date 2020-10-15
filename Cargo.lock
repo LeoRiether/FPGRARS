@@ -342,6 +342,7 @@ name = "fpgrars"
 version = "0.1.0"
 dependencies = [
  "combine",
+ "fnv",
  "glium",
  "lazy_static",
  "pixel-canvas",

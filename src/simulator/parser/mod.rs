@@ -11,7 +11,7 @@ use std::io::{self, BufRead, BufReader};
 use std::path::Path;
 
 mod register_names;
-use register_names::*;
+use register_names as reg_names;
 
 /// Giant enum that represents a single RISC-V instruction and its arguments
 #[allow(dead_code)] // please, cargo, no more warnings
@@ -135,6 +135,10 @@ enum Directive {
 
 /// The "current" state of the parser
 struct Context {
+    regmap: reg_names::RegMap,
+    floatmap: reg_names::RegMap,
+    statusmap: reg_names::RegMap,
+
     directive: Directive,
     code: Vec<PreLabelInstruction>,
     data: Vec<u8>,
@@ -144,6 +148,10 @@ struct Context {
 impl Context {
     fn new() -> Self {
         Self {
+            regmap: reg_names::regs(),
+            floatmap: reg_names::floats(),
+            statusmap: reg_names::status(),
+
             directive: Directive::Text,
             code: Vec::new(),
             data: Vec::new(), // TODO: Vec::with_capacity(final data size)
