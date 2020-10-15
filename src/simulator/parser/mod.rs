@@ -6,12 +6,16 @@
 use combine::*;
 use radix_trie::Trie;
 use std::fmt;
-use std::fs::File;
-use std::io::{self, BufRead, BufReader};
-use std::path::Path;
 
 mod register_names;
 use register_names as reg_names;
+
+mod preprocessor;
+pub use preprocessor::*;
+
+mod util;
+pub use util::*;
+
 
 /// Giant enum that represents a single RISC-V instruction and its arguments
 #[allow(dead_code)] // please, cargo, no more warnings
@@ -43,7 +47,8 @@ pub enum Instruction {
     Lw(u8, i32, u8),
     Lbu(u8, i32, u8),
     Lhu(u8, i32, u8),
-    Addi(u8, u8, i32), /// rd, rs1, imm
+    Addi(u8, u8, i32),
+    /// rd, rs1, imm
     Slti(u8, u8, i32),
     Sltiu(u8, u8, u32),
     Slli(u8, u8, i32),
@@ -107,27 +112,6 @@ pub struct Parsed {
     pub data: Vec<u8>,
 }
 
-/// Represents any kind of error the parser may find
-#[derive(Debug)]
-pub enum Error {
-    /// Not the parser's fault, some std::io went wrong
-    IO(io::Error),
-    LabelNotFound(String),
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Self {
-        Error::IO(e)
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self) // muahahahaha
-    }
-}
-
-impl std::error::Error for Error {}
 
 pub type ParseResult = Result<Parsed, Error>;
 
@@ -137,101 +121,39 @@ enum Directive {
     Data,
 }
 
-/// The "current" state of the parser
-struct Context {
-    regmap: reg_names::RegMap,
-    floatmap: reg_names::RegMap,
-    statusmap: reg_names::RegMap,
-
-    directive: Directive,
-    code: Vec<PreLabelInstruction>,
-    data: Vec<u8>,
-    labels: Trie<String, usize>,
+pub trait LineParser {
+    fn parse_riscv(self, data_segment_size: usize) -> ParseResult;
 }
 
-impl Context {
-    fn new() -> Self {
-        Self {
-            regmap: reg_names::regs(),
-            floatmap: reg_names::floats(),
-            statusmap: reg_names::status(),
-
-            directive: Directive::Text,
-            code: Vec::new(),
-            data: Vec::new(), // TODO: Vec::with_capacity(final data size)
-            labels: Trie::new(),
-        }
-    }
-}
-
-fn parse_file_with_context(path: impl AsRef<Path>, ctx: &mut Context) -> Result<(), Error> {
-    let reader = File::open(path).map(BufReader::new)?;
-    let lines = reader.lines().map(|x| x.unwrap());
-    parse_with_context(lines, ctx)
-}
-
-/// Parses some lines with a given mutable context, instead of returning a context.
-/// This is done to make the .include "file" directive easier to implement, as we can have
-/// just one context shared among recursive parse calls
-fn parse_with_context<S, T>(lines: T, ctx: &mut Context) -> Result<(), Error>
-where
-    S: AsRef<str>,
-    T: Iterator<Item = S>,
+impl<I: Iterator<Item = String>> LineParser for I
 {
-    for (line_number, line) in lines.enumerate() {
-        if line.as_ref().starts_with(".include") {
-            // parse_file_with_context(path, ctx)?;
+    fn parse_riscv(self, data_segment_size: usize) -> ParseResult {
+        let regmap = reg_names::regs();
+        let floatmap = reg_names::floats();
+        let statusmap = reg_names::status();
+        let labels = Trie::<String, usize>::new();
+
+        let mut code = Vec::new();
+        let mut data = Vec::with_capacity(data_segment_size);
+
+        for line in self {
+            println!("> {}", line);
         }
+
+        let code: Result<Vec<Instruction>, Error> = code
+            .into_iter()
+            .map(|i| unlabel_instruction(i, &labels))
+            .collect();
+        let mut code = code?;
+
+        code.extend(vec![
+            Instruction::Li(17, 10), // li a7 10
+            Instruction::Ecall,
+        ]);
+
+        data.resize(data_segment_size, 0);
+        Ok(Parsed { code, data })
     }
-    Ok(())
-}
-
-/// Parses an iterator of lines. Generally only called by [parse_file](fn.parse_file)
-pub fn parse_lines<S, T>(lines: T) -> ParseResult
-where
-    S: AsRef<str>,
-    T: Iterator<Item = S>,
-{
-    let mut ctx = Context::new();
-    parse_with_context(lines, &mut ctx)?;
-
-    let labels = &ctx.labels;
-    let code: Result<Vec<Instruction>, Error> = ctx
-        .code
-        .into_iter()
-        .map(|i| unlabel_instruction(i, labels))
-        .collect();
-    let mut code = code?;
-
-    //* Sample code, just to test things out
-    use Instruction::*;
-    code.extend(vec![
-        Li(8, 0xff000000u32 as i32),
-        Li(9, 76800),
-        Add(9, 9, 8),
-        Bge(8, 9, 8 * 4),
-        Li(5, 0xf3),
-        Sb(5, 0, 8),
-        Addi(8, 8, 1),
-        Jal(0, 3 * 4),
-        Jal(0, 8 * 4), // main.stall
-    ]);
-
-    code.extend(vec![
-        Instruction::Li(17, 10), // li a7 10
-        Instruction::Ecall,
-    ]);
-
-    let data = ctx.data;
-    Ok(Parsed { code, data })
-}
-
-pub fn parse_file(path: impl AsRef<Path>) -> ParseResult {
-    let reader = File::open(path).map(BufReader::new)?;
-
-    // I feel a bit bad about this unwrap, but, like, really? it's going to fail now?
-    let parsed = parse_lines(reader.lines().map(|x| x.unwrap()))?;
-    Ok(parsed)
 }
 
 /// Transforms a PreLabelInstruction into a normal Instruction by "commiting" the labels

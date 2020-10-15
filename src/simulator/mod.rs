@@ -8,11 +8,12 @@
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-const DATA_SIZE: usize = 128;
+const DATA_SIZE: usize = 2048; // TODO: this
 const MMIO_SIZE: usize = 0x201000;
 const MMIO_START: usize = 0xff000000;
 
 pub mod parser;
+use parser::{LineParser, Preprocess, Preprocessor};
 
 mod into_register;
 use into_register::*;
@@ -74,10 +75,12 @@ impl Simulator {
     }
 
     pub fn load_from_file<P: AsRef<Path>>(mut self, path: P) -> Result<Self, parser::Error> {
-        let parser::Parsed { code, data } = parser::parse_file(path)?;
+        let parser::Parsed { code, data } = parser::file_lines(path)?
+            .preprocess()
+            .parse_riscv(DATA_SIZE)?;
+
         self.code = code;
         self.memory.data = data;
-        self.memory.data.resize(DATA_SIZE, 0);
         Ok(self)
     }
 
