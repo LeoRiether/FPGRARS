@@ -10,6 +10,8 @@ use std::fmt;
 mod register_names;
 use register_names as reg_names;
 
+mod combinators;
+
 mod preprocessor;
 pub use preprocessor::*;
 

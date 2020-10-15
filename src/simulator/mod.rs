@@ -13,7 +13,7 @@ const MMIO_SIZE: usize = 0x201000;
 const MMIO_START: usize = 0xff000000;
 
 pub mod parser;
-use parser::{LineParser, Preprocess, Preprocessor};
+use parser::{LineParser, MacroParseable, Includable};
 
 mod into_register;
 use into_register::*;
@@ -76,7 +76,8 @@ impl Simulator {
 
     pub fn load_from_file<P: AsRef<Path>>(mut self, path: P) -> Result<Self, parser::Error> {
         let parser::Parsed { code, data } = parser::file_lines(path)?
-            .preprocess()
+            .parse_includes()
+            .parse_macros()
             .parse_riscv(DATA_SIZE)?;
 
         self.code = code;
