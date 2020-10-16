@@ -12,7 +12,7 @@ where
     lines: I,
 
     /// If we encounter an `.include "file"` in a line, we will create a includer
-    /// for the file and consume it lazily. This includerwill be stored in `inner`
+    /// for the file and consume it lazily. This includer will be stored in `inner`
     inner: Option<Box<dyn Iterator<Item = String> + 'a>>,
 }
 
@@ -44,7 +44,8 @@ impl<'a, I: Iterator<Item = String>> Iterator for Includer<'a, I> {
 
 pub trait Includable<'a, I: Iterator<Item = String>> {
     /// Returns an iterator over RISC-V lines that can process `.include "file"` directives
-    /// and flatten all of the files into one stream.
+    /// and flatten all of the files into one stream. Refer to
+    /// [RISCVParser](../trait.RISCVParser.html#fn.parse_riscv) for example usage.
     ///
     /// Also removes comments for some reason.
     fn parse_includes(self) -> Includer<'a, I>;
@@ -83,7 +84,9 @@ impl<I: Iterator<Item = String>> Iterator for MacroParser<I> {
 }
 
 pub trait MacroParseable<I: Iterator<Item = String>> {
-    /// Returns an iterator that inlines macros defined in the strings
+    /// Returns an iterator that inlines macros defined in the strings.
+    /// Refer to [RISCVParser](../trait.RISCVParser.html#fn.parse_riscv)
+    /// for example usage.
     fn parse_macros(self) -> MacroParser<I>;
 }
 

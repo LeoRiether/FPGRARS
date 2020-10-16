@@ -132,7 +132,7 @@ pub trait RISCVParser {
     ///     .parse_riscv(DATA_SIZE)?;
     /// ```
     ///
-    /// The `data_segment_size` parameter is the final size of the data segment, in bytes
+    /// The `data_segment_size` parameter is the final size of the data segment, in bytes.
     fn parse_riscv(self, data_segment_size: usize) -> ParseResult;
 }
 

@@ -25,29 +25,9 @@ pub fn quoted_string(s: &str) -> IResult<&str, String> {
     )(s)
 }
 
-#[test]
-pub fn test_quoted_string() {
-    assert_eq!(
-        quoted_string("\"some quoted string\""),
-        Ok(("", "some quoted string".to_owned()))
-    );
-    assert_eq!(
-        quoted_string(r#""escape \"sequences\"\n parsed \t correctly""#),
-        Ok(("", "escape \"sequences\"\n parsed \t correctly".to_owned()))
-    );
-}
-
 pub fn include_directive(s: &str) -> IResult<&str, String> {
     let parser = tuple((space0, tag(".include"), space0, quoted_string));
     map(parser, |(_, _, _, file)| file)(s)
-}
-
-#[test]
-pub fn test_include_directive() {
-    assert_eq!(
-        include_directive(".include \"some file.s\""),
-        Ok(("", "some file.s".to_owned()))
-    );
 }
 
 /// Strips indentation and removes comments
@@ -55,15 +35,6 @@ pub fn strip_unneeded(s: &str) -> Result<&str, nom::Err<(&str, nom::error::Error
     preceded(space0, take_till(|c| c == '#'))(s)
         .map(|(_i, o)| o)
         .map(|s| s.trim_end())
-}
-
-#[test]
-pub fn test_strip_unneeded() {
-    assert_eq!(
-        strip_unneeded("     mv x0 x0 # does nothing"),
-        Ok("mv x0 x0"),
-    );
-    assert_eq!(strip_unneeded("j main # Does nothing"), Ok("j main"),)
 }
 
 /// Parses a line that *begins* with a label
@@ -74,9 +45,44 @@ pub fn parse_label(s: &str) -> IResult<&str, &str> {
     )(s)
 }
 
-#[test]
-pub fn test_parse_label() {
-    assert_eq!(parse_label("label: mv x0 x0"), Ok((" mv x0 x0", "label")),);
-    assert_eq!(parse_label(".L0 : mv x0 x0"), Ok((" mv x0 x0", ".L0")),);
-    assert_eq!(parse_label(": mv x0 x0").map_err(|_| ()), Err(()));
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_label() {
+        assert_eq!(parse_label("label: mv x0 x0"), Ok((" mv x0 x0", "label")),);
+        assert_eq!(parse_label(".L0 : mv x0 x0"), Ok((" mv x0 x0", ".L0")),);
+        assert_eq!(parse_label(": mv x0 x0").map_err(|_| ()), Err(()));
+    }
+
+    #[test]
+    fn test_strip_unneeded() {
+        assert_eq!(
+            strip_unneeded("     mv x0 x0 # does nothing"),
+            Ok("mv x0 x0"),
+        );
+        assert_eq!(strip_unneeded("j main # Does nothing"), Ok("j main"),)
+    }
+
+    #[test]
+    fn test_include_directive() {
+        assert_eq!(
+            include_directive(".include \"some file.s\""),
+            Ok(("", "some file.s".to_owned()))
+        );
+    }
+
+    #[test]
+    fn test_quoted_string() {
+        assert_eq!(
+            quoted_string("\"some quoted string\""),
+            Ok(("", "some quoted string".to_owned()))
+        );
+        assert_eq!(
+            quoted_string(r#""escape \"sequences\"\n parsed \t correctly""#),
+            Ok(("", "escape \"sequences\"\n parsed \t correctly".to_owned()))
+        );
+    }
 }
