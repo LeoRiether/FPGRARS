@@ -59,15 +59,18 @@ pub fn test_include_directive() {
 
 /// Strips indentation and removes comments
 pub fn strip_unneeded(s: &str) -> Result<&str, nom::Err<(&str, nom::error::ErrorKind)>> {
-    preceded(space0, take_till(|c| c == '#'))(s).map(|(_i, o)| o)
+    preceded(space0, take_till(|c| c == '#'))(s)
+        .map(|(_i, o)| o)
+        .map(|s| s.trim_end())
 }
 
 #[test]
 pub fn test_strip_unneeded() {
     assert_eq!(
         strip_unneeded("     mv x0 x0 # does nothing"),
-        Ok("mv x0 x0 "),
+        Ok("mv x0 x0"),
     );
+    assert_eq!(strip_unneeded("j main # Does nothing"), Ok("j main"),)
 }
 
 /// Parses a line that *begins* with a label

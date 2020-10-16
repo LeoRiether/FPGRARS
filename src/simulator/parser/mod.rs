@@ -151,9 +151,8 @@ impl<I: Iterator<Item = String>> RISCVParser for I
         let mut data = Vec::with_capacity(data_segment_size);
 
         for line in self {
-            let line = strip_unneeded(&line)?;
-
-            let line = match parse_label(line) {
+            // TODO: extract this into a function
+            let line = match parse_label(&line) {
                 Ok((rest, label)) => {
                     let label_pos = match directive {
                         Directive::Text => code.len() * 4,
@@ -162,10 +161,12 @@ impl<I: Iterator<Item = String>> RISCVParser for I
                     labels.insert(label.to_owned(), label_pos);
                     rest
                 },
-                Err(_) => line,
+                Err(_) => &line,
             };
 
             // Identify directives
+            // This accepts stuff like ".textSOMETHING" or ".database", but RARS accepts it too
+            // Gotta be consistent! ¯\_(ツ)_/¯
             if line.starts_with(".data") {
                 directive = Directive::Data;
                 continue;

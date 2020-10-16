@@ -30,12 +30,14 @@ impl<'a, I: Iterator<Item = String>> Iterator for Includer<'a, I> {
         }
 
         let line = self.lines.next()?;
+        let line = strip_unneeded(&line).unwrap();
+
         if let Ok((_, file)) = include_directive(line.as_bytes()) {
             let error = format!("Can't open file: <{}>", file);
-            self.inner = Some(Box::new(file_lines(file).expect(&error)));
+            self.inner = Some(Box::new(file_lines(file).expect(&error).parse_includes()));
             Some(String::new())
         } else {
-            Some(line)
+            Some(line.into())
         }
     }
 }
@@ -81,7 +83,7 @@ impl<I: Iterator<Item = String>> Iterator for MacroParser<I> {
 }
 
 pub trait MacroParseable<I: Iterator<Item = String>> {
-    /// Returns an iterator that inlines macros defined in the Strings
+    /// Returns an iterator that inlines macros defined in the strings
     fn parse_macros(self) -> MacroParser<I>;
 }
 
