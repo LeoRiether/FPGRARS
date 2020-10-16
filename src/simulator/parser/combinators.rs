@@ -8,43 +8,36 @@ use nom::{
     IResult,
 };
 
-fn transform_escaped_char(c: &[u8]) -> IResult<&[u8], &[u8]> {
+fn transform_escaped_char(c: &str) -> IResult<&str, &str> {
     alt((
-        value("\\".as_bytes(), the_char('\\')),
-        value("\"".as_bytes(), the_char('"')),
-        value("\n".as_bytes(), the_char('n')),
-        value("\t".as_bytes(), the_char('t')),
+        value("\\", the_char('\\')),
+        value("\"", the_char('"')),
+        value("\n", the_char('n')),
+        value("\t", the_char('t')),
     ))(c)
 }
 
-pub fn quoted_string(s: &[u8]) -> IResult<&[u8], String> {
-    let parser = delimited(
+pub fn quoted_string(s: &str) -> IResult<&str, String> {
+    delimited(
         the_char('"'),
         escaped_transform(is_not("\"\\"), '\\', transform_escaped_char),
         the_char('"'),
-    );
-
-    map(parser, |s: Vec<u8>| {
-        std::str::from_utf8(&s).unwrap().to_owned()
-    })(s)
+    )(s)
 }
 
 #[test]
 pub fn test_quoted_string() {
     assert_eq!(
-        quoted_string("\"some quoted string\"".as_bytes()),
-        Ok(("".as_bytes(), "some quoted string".to_owned()))
+        quoted_string("\"some quoted string\""),
+        Ok(("", "some quoted string".to_owned()))
     );
     assert_eq!(
-        quoted_string(r#""escape \"sequences\"\n parsed \t correctly""#.as_bytes()),
-        Ok((
-            "".as_bytes(),
-            "escape \"sequences\"\n parsed \t correctly".to_owned()
-        ))
+        quoted_string(r#""escape \"sequences\"\n parsed \t correctly""#),
+        Ok(("", "escape \"sequences\"\n parsed \t correctly".to_owned()))
     );
 }
 
-pub fn include_directive(s: &[u8]) -> IResult<&[u8], String> {
+pub fn include_directive(s: &str) -> IResult<&str, String> {
     let parser = tuple((space0, tag(".include"), space0, quoted_string));
     map(parser, |(_, _, _, file)| file)(s)
 }
@@ -52,8 +45,8 @@ pub fn include_directive(s: &[u8]) -> IResult<&[u8], String> {
 #[test]
 pub fn test_include_directive() {
     assert_eq!(
-        include_directive(".include \"some file.s\"".as_bytes()),
-        Ok(("".as_bytes(), "some file.s".to_owned()))
+        include_directive(".include \"some file.s\""),
+        Ok(("", "some file.s".to_owned()))
     );
 }
 

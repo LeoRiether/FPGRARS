@@ -32,7 +32,7 @@ impl<'a, I: Iterator<Item = String>> Iterator for Includer<'a, I> {
         let line = self.lines.next()?;
         let line = strip_unneeded(&line).unwrap();
 
-        if let Ok((_, file)) = include_directive(line.as_bytes()) {
+        if let Ok((_, file)) = include_directive(&line) {
             let error = format!("Can't open file: <{}>", file);
             self.inner = Some(Box::new(file_lines(file).expect(&error).parse_includes()));
             Some(String::new())
