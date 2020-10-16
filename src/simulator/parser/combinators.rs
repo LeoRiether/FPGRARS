@@ -1,7 +1,7 @@
 use nom::{
     self,
     branch::alt,
-    bytes::complete::{escaped_transform, is_not, tag, take_till},
+    bytes::complete::{escaped_transform, is_not, tag, take_till, take_till1},
     character::complete::{char as the_char, space0},
     combinator::{map, value},
     sequence::{delimited, preceded, terminated, tuple},
@@ -73,7 +73,14 @@ pub fn test_strip_unneeded() {
 /// Parses a line that *begins* with a label
 pub fn parse_label(s: &str) -> IResult<&str, &str> {
     terminated(
-        take_till(|c| c == ':' || c == ' '),
+        take_till1(|c| c == ':' || c == ' '),
         tuple((space0, tag(":"))),
     )(s)
+}
+
+#[test]
+pub fn test_parse_label() {
+    assert_eq!(parse_label("label: mv x0 x0"), Ok((" mv x0 x0", "label")),);
+    assert_eq!(parse_label(".L0 : mv x0 x0"), Ok((" mv x0 x0", ".L0")),);
+    assert_eq!(parse_label(": mv x0 x0").map_err(|_| ()), Err(()));
 }
