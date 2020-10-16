@@ -1,5 +1,7 @@
 use fnv::FnvHashMap;
 
+use super::util::Error;
+
 pub type RegMap = FnvHashMap<String, u8>;
 
 fn insert_names(map: &mut RegMap, names: &[&'static str]) {
@@ -53,4 +55,16 @@ pub fn status() -> RegMap {
     insert_names(&mut map, &names);
 
     map
+}
+
+pub trait TryGetRegister {
+    fn try_get(&self, name: &str) -> Result<u8, Error>;
+}
+
+impl TryGetRegister for RegMap {
+    fn try_get(&self, name: &str) -> Result<u8, Error> {
+        self.get(name)
+            .copied()
+            .ok_or_else(|| Error::RegisterNotFound(name.to_owned()))
+    }
 }

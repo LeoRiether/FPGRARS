@@ -10,6 +10,7 @@ pub enum Error {
     IO(io::Error),
     LabelNotFound(String),
     Nom(String, nom::error::ErrorKind), // I'm feeling lazy
+    RegisterNotFound(String),
 }
 
 impl From<io::Error> for Error {

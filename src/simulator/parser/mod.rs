@@ -6,16 +6,16 @@
 use radix_trie::Trie;
 
 mod register_names;
-use register_names as reg_names;
+use register_names::{self as reg_names, RegMap};
 
 mod combinators;
+use combinators::*;
 
 mod preprocessor;
 pub use preprocessor::*;
 
 mod util;
 pub use util::*;
-
 
 /// Giant enum that represents a single RISC-V instruction and its arguments
 #[allow(dead_code)] // please, cargo, no more warnings
@@ -93,7 +93,6 @@ pub enum Instruction {
 /// consider a jump instruction that jumps to a label in the next line).
 ///
 /// We process the labels stored after the entire file has been parsed.
-#[allow(dead_code)]
 enum PreLabelInstruction {
     Beq(u8, u8, String),
     Bne(u8, u8, String),
@@ -104,6 +103,12 @@ enum PreLabelInstruction {
     Jal(u8, String),
     La(u8, String),
     Other(Instruction),
+}
+
+impl From<Instruction> for PreLabelInstruction {
+    fn from(i: Instruction) -> PreLabelInstruction {
+        PreLabelInstruction::Other(i)
+    }
 }
 
 /// Represents a successful parser result. This is the same format the simulator
@@ -136,18 +141,17 @@ pub trait RISCVParser {
     fn parse_riscv(self, data_segment_size: usize) -> ParseResult;
 }
 
-impl<I: Iterator<Item = String>> RISCVParser for I
-{
+type FullRegMap = (RegMap, RegMap, RegMap);
+
+impl<I: Iterator<Item = String>> RISCVParser for I {
     fn parse_riscv(self, data_segment_size: usize) -> ParseResult {
         use combinators::*;
 
-        let _regmap = reg_names::regs();
-        let _floatmap = reg_names::floats();
-        let _statusmap = reg_names::status();
+        let regmaps = (reg_names::regs(), reg_names::floats(), reg_names::status());
         let mut labels = Trie::<String, usize>::new();
 
         let mut directive = Directive::Text;
-        let code = Vec::new();
+        let mut code = Vec::new();
         let mut data = Vec::with_capacity(data_segment_size);
 
         for line in self {
@@ -160,9 +164,13 @@ impl<I: Iterator<Item = String>> RISCVParser for I
                     };
                     labels.insert(label.to_owned(), label_pos);
                     rest
-                },
+                }
                 Err(_) => &line,
             };
+
+            if line.is_empty() {
+                continue;
+            }
 
             // Identify directives
             // This accepts stuff like ".textSOMETHING" or ".database", but RARS accepts it too
@@ -175,10 +183,10 @@ impl<I: Iterator<Item = String>> RISCVParser for I
                 continue;
             }
 
-            // match directive {
-            //     Directive::Text => unimplemented!("Haven't implemented .text yet"),
-            //     Directive::Data => unimplemented!("Haven't implemented .data either!"),
-            // }
+            match directive {
+                Directive::Text => code.push(parse_text(line, &regmaps)?),
+                Directive::Data => unimplemented!("No .data implementation yet"),
+            }
 
             println!("> {}", line);
         }
@@ -200,6 +208,67 @@ impl<I: Iterator<Item = String>> RISCVParser for I
         data.resize(data_segment_size, 0);
         Ok(Parsed { code, data })
     }
+}
+
+fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Error> {
+    let (regs, floats, status) = regmaps;
+    use Instruction::*;
+    use PreLabelInstruction as pre;
+
+    macro_rules! type_r {
+        ($inst:expr) => {
+            args_type_r(s, &regs).map(|(rd, rs1, rs2)| $inst(rd, rs1, rs2).into())?
+        };
+    }
+
+    macro_rules! type_sb {
+        ($inst:expr) => {
+            args_type_sb(s, &regs).map(|(rs1, rs2, label)| $inst(rs1, rs2, label))?
+        };
+    }
+
+    // Reverses the order of rs1 and rs2 to convert, for example,
+    // `ble t0 t1 label` into `bge t1 t0 label`
+    macro_rules! type_sb_reversed {
+        ($inst:expr) => {
+            args_type_sb(s, &regs).map(|(rs1, rs2, label)| $inst(rs2, rs1, label))?
+        };
+    }
+
+    let (s, instruction) = one_arg(s)?;
+
+    let parsed = match instruction.to_lowercase().as_str() {
+        "add" => type_r!(Add),
+        "sub" => type_r!(Sub),
+        "sll" => type_r!(Sll),
+        "slt" => type_r!(Slt),
+        "sltu" => type_r!(Sltu),
+        "xor" => type_r!(Xor),
+        "srl" => type_r!(Srl),
+        "sra" => type_r!(Sra),
+        "or" => type_r!(Or),
+        "and" => type_r!(And),
+
+        "beq" => type_sb!(pre::Beq),
+        "bne" => type_sb!(pre::Bne),
+        "blt" => type_sb!(pre::Blt),
+        "bge" => type_sb!(pre::Bge),
+        "bltu" => type_sb!(pre::Bltu),
+        "bgeu" => type_sb!(pre::Bgeu),
+        "bgt" => type_sb_reversed!(pre::Blt),
+        "ble" => type_sb_reversed!(pre::Bge),
+        "bgtu" => type_sb_reversed!(pre::Bltu),
+        "bleu" => type_sb_reversed!(pre::Bgeu),
+
+        "jal" => args_jal(s, &regs).map(|(rd, label)| pre::Jal(rd, label))?,
+        "j" => one_arg(s).map(|(_i, label)| pre::Jal(0, label.to_owned()))?,
+
+        "ecall" => Ecall.into(),
+
+        idk => unimplemented!("Instruction <{}> hasn't been implemented", idk),
+    };
+
+    Ok(parsed)
 }
 
 /// Transforms a PreLabelInstruction into a normal Instruction by "commiting" the labels
