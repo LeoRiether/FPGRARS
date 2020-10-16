@@ -113,7 +113,6 @@ pub struct Parsed {
     pub data: Vec<u8>,
 }
 
-
 pub type ParseResult = Result<Parsed, Error>;
 
 /// The "current" parser directive
@@ -140,16 +139,46 @@ pub trait RISCVParser {
 impl<I: Iterator<Item = String>> RISCVParser for I
 {
     fn parse_riscv(self, data_segment_size: usize) -> ParseResult {
+        use combinators::*;
+
         let _regmap = reg_names::regs();
         let _floatmap = reg_names::floats();
         let _statusmap = reg_names::status();
-        let labels = Trie::<String, usize>::new();
+        let mut labels = Trie::<String, usize>::new();
 
-        let _directive = Directive::Text;
+        let mut directive = Directive::Text;
         let code = Vec::new();
         let mut data = Vec::with_capacity(data_segment_size);
 
         for line in self {
+            let line = strip_unneeded(&line)?;
+
+            let line = match parse_label(line) {
+                Ok((rest, label)) => {
+                    let label_pos = match directive {
+                        Directive::Text => code.len() * 4,
+                        Directive::Data => data.len(),
+                    };
+                    labels.insert(label.to_owned(), label_pos);
+                    rest
+                },
+                Err(_) => line,
+            };
+
+            // Identify directives
+            if line.starts_with(".data") {
+                directive = Directive::Data;
+                continue;
+            } else if line.starts_with(".text") {
+                directive = Directive::Text;
+                continue;
+            }
+
+            // match directive {
+            //     Directive::Text => unimplemented!("Haven't implemented .text yet"),
+            //     Directive::Data => unimplemented!("Haven't implemented .data either!"),
+            // }
+
             println!("> {}", line);
         }
 

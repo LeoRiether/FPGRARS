@@ -1,10 +1,10 @@
 use nom::{
     self,
     branch::alt,
-    bytes::complete::{escaped_transform, is_not, tag},
+    bytes::complete::{escaped_transform, is_not, tag, take_till},
     character::complete::{char as the_char, space0},
     combinator::{map, value},
-    sequence::{delimited, tuple},
+    sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
 
@@ -55,4 +55,25 @@ pub fn test_include_directive() {
         include_directive(".include \"some file.s\"".as_bytes()),
         Ok(("".as_bytes(), "some file.s".to_owned()))
     );
+}
+
+/// Strips indentation and removes comments
+pub fn strip_unneeded(s: &str) -> Result<&str, nom::Err<(&str, nom::error::ErrorKind)>> {
+    preceded(space0, take_till(|c| c == '#'))(s).map(|(_i, o)| o)
+}
+
+#[test]
+pub fn test_strip_unneeded() {
+    assert_eq!(
+        strip_unneeded("     mv x0 x0 # does nothing"),
+        Ok("mv x0 x0 "),
+    );
+}
+
+/// Parses a line that *begins* with a label
+pub fn parse_label(s: &str) -> IResult<&str, &str> {
+    terminated(
+        take_till(|c| c == ':' || c == ' '),
+        tuple((space0, tag(":"))),
+    )(s)
 }

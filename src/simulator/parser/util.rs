@@ -9,11 +9,23 @@ pub enum Error {
     /// Not the parser's fault, some std::io went wrong
     IO(io::Error),
     LabelNotFound(String),
+    Nom(String, nom::error::ErrorKind), // I'm feeling lazy
 }
 
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Self {
         Error::IO(e)
+    }
+}
+
+impl<'a> From<nom::Err<(&'a str, nom::error::ErrorKind)>> for Error {
+    fn from(err: nom::Err<(&'a str, nom::error::ErrorKind)>) -> Self {
+        use nom::Err as e;
+        match err {
+            e::Incomplete(_) => unreachable!("nom::Err::Incomplete should only exist in streaming parsers"),
+            e::Error((i, e)) => Error::Nom(i.into(), e),
+            e::Failure((i, e)) => Error::Nom(i.into(), e),
+        }
     }
 }
 
