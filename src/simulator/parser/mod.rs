@@ -335,40 +335,30 @@ fn unlabel_instruction(
     use Instruction::*;
     use PreLabelInstruction as p;
 
-    // TODO: refactor this, maybe
+    macro_rules! unlabel {
+        ($inst:ident, $rd:ident, $label:ident) => {
+            labels
+                .get(&$label)
+                .map(|&pos| $inst($rd, pos))
+                .ok_or(Error::LabelNotFound($label))
+        };
+        ($inst:ident, $rs1:ident, $rs2:ident, $label:ident) => {
+            labels
+                .get(&$label)
+                .map(|&pos| $inst($rs1, $rs2, pos))
+                .ok_or(Error::LabelNotFound($label))
+        };
+    }
+
     match instruction {
-        p::Jal(rd, label) => labels
-            .get(&label)
-            .map(|&pos| Jal(rd, pos))
-            .ok_or(Error::LabelNotFound(label)),
-        p::Beq(rs1, rs2, label) => labels
-            .get(&label)
-            .map(|&pos| Beq(rs1, rs2, pos))
-            .ok_or(Error::LabelNotFound(label)),
-        p::Bne(rs1, rs2, label) => labels
-            .get(&label)
-            .map(|&pos| Bne(rs1, rs2, pos))
-            .ok_or(Error::LabelNotFound(label)),
-        p::Bge(rs1, rs2, label) => labels
-            .get(&label)
-            .map(|&pos| Bge(rs1, rs2, pos))
-            .ok_or(Error::LabelNotFound(label)),
-        p::Blt(rs1, rs2, label) => labels
-            .get(&label)
-            .map(|&pos| Blt(rs1, rs2, pos))
-            .ok_or(Error::LabelNotFound(label)),
-        p::Bltu(rs1, rs2, label) => labels
-            .get(&label)
-            .map(|&pos| Bltu(rs1, rs2, pos))
-            .ok_or(Error::LabelNotFound(label)),
-        p::Bgeu(rs1, rs2, label) => labels
-            .get(&label)
-            .map(|&pos| Bgeu(rs1, rs2, pos))
-            .ok_or(Error::LabelNotFound(label)),
-        p::La(rd, label) => labels
-            .get(&label)
-            .map(|&pos| La(rd, pos))
-            .ok_or(Error::LabelNotFound(label)),
+        p::Jal(rd, label) => unlabel!(Jal, rd, label),
+        p::Beq(rs1, rs2, label) => unlabel!(Beq, rs1, rs2, label),
+        p::Bne(rs1, rs2, label) => unlabel!(Bne, rs1, rs2, label),
+        p::Bge(rs1, rs2, label) => unlabel!(Bge, rs1, rs2, label),
+        p::Blt(rs1, rs2, label) => unlabel!(Blt, rs1, rs2, label),
+        p::Bltu(rs1, rs2, label) => unlabel!(Bltu, rs1, rs2, label),
+        p::Bgeu(rs1, rs2, label) => unlabel!(Bgeu, rs1, rs2, label),
+        p::La(rd, label) => unlabel!(La, rd, label),
         p::Other(instruction) => Ok(instruction),
     }
 }
