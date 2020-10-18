@@ -151,9 +151,9 @@ impl Simulator {
 
                 // Type I
                 Ecall => self.ecall(),
-                Addi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) + imm),
+                Addi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) + (imm as i32)),
                 Slli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) << imm),
-                Slti(rd, rs1, imm) => self.set_reg(rd, to_1(self.get_reg::<i32>(rs1) < imm)),
+                Slti(rd, rs1, imm) => self.set_reg(rd, to_1(self.get_reg::<i32>(rs1) < (imm as i32))),
                 Sltiu(rd, rs1, imm) => self.set_reg(rd, to_1(self.get_reg::<u32>(rs1) < imm)),
                 Xori(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) ^ imm),
                 Srli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) >> imm),
@@ -203,7 +203,7 @@ impl Simulator {
                     // so it works as a nop. Maybe this is correct, maybe it's not, but I'll copy the behavior seen in
                     // RARS to be consistent.
                     self.set_reg(rd, (self.pc + 4) as u32);
-                    self.pc = (self.get_reg::<i32>(rs1) + imm) as usize & !1;
+                    self.pc = (self.get_reg::<i32>(rs1) + (imm as i32)) as usize & !1;
                     continue;
                 }
                 Jal(rd, label) => {

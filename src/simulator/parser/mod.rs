@@ -19,7 +19,7 @@ pub use util::*;
 
 /// Giant enum that represents a single RISC-V instruction and its arguments
 #[allow(dead_code)] // please, cargo, no more warnings
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Instruction {
     // Type R
     /// rd, rs1, rs2
@@ -93,6 +93,7 @@ pub enum Instruction {
 /// consider a jump instruction that jumps to a label in the next line).
 ///
 /// We process the labels stored after the entire file has been parsed.
+#[derive(Debug, PartialEq, Eq)]
 enum PreLabelInstruction {
     Beq(u8, u8, String),
     Bne(u8, u8, String),
@@ -198,8 +199,6 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
             .collect();
         let mut code = code?;
 
-        code.push(Instruction::Jal(0, code.len() * 4));
-
         // If the program ever drops off bottom, we make an "exit" ecall and terminate execution
         code.extend(vec![
             Instruction::Li(17, 10), // li a7 10
@@ -215,6 +214,8 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
     let (regs, floats, status) = regmaps;
     use Instruction::*;
     use PreLabelInstruction as pre;
+
+    let (s, instruction) = one_arg(s)?;
 
     macro_rules! type_i {
         ($inst:expr) => {
@@ -234,6 +235,13 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         };
     }
 
+    // bgez, bnez, ...
+    macro_rules! type_sb_z {
+        ($inst:expr) => {
+            args_jal(s, &regs).map(|(rs1, label)| $inst(rs1, 0, label))?
+        };
+    }
+
     // Reverses the order of rs1 and rs2 to convert, for example,
     // `ble t0 t1 label` into `bge t1 t0 label`
     macro_rules! type_sb_reversed {
@@ -242,19 +250,14 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         };
     }
 
-    let (s, instruction) = one_arg(s)?;
+    // blez, ...
+    macro_rules! type_sb_reversed_z {
+        ($inst:expr) => {
+            args_jal(s, &regs).map(|(rs1, label)| $inst(0, rs1, label))?
+        };
+    }
 
     let parsed = match instruction.to_lowercase().as_str() {
-        "addi" => type_i!(Addi),
-        "slli" => type_i!(Slli),
-        "slti" => type_i!(Slti),
-        "sltiu" => type_i!(Sltiu),
-        "xori" => type_i!(Xori),
-        "srli" => type_i!(Srli),
-        "srai" => type_i!(Srai),
-        "ori" => type_i!(Ori),
-        "andi" => type_i!(Andi),
-
         "add" => type_r!(Add),
         "sub" => type_r!(Sub),
         "sll" => type_r!(Sll),
@@ -266,6 +269,16 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "or" => type_r!(Or),
         "and" => type_r!(And),
 
+        "addi" => type_i!(Addi),
+        "slli" => type_i!(Slli),
+        "slti" => type_i!(Slti),
+        "sltiu" => type_i!(Sltiu),
+        "xori" => type_i!(Xori),
+        "srli" => type_i!(Srli),
+        "srai" => type_i!(Srai),
+        "ori" => type_i!(Ori),
+        "andi" => type_i!(Andi),
+
         "beq" => type_sb!(pre::Beq),
         "bne" => type_sb!(pre::Bne),
         "blt" => type_sb!(pre::Blt),
@@ -276,9 +289,18 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "ble" => type_sb_reversed!(pre::Bge),
         "bgtu" => type_sb_reversed!(pre::Bltu),
         "bleu" => type_sb_reversed!(pre::Bgeu),
+        "beqz" => type_sb_z!(pre::Beq),
+        "bnez" => type_sb_z!(pre::Bne),
+        "bltz" => type_sb_z!(pre::Blt),
+        "bgez" => type_sb_z!(pre::Bge),
+        "bltuz" => type_sb_z!(pre::Bltu),
+        "bgeuz" => type_sb_z!(pre::Bgeu),
+        "bgtz" => type_sb_reversed_z!(pre::Blt),
+        "blez" => type_sb_reversed_z!(pre::Bge),
 
-        "jal" => args_jal(s, &regs).map(|(rd, label)| pre::Jal(rd, label))?,
-        "j" => one_arg(s).map(|(_i, label)| pre::Jal(0, label.to_owned()))?,
+        "jal" => parse_jal(s, &regs)?,
+        "call" => one_arg(s).map(|(_i, label)| pre::Jal(1, label.to_owned()))?,
+        "j" | "tail" | "b" => one_arg(s).map(|(_i, label)| pre::Jal(0, label.to_owned()))?,
 
         "ecall" => Ecall.into(),
 
@@ -287,10 +309,21 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
 
         "li" => args_li(s, &regs).map(|(rd, imm)| Li(rd, imm).into())?,
 
-        idk => unimplemented!("Instruction <{}> hasn't been implemented", idk),
+        "nop" => Mv(0, 0).into(),
+
+        dont_know => return Err(Error::InstructionNotFound(dont_know.to_owned())),
     };
 
     Ok(parsed)
+}
+
+/// Parses either `jal rd label` or `jal label`. In the last case, we set `rd = ra`
+fn parse_jal<'a>(s: &'a str, regs: &RegMap) -> Result<PreLabelInstruction, Error> {
+    use PreLabelInstruction as pre;
+    args_jal(s, regs)
+        .map(|(rd, label)| pre::Jal(rd, label.to_owned()))
+        .or_else(|_| one_arg(s).map(|(_i, label)| pre::Jal(1, label.to_owned())))
+        .map_err(|e| e.into())
 }
 
 /// Transforms a PreLabelInstruction into a normal Instruction by "commiting" the labels
@@ -337,5 +370,34 @@ fn unlabel_instruction(
             .map(|&pos| La(rd, pos))
             .ok_or(Error::LabelNotFound(label)),
         p::Other(instruction) => Ok(instruction),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Instruction::*;
+    use super::PreLabelInstruction as pre;
+    use super::*;
+
+    use lazy_static::*;
+    lazy_static! {
+        static ref FULLREG: FullRegMap =
+            { (reg_names::regs(), reg_names::floats(), reg_names::status()) };
+    }
+
+    #[test]
+    fn test_parse_text() {
+        assert_eq!(
+            parse_text("add s0, s0, s1,,,, ", &FULLREG).map_err(|_| ()),
+            Ok(Add(8, 8, 9).into())
+        );
+        assert_eq!(
+            parse_text("j label", &FULLREG).map_err(|_| ()),
+            Ok(pre::Jal(0, "label".to_owned()).into())
+        );
+        assert_eq!(
+            parse_text("bgtz x1 somewhere", &FULLREG).map_err(|_| ()),
+            Ok(pre::Blt(0, 1, "somewhere".to_owned()).into())
+        );
     }
 }

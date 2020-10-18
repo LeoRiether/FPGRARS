@@ -276,6 +276,10 @@ mod tests {
             args_type_r("a0,,,a1 , a2 ,", &REGS).map_err(|_| ()),
             Ok((10, 11, 12))
         );
+        assert_eq!(
+            args_type_r("t0 t0 t1", &REGS).map_err(|_| ()),
+            Ok((5, 5, 6))
+        );
     }
 
     #[test]

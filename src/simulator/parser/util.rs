@@ -11,6 +11,7 @@ pub enum Error {
     LabelNotFound(String),
     Nom(String, nom::error::ErrorKind), // I'm feeling lazy
     RegisterNotFound(String),
+    InstructionNotFound(String),
 }
 
 impl From<io::Error> for Error {

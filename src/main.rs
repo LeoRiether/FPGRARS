@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     thread::Builder::new()
         .name("FPGRARS Simulator".into())
         .spawn(move || {
-            let mut sim = sim.load_from_file("something.s".into()).unwrap();
+            let mut sim = sim.load_from_file("something.s".into()).unwrap(); // TODO: not unwrap
 
             for instruction in sim.code.iter() {
                 println!("{:?}", instruction);
