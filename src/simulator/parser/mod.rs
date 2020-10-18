@@ -47,13 +47,13 @@ pub enum Instruction {
     Lw(u8, i32, u8),
     Lbu(u8, i32, u8),
     Lhu(u8, i32, u8),
-    Addi(u8, u8, i32),
     /// rd, rs1, imm
-    Slti(u8, u8, i32),
+    Addi(u8, u8, u32),
+    Slti(u8, u8, u32),
     Sltiu(u8, u8, u32),
-    Slli(u8, u8, i32),
-    Srli(u8, u8, i32),
-    Srai(u8, u8, i32),
+    Slli(u8, u8, u32),
+    Srli(u8, u8, u32),
+    Srai(u8, u8, u32),
     Ori(u8, u8, u32),
     Andi(u8, u8, u32),
     Xori(u8, u8, u32),
@@ -73,13 +73,13 @@ pub enum Instruction {
     Bltu(u8, u8, usize),
     Bgeu(u8, u8, usize),
     /// rd, rs1, imm
-    Jalr(u8, u8, i32),
+    Jalr(u8, u8, u32),
     /// rd, label
     Jal(u8, usize),
 
     // Some pseudoinstructions
     /// rd, imm
-    Li(u8, i32),
+    Li(u8, u32),
     /// rd, rs1
     Mv(u8, u8),
     /// rd, label
@@ -168,6 +168,7 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
                 Err(_) => &line,
             };
 
+            let (line, _) = separator0(line)?;
             if line.is_empty() {
                 continue;
             }
@@ -215,6 +216,12 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
     use Instruction::*;
     use PreLabelInstruction as pre;
 
+    macro_rules! type_i {
+        ($inst:expr) => {
+            args_type_i(s, &regs).map(|(rd, rs1, imm)| $inst(rd, rs1, imm).into())?
+        };
+    }
+
     macro_rules! type_r {
         ($inst:expr) => {
             args_type_r(s, &regs).map(|(rd, rs1, rs2)| $inst(rd, rs1, rs2).into())?
@@ -238,6 +245,16 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
     let (s, instruction) = one_arg(s)?;
 
     let parsed = match instruction.to_lowercase().as_str() {
+        "addi" => type_i!(Addi),
+        "slli" => type_i!(Slli),
+        "slti" => type_i!(Slti),
+        "sltiu" => type_i!(Sltiu),
+        "xori" => type_i!(Xori),
+        "srli" => type_i!(Srli),
+        "srai" => type_i!(Srai),
+        "ori" => type_i!(Ori),
+        "andi" => type_i!(Andi),
+
         "add" => type_r!(Add),
         "sub" => type_r!(Sub),
         "sll" => type_r!(Sll),
@@ -264,6 +281,11 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "j" => one_arg(s).map(|(_i, label)| pre::Jal(0, label.to_owned()))?,
 
         "ecall" => Ecall.into(),
+
+        // not quite a `jal`, but the same arguments
+        "la" => args_jal(s, &regs).map(|(rd, label)| pre::La(rd, label.to_owned()))?,
+
+        "li" => args_li(s, &regs).map(|(rd, imm)| Li(rd, imm).into())?,
 
         idk => unimplemented!("Instruction <{}> hasn't been implemented", idk),
     };

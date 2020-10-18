@@ -2,9 +2,10 @@ use nom::{
     self,
     branch::alt,
     bytes::complete::{escaped_transform, is_a, is_not, tag, take_till, take_till1},
-    character::complete::{char as the_char, one_of, space0},
-    combinator::{map, map_res, value},
+    character::complete::{anychar, char as the_char, hex_digit1, one_of, space0},
+    combinator::{all_consuming, map, map_res, value},
     multi::{many1, separated_list},
+    number::complete::{be_i32, be_u32, hex_u32},
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
@@ -13,6 +14,24 @@ pub type NomErr<'a> = nom::Err<(&'a str, nom::error::ErrorKind)>;
 
 use super::register_names::{RegMap, TryGetRegister};
 use super::util::Error;
+
+macro_rules! all_consuming_tuple {
+    ($tup:expr) => {
+        all_consuming(tuple($tup))
+    };
+}
+
+pub fn is_separator(c: char) -> bool {
+    c == ',' || c.is_whitespace()
+}
+
+pub fn separator1(s: &str) -> IResult<&str, ()> {
+    map(take_till1(|c| !is_separator(c)), |_| ())(s)
+}
+
+pub fn separator0(s: &str) -> IResult<&str, ()> {
+    map(take_till(|c| !is_separator(c)), |_| ())(s)
+}
 
 fn transform_escaped_char(c: &str) -> IResult<&str, &str> {
     alt((
@@ -31,8 +50,20 @@ pub fn quoted_string(s: &str) -> IResult<&str, String> {
     )(s)
 }
 
+// TODO: remove duplicated logic, this is almost the same as fn quoted_string
+fn quoted_char(s: &str) -> IResult<&str, char> {
+    let parser = delimited(
+        the_char('\''),
+        escaped_transform(is_not("\'\\"), '\\', transform_escaped_char),
+        the_char('\''),
+    );
+
+    map(parser, |c| c.chars().next().unwrap())(s)
+}
+
+/// Parses `.include "file.s"` and outputs `file.s`
 pub fn include_directive(s: &str) -> IResult<&str, String> {
-    let parser = tuple((space0, tag(".include"), space0, quoted_string));
+    let parser = tuple((separator0, tag(".include"), separator0, quoted_string));
     map(parser, |(_, _, _, file)| file)(s)
 }
 
@@ -51,21 +82,43 @@ pub fn parse_label(s: &str) -> IResult<&str, &str> {
     )(s)
 }
 
-pub fn is_separator(c: char) -> bool {
-    c == ',' || c.is_whitespace()
-}
-
-pub fn separator1(s: &str) -> IResult<&str, ()> {
-    map(take_till1(|c| !is_separator(c)), |_| ())(s)
-}
-
-pub fn separator0(s: &str) -> IResult<&str, ()> {
-    map(take_till(|c| !is_separator(c)), |_| ())(s)
-}
-
 /// Parses one argument from the input and the separators that follow it.
+/// Should work correctly for immediates, for example `one_arg("-4(sp)")` should only parse `-4`.
 pub fn one_arg(s: &str) -> IResult<&str, &str> {
-    terminated(take_till1(is_separator), separator0)(s)
+    terminated(take_till1(|c| is_separator(c) || c == '('), separator0)(s)
+}
+
+/// Parses something like `0x10ab` or `-0xff` to a u32.
+/// For some reason, I can't get nom::number::complete::hex_u32 to work...
+fn hex_immediate(s: &str) -> IResult<&str, u32> {
+    alt((
+        map_res(preceded(tag("0x"), hex_digit1), |x| {
+            u32::from_str_radix(x, 16)
+        }),
+        map_res(preceded(tag("-0x"), hex_digit1), |x| {
+            u32::from_str_radix(x, 16).map(|x| (!x).wrapping_add(1))
+        }),
+    ))(s)
+}
+
+/// Parses an immediate u32, i32 or char.
+/// For example, in `li a7 100`, the last argument is the "immediate" 100
+fn immediate(s: &str) -> IResult<&str, u32> {
+    alt((
+        // numeric immediate
+        map_res(one_arg, |token| {
+            all_consuming(hex_immediate)(token)
+                .map(|(_, x)| x)
+                .or_else(|_| token.parse::<u32>())
+                .or_else(|_| token.parse::<i32>().map(|x| x as u32))
+        }),
+        // character immediate
+        map(quoted_char, |c| c as u32),
+    ))(s)
+}
+
+fn immediate_with_sep(s: &str) -> IResult<&str, u32> {
+    terminated(immediate, separator0)(s)
 }
 
 /// Parses the arguments for a Type R instruction.
@@ -73,7 +126,7 @@ pub fn one_arg(s: &str) -> IResult<&str, &str> {
 /// `args_type_r("a0, a1, a2")`
 pub fn args_type_r(s: &str, regs: &RegMap) -> Result<(u8, u8, u8), Error> {
     // TODO: make sure there are no trailing arguments
-    let res = tuple((
+    let res = all_consuming_tuple!((
         one_arg, // rd
         one_arg, // rs1
         one_arg, // rs2
@@ -87,7 +140,7 @@ pub fn args_type_r(s: &str, regs: &RegMap) -> Result<(u8, u8, u8), Error> {
 
 /// Parses the arguments for a `jal`.
 pub fn args_jal(s: &str, regs: &RegMap) -> Result<(u8, String), Error> {
-    let res = tuple((
+    let res = all_consuming_tuple!((
         one_arg, // rd
         one_arg, // label
     ))(s);
@@ -99,7 +152,7 @@ pub fn args_jal(s: &str, regs: &RegMap) -> Result<(u8, String), Error> {
 
 /// Parses the arguments for a Type SB instruction, like `bge` or `blt`
 pub fn args_type_sb(s: &str, regs: &RegMap) -> Result<(u8, u8, String), Error> {
-    let res = tuple((
+    let res = all_consuming_tuple!((
         one_arg, // rs1
         one_arg, // rs2
         one_arg, // label
@@ -111,6 +164,29 @@ pub fn args_type_sb(s: &str, regs: &RegMap) -> Result<(u8, u8, String), Error> {
     Ok((rs1, rs2, label))
 }
 
+/// Parses the arguments for a type I instruction, like `addi t0 t1 123`
+pub fn args_type_i(s: &str, regs: &RegMap) -> Result<(u8, u8, u32), Error> {
+    let res = all_consuming_tuple!((
+        one_arg, // rd
+        one_arg, // rs1
+        immediate_with_sep,
+    ))(s);
+
+    let (_i, (rd, rs1, imm)) = res?;
+    let (rd, rs1) = (regs.try_get(rd)?, regs.try_get(rs1)?);
+    Ok((rd, rs1, imm))
+}
+
+pub fn args_li(s: &str, regs: &RegMap) -> Result<(u8, u32), Error> {
+    let res = all_consuming_tuple!((
+        one_arg, // rd
+        immediate_with_sep,
+    ))(s);
+
+    let (_i, (rd, imm)) = res?;
+    let rd = regs.try_get(rd)?;
+    Ok((rd, imm))
+}
 
 #[cfg(test)]
 mod tests {
@@ -176,6 +252,17 @@ mod tests {
     }
 
     #[test]
+    fn test_immediate() {
+        assert_eq!(immediate("123"), Ok(("", 123)));
+        assert_eq!(immediate("-10"), Ok(("", (-10i32) as u32)));
+        assert_eq!(immediate("0xff000000"), Ok(("", 4278190080)));
+        assert_eq!(immediate("-0xff000000"), Ok(("", !(0xff000000) + 1)));
+        assert_eq!(immediate("' '"), Ok(("", 32)));
+        assert_eq!(immediate("'\\n'"), Ok(("", '\n' as u32)));
+        assert_eq!(immediate("0xA(sp)"), Ok(("(sp)", 10)));
+    }
+
+    #[test]
     fn test_args_type_r() {
         assert_eq!(
             args_type_r("x0 x1 x2", &REGS).map_err(|_| ()),
@@ -200,10 +287,22 @@ mod tests {
     }
 
     #[test]
-    fn test_args_sb() {
+    fn test_args_type_sb() {
         assert_eq!(
             args_type_sb("s11 s10 LaBeL", &REGS).map_err(|_| ()),
             Ok((27, 26, "LaBeL".to_owned()))
+        );
+    }
+
+    #[test]
+    fn test_args_type_i() {
+        assert_eq!(
+            args_type_i("sp sp -4", &REGS).map_err(|_| ()),
+            Ok((2, 2, (-4i32) as u32))
+        );
+        assert_eq!(
+            args_type_i("a0, a0, 0x01,,", &REGS).map_err(|_| ()),
+            Ok((10, 10, 1))
         );
     }
 }
