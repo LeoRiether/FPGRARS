@@ -212,7 +212,7 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
 }
 
 fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Error> {
-    let (regs, floats, status) = regmaps;
+    let (regs, _floats, _status) = regmaps;
     use Instruction::*;
     use PreLabelInstruction as pre;
 

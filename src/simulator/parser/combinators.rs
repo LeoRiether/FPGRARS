@@ -1,10 +1,9 @@
 use nom::{
     self,
     branch::alt,
-    bytes::complete::{escaped_transform, is_a, is_not, tag, take_till, take_till1},
-    character::complete::{anychar, char as the_char, hex_digit1, one_of, space0},
+    bytes::complete::{escaped_transform, is_not, tag, take_till, take_till1},
+    character::complete::{char as the_char, hex_digit1, space0},
     combinator::{all_consuming, map, map_res, value},
-    multi::{many1, separated_list},
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
@@ -22,10 +21,6 @@ macro_rules! all_consuming_tuple {
 
 pub fn is_separator(c: char) -> bool {
     c == ',' || c.is_whitespace()
-}
-
-pub fn separator1(s: &str) -> IResult<&str, ()> {
-    map(take_till1(|c| !is_separator(c)), |_| ())(s)
 }
 
 pub fn separator0(s: &str) -> IResult<&str, ()> {
