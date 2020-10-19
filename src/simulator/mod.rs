@@ -12,10 +12,12 @@ const MMIO_SIZE: usize = 0x201000;
 const MMIO_START: usize = 0xff000000;
 
 pub mod parser;
-use parser::{RISCVParser, MacroParseable, Includable};
+use parser::{Includable, MacroParseable, RISCVParser};
 
 mod into_register;
 use into_register::*;
+
+use byteorder::{ByteOrder, LittleEndian};
 
 pub struct Memory {
     pub mmio: Arc<Mutex<Vec<u8>>>,
@@ -30,12 +32,57 @@ impl Memory {
         }
     }
 
+    pub fn get_byte(&self, i: usize) -> u8 {
+        if i >= MMIO_START {
+            self.mmio.lock().unwrap()[i - MMIO_START]
+        } else {
+            self.data[i]
+        }
+    }
+
     pub fn set_byte(&mut self, i: usize, x: u8) {
         if i >= MMIO_START {
             let mut mmio = self.mmio.lock().unwrap();
             (*mmio)[i - MMIO_START] = x;
         } else {
             self.data[i] = x;
+        }
+    }
+
+    pub fn get_half(&self, i: usize) -> u16 {
+        if i >= MMIO_START {
+            let mmio = self.mmio.lock().unwrap();
+            LittleEndian::read_u16(&mmio[i - MMIO_START..])
+        } else {
+            LittleEndian::read_u16(&self.data[i..])
+        }
+    }
+
+    pub fn set_half(&mut self, i: usize, x: u16) {
+        if i >= MMIO_START {
+            let mut mmio = self.mmio.lock().unwrap();
+            LittleEndian::write_u16(&mut mmio[i - MMIO_START..], x);
+        } else {
+            LittleEndian::write_u16(&mut self.data[i..], x);
+        }
+    }
+
+
+    pub fn get_word(&self, i: usize) -> u32 {
+        if i >= MMIO_START {
+            let mmio = self.mmio.lock().unwrap();
+            LittleEndian::read_u32(&mmio[i - MMIO_START..])
+        } else {
+            LittleEndian::read_u32(&self.data[i..])
+        }
+    }
+
+    pub fn set_word(&mut self, i: usize, x: u32) {
+        if i >= MMIO_START {
+            let mut mmio = self.mmio.lock().unwrap();
+            LittleEndian::write_u32(&mut mmio[i - MMIO_START..], x);
+        } else {
+            LittleEndian::write_u32(&mut self.data[i..], x);
         }
     }
 }
@@ -153,7 +200,9 @@ impl Simulator {
                 Ecall => self.ecall(),
                 Addi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) + (imm as i32)),
                 Slli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) << imm),
-                Slti(rd, rs1, imm) => self.set_reg(rd, to_1(self.get_reg::<i32>(rs1) < (imm as i32))),
+                Slti(rd, rs1, imm) => {
+                    self.set_reg(rd, to_1(self.get_reg::<i32>(rs1) < (imm as i32)))
+                }
                 Sltiu(rd, rs1, imm) => self.set_reg(rd, to_1(self.get_reg::<u32>(rs1) < imm)),
                 Xori(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) ^ imm),
                 Srli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) >> imm),
@@ -161,10 +210,45 @@ impl Simulator {
                 Ori(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) | imm),
                 Andi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) & imm),
 
+                // Type I, loads from memory
+                Lb(rd, imm, rs1) => self.set_reg(
+                    rd,
+                    self.memory
+                        .get_byte((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize) as u32,
+                ),
+                Lh(rd, imm, rs1) => self.set_reg(
+                    rd,
+                    self.memory
+                        .get_half((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize) as u32,
+                ),
+                Lw(rd, imm, rs1) => self.set_reg(
+                    rd,
+                    self.memory
+                        .get_word((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize) as u32,
+                ),
+                Lbu(rd, imm, rs1) => self.set_reg(
+                    rd,
+                    self.memory
+                        .get_byte((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize) as u8 as u32,
+                ),
+                Lhu(rd, imm, rs1) => self.set_reg(
+                    rd,
+                    self.memory
+                        .get_half((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize) as u16 as u32,
+                ),
+
                 // Type S
                 Sb(rs2, imm, rs1) => self.memory.set_byte(
-                    (self.get_reg::<i32>(rs1) + imm) as u32 as usize,
+                    (self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize,
                     self.get_reg::<u8>(rs2),
+                ),
+                Sh(rs2, imm, rs1) => self.memory.set_half(
+                    (self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize,
+                    self.get_reg::<u16>(rs2),
+                ),
+                Sw(rs2, imm, rs1) => self.memory.set_word(
+                    (self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize,
+                    self.get_reg::<u32>(rs2),
                 ),
 
                 // Type SB + jumps

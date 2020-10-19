@@ -42,11 +42,11 @@ pub enum Instruction {
     // Type I
     Ecall,
     /// rd, imm, rs1
-    Lb(u8, i32, u8),
-    Lh(u8, i32, u8),
-    Lw(u8, i32, u8),
-    Lbu(u8, i32, u8),
-    Lhu(u8, i32, u8),
+    Lb(u8, u32, u8),
+    Lh(u8, u32, u8),
+    Lw(u8, u32, u8),
+    Lbu(u8, u32, u8),
+    Lhu(u8, u32, u8),
     /// rd, rs1, imm
     Addi(u8, u8, u32),
     Slti(u8, u8, u32),
@@ -60,9 +60,9 @@ pub enum Instruction {
 
     // Type S
     /// rs2, imm, rs1
-    Sb(u8, i32, u8),
-    Sh(u8, i32, u8),
-    Sw(u8, i32, u8),
+    Sb(u8, u32, u8),
+    Sh(u8, u32, u8),
+    Sw(u8, u32, u8),
 
     // Type SB + jumps
     /// rs1, rs2, label
