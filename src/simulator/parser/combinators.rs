@@ -5,7 +5,6 @@ use nom::{
     character::complete::{anychar, char as the_char, hex_digit1, one_of, space0},
     combinator::{all_consuming, map, map_res, value},
     multi::{many1, separated_list},
-    number::complete::{be_i32, be_u32, hex_u32},
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
@@ -188,6 +187,35 @@ pub fn args_li(s: &str, regs: &RegMap) -> Result<(u8, u32), Error> {
     Ok((rd, imm))
 }
 
+pub fn args_type_s(s: &str, regs: &RegMap) -> Result<(u8, u32, u8), Error> {
+    let res = all_consuming_tuple!((
+        one_arg,
+        immediate_with_sep,
+        delimited(
+            the_char('('),
+            delimited(
+                separator0,
+                take_till1(|c| is_separator(c) || c == ')'),
+                separator0
+            ),
+            the_char(')')
+        ),
+        separator0,
+    ))(s);
+
+    let (_i, (r1, imm, r2, _)) = res?;
+    let (r1, r2) = (regs.try_get(r1)?, regs.try_get(r2)?);
+    Ok((r1, imm, r2))
+}
+
+pub fn args_mv(s: &str, regs: &RegMap) -> Result<(u8, u8), Error> {
+    let res = all_consuming_tuple!((one_arg, one_arg))(s);
+
+    let (_i, (rd, rs1)) = res?;
+    let (rd, rs1) = (regs.try_get(rd)?, regs.try_get(rs1)?);
+    Ok((rd, rs1))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::register_names as reg_names;
@@ -307,6 +335,26 @@ mod tests {
         assert_eq!(
             args_type_i("a0, a0, 0x01,,", &REGS).map_err(|_| ()),
             Ok((10, 10, 1))
+        );
+    }
+
+    #[test]
+    fn test_args_type_s() {
+        assert_eq!(
+            args_type_s("x31 0xA(x25)", &REGS).map_err(|e| format!("{:?}", e)),
+            Ok((31, 10, 25))
+        );
+        assert_eq!(
+            args_type_s("x10 4 ( ,sp, )", &REGS).map_err(|_| ()),
+            Ok((10, 4, 2))
+        );
+        assert_eq!(
+            args_type_s("x0, ' ',(,x7,) ,", &REGS).map_err(|_| ()),
+            Ok((0, 32, 7))
+        );
+        assert_eq!(
+            args_type_s("x0 -1(zero)", &REGS).map_err(|_| ()),
+            Ok((0, (-1i32) as u32, 0))
         );
     }
 }

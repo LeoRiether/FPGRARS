@@ -257,7 +257,14 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         };
     }
 
+    macro_rules! type_s {
+        ($inst:expr) => {
+            args_type_s(s, &regs).map(|(r1, imm, r2)| $inst(r1, imm, r2).into())?
+        };
+    }
+
     let parsed = match instruction.to_lowercase().as_str() {
+        // Type R
         "add" => type_r!(Add),
         "sub" => type_r!(Sub),
         "sll" => type_r!(Sll),
@@ -269,6 +276,7 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "or" => type_r!(Or),
         "and" => type_r!(And),
 
+        // Type I
         "addi" => type_i!(Addi),
         "slli" => type_i!(Slli),
         "slti" => type_i!(Slti),
@@ -279,6 +287,19 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "ori" => type_i!(Ori),
         "andi" => type_i!(Andi),
 
+        // Type I, loads from memory
+        "lb" => type_s!(Lb),
+        "lh" => type_s!(Lh),
+        "lw" => type_s!(Lw),
+        "lbu" => type_s!(Lbu),
+        "lhu" => type_s!(Lhu),
+
+        // Type S
+        "sb" => type_s!(Sb),
+        "sh" => type_s!(Sh),
+        "sw" => type_s!(Sw),
+
+        // Type SB and pseudoinstructions that map to SBs
         "beq" => type_sb!(pre::Beq),
         "bne" => type_sb!(pre::Bne),
         "blt" => type_sb!(pre::Blt),
@@ -301,6 +322,7 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "jal" => parse_jal(s, &regs)?,
         "call" => one_arg(s).map(|(_i, label)| pre::Jal(1, label.to_owned()))?,
         "j" | "tail" | "b" => one_arg(s).map(|(_i, label)| pre::Jal(0, label.to_owned()))?,
+        "ret" => Ret.into(),
 
         "ecall" => Ecall.into(),
 
@@ -309,6 +331,7 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
 
         "li" => args_li(s, &regs).map(|(rd, imm)| Li(rd, imm).into())?,
 
+        "mv" => args_mv(s, &regs).map(|(rd, rs1)| Mv(rd, rs1).into())?,
         "nop" => Mv(0, 0).into(),
 
         dont_know => return Err(Error::InstructionNotFound(dont_know.to_owned())),
