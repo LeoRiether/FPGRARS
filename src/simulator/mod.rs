@@ -121,13 +121,15 @@ impl Simulator {
     }
 
     pub fn load_from_file(mut self, path: String) -> Result<Self, parser::Error> {
-        let parser::Parsed { code, data } = parser::file_lines(path)?
-            .parse_includes()
+        let pathbuf = std::path::PathBuf::from(&path);
+        let parser::Parsed { code, data } = parser::file_lines(&path)?
+            .parse_includes(pathbuf)
             .parse_macros()
             .parse_riscv(DATA_SIZE)?;
 
         self.code = code;
         self.memory.data = data;
+        self.set_reg(2, self.memory.data.len() as u32 - 4); // set stack pointer
         Ok(self)
     }
 
@@ -303,8 +305,6 @@ impl Simulator {
                     self.pc = self.registers[1] as usize;
                     continue;
                 }
-
-                _ => unimplemented!(),
             }
 
             self.pc += 4;
@@ -312,9 +312,15 @@ impl Simulator {
     }
 
     fn ecall(&mut self) {
+        // 17 = a7
         match self.get_reg::<i32>(17) {
-            // 17 = a7
-            10 => std::process::exit(0),
+            10 => std::process::exit(0), // exit
+            1 => { println!("{}", self.get_reg::<i32>(10)); }, // print int
+            5 => { // read int
+                let mut buf = String::new();
+                std::io::stdin().read_line(&mut buf).unwrap();
+                self.set_reg(10, buf.parse::<i32>().unwrap());
+            }
 
             x => unimplemented!("Ecall {} is not implemented", x),
         }

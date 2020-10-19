@@ -16,6 +16,7 @@
 mod renderer;
 mod simulator;
 
+use std::env;
 use std::error::Error;
 use std::thread;
 
@@ -23,10 +24,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sim = simulator::Simulator::new();
     let mmio = sim.memory.mmio.clone();
 
+    let mut args: Vec<String> = env::args().collect();
+    let file = args.pop().expect("Usage: ./fpgrars [OPTIONS] riscv_file.s");
+
     thread::Builder::new()
         .name("FPGRARS Simulator".into())
         .spawn(move || {
-            let mut sim = sim.load_from_file("something.s".into()).unwrap(); // TODO: not unwrap
+            let mut sim = sim.load_from_file(file).unwrap(); // TODO: not unwrap
 
             for instruction in sim.code.iter() {
                 println!("{:?}", instruction);

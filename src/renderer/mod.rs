@@ -6,7 +6,6 @@ use pixel_canvas::{
     input::{Event, WindowEvent},
     Canvas, Color,
 };
-use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 const WIDTH: usize = 320;
@@ -14,17 +13,15 @@ const HEIGHT: usize = 240;
 const FRAME_SELECT: usize = 0x200604;
 const FRAME_0: usize = 0;
 const FRAME_1: usize = 0x100000;
-// const FRAME_SIZE: usize = WIDTH * HEIGHT;
+const KEYBOARD: usize = 0x200000;
 
 struct MyState {
-    key_buffer: VecDeque<u8>,
+    mmio: Arc<Mutex<Vec<u8>>>,
 }
 
 impl MyState {
-    fn new() -> Self {
-        Self {
-            key_buffer: VecDeque::new(),
-        }
+    fn new(mmio: Arc<Mutex<Vec<u8>>>) -> Self {
+        Self { mmio }
     }
 
     fn handle_input(_info: &CanvasInfo, state: &mut MyState, event: &Event<()>) -> bool {
@@ -44,8 +41,9 @@ impl MyState {
                     },
                 ..
             } => {
-                dbg!(scancode::to_ascii(*key) as char);
-                state.key_buffer.push_back(scancode::to_ascii(*key));
+                let mut mmio = state.mmio.lock().unwrap();
+                mmio[KEYBOARD] = 1;
+                mmio[KEYBOARD + 4] = scancode::to_ascii(*key);
                 true
             }
 
@@ -69,7 +67,7 @@ fn mmio_color_to_rgb(x: u8) -> Color {
 pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
     let canvas = Canvas::new(2 * WIDTH, 2 * HEIGHT)
         .title("FPGRARS")
-        .state(MyState::new())
+        .state(MyState::new(mmio.clone()))
         .input(MyState::handle_input);
 
     #[cfg(debug_assertions)]

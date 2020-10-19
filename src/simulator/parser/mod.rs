@@ -82,8 +82,6 @@ pub enum Instruction {
     Li(u8, u32),
     /// rd, rs1
     Mv(u8, u8),
-    /// rd, label
-    La(u8, usize),
 
     Ret,
 }
@@ -102,7 +100,10 @@ enum PreLabelInstruction {
     Bltu(u8, u8, String),
     Bgeu(u8, u8, String),
     Jal(u8, String),
+
+    /// Gets mapped to an Instruction::Li(rd, position) after unlabeling
     La(u8, String),
+
     Other(Instruction),
 }
 
@@ -381,7 +382,10 @@ fn unlabel_instruction(
         p::Blt(rs1, rs2, label) => unlabel!(Blt, rs1, rs2, label),
         p::Bltu(rs1, rs2, label) => unlabel!(Bltu, rs1, rs2, label),
         p::Bgeu(rs1, rs2, label) => unlabel!(Bgeu, rs1, rs2, label),
-        p::La(rd, label) => unlabel!(La, rd, label),
+        p::La(rd, label) => labels
+            .get(&label)
+            .map(|&pos| Li(rd, pos as u32))
+            .ok_or(Error::LabelNotFound(label)),
         p::Other(instruction) => Ok(instruction),
     }
 }

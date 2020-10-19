@@ -40,7 +40,7 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {}
 
 /// Returns an iterator over the lines of a file
-pub fn file_lines(filepath: String) -> Result<impl Iterator<Item = String>, Error> {
-    let reader = File::open(Path::new(&filepath)).map(BufReader::new)?;
+pub fn file_lines<P: AsRef<Path>>(filepath: P) -> Result<impl Iterator<Item = String>, Error> {
+    let reader = File::open(filepath).map(BufReader::new)?;
     Ok(reader.lines().map(|x| x.unwrap()))
 }
