@@ -67,7 +67,6 @@ impl Memory {
         }
     }
 
-
     pub fn get_word(&self, i: usize) -> u32 {
         if i >= MMIO_START {
             let mmio = self.mmio.lock().unwrap();
@@ -122,7 +121,10 @@ impl Simulator {
 
     pub fn load_from_file(mut self, path: String) -> Result<Self, parser::Error> {
         let pathbuf = std::path::PathBuf::from(&path);
-        let parser::Parsed { code, data } = parser::file_lines(&path)?
+        // TODO: some of this logic is duplicated from the Includer, try to remove dedup?
+        let error = format!("Can't open file: <{:?}>", pathbuf.to_str());
+        let parser::Parsed { code, data } = parser::file_lines(&path)
+            .expect(&error)
             .parse_includes(pathbuf)
             .parse_macros()
             .parse_riscv(DATA_SIZE)?;
@@ -216,27 +218,32 @@ impl Simulator {
                 Lb(rd, imm, rs1) => self.set_reg(
                     rd,
                     self.memory
-                        .get_byte((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize) as u32,
+                        .get_byte((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
+                        as u32,
                 ),
                 Lh(rd, imm, rs1) => self.set_reg(
                     rd,
                     self.memory
-                        .get_half((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize) as u32,
+                        .get_half((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
+                        as u32,
                 ),
                 Lw(rd, imm, rs1) => self.set_reg(
                     rd,
                     self.memory
-                        .get_word((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize) as u32,
+                        .get_word((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
+                        as u32,
                 ),
                 Lbu(rd, imm, rs1) => self.set_reg(
                     rd,
                     self.memory
-                        .get_byte((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize) as u8 as u32,
+                        .get_byte((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
+                        as u8 as u32,
                 ),
                 Lhu(rd, imm, rs1) => self.set_reg(
                     rd,
                     self.memory
-                        .get_half((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize) as u16 as u32,
+                        .get_half((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
+                        as u16 as u32,
                 ),
 
                 // Type S
@@ -315,8 +322,11 @@ impl Simulator {
         // 17 = a7
         match self.get_reg::<i32>(17) {
             10 => std::process::exit(0), // exit
-            1 => { println!("{}", self.get_reg::<i32>(10)); }, // print int
-            5 => { // read int
+            1 => {
+                println!("{}", self.get_reg::<i32>(10));
+            } // print int
+            5 => {
+                // read int
                 let mut buf = String::new();
                 std::io::stdin().read_line(&mut buf).unwrap();
                 self.set_reg(10, buf.parse::<i32>().unwrap());
