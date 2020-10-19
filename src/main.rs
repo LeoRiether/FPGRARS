@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sim = simulator::Simulator::new();
     let mmio = sim.memory.mmio.clone();
 
-    let mut args: Vec<String> = env::args().collect();
+    let mut args: Vec<String> = env::args().skip(1).collect();
     let file = args.pop().expect("Usage: ./fpgrars [OPTIONS] riscv_file.s");
 
     thread::Builder::new()
