@@ -261,12 +261,6 @@ mod tests {
     }
 
     #[test]
-    fn test_separator1() {
-        assert_eq!(separator1(" ,  , ,,, "), Ok(("", ())));
-        assert_eq!(separator1("  ,,, , li t0, 123"), Ok(("li t0, 123", ())));
-    }
-
-    #[test]
     fn test_one_arg() {
         assert_eq!(one_arg("li a7 10"), Ok(("a7 10", "li")));
         assert_eq!(one_arg("ecall"), Ok(("", "ecall")));

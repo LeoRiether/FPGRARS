@@ -18,7 +18,6 @@ mod util;
 pub use util::*;
 
 /// Giant enum that represents a single RISC-V instruction and its arguments
-#[allow(dead_code)] // please, cargo, no more warnings
 #[derive(Debug, PartialEq, Eq)]
 pub enum Instruction {
     // Type R
@@ -276,6 +275,11 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "sra" => type_r!(Sra),
         "or" => type_r!(Or),
         "and" => type_r!(And),
+        "mul" => type_r!(Mul),
+        "div" => type_r!(Div),
+        "divu" => type_r!(Divu),
+        "rem" => type_r!(Rem),
+        "remu" => type_r!(Remu),
 
         // Type I
         "addi" => type_i!(Addi),
@@ -287,6 +291,7 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "srai" => type_i!(Srai),
         "ori" => type_i!(Ori),
         "andi" => type_i!(Andi),
+        "jalr" => type_i!(Jalr),
 
         // Type I, loads from memory
         "lb" => type_s!(Lb),

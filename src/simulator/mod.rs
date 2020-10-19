@@ -121,7 +121,7 @@ impl Simulator {
 
     pub fn load_from_file(mut self, path: String) -> Result<Self, parser::Error> {
         let pathbuf = std::path::PathBuf::from(&path);
-        // TODO: some of this logic is duplicated from the Includer, try to remove dedup?
+        // TODO: some of this logic is duplicated from the Includer, try to dedup?
         let error = format!("Can't open file: <{:?}>", pathbuf.to_str());
         let parser::Parsed { code, data } = parser::file_lines(&path)
             .expect(&error)
@@ -323,8 +323,9 @@ impl Simulator {
         match self.get_reg::<i32>(17) {
             10 => std::process::exit(0), // exit
             1 => {
+                // print int
                 println!("{}", self.get_reg::<i32>(10));
-            } // print int
+            }
             5 => {
                 // read int
                 let mut buf = String::new();
