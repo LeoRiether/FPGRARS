@@ -36,7 +36,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("{:?}", instruction);
             }
 
+            let start_time = std::time::Instant::now();
             sim.run();
+            println!("Finished in {}ms", start_time.elapsed().as_millis());
         })?;
 
     renderer::init(mmio);

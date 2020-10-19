@@ -7,7 +7,7 @@
 
 use std::sync::{Arc, Mutex};
 
-const DATA_SIZE: usize = 2048; // TODO: this
+const DATA_SIZE: usize = 0x201000; // TODO: this
 const MMIO_SIZE: usize = 0x201000;
 const MMIO_START: usize = 0xff000000;
 
@@ -201,7 +201,12 @@ impl Simulator {
                 }
 
                 // Type I
-                Ecall => self.ecall(),
+                Ecall => {
+                    let signal = self.ecall();
+                    if signal == true {
+                        return;
+                    }
+                }
                 Addi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) + (imm as i32)),
                 Slli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) << imm),
                 Slti(rd, rs1, imm) => {
@@ -318,10 +323,10 @@ impl Simulator {
         }
     }
 
-    fn ecall(&mut self) {
+    fn ecall(&mut self) -> bool {
         // 17 = a7
         match self.get_reg::<i32>(17) {
-            10 => std::process::exit(0), // exit
+            10 =>  return true, // exit
             1 => {
                 // print int
                 println!("{}", self.get_reg::<i32>(10));
@@ -330,10 +335,11 @@ impl Simulator {
                 // read int
                 let mut buf = String::new();
                 std::io::stdin().read_line(&mut buf).unwrap();
-                self.set_reg(10, buf.parse::<i32>().unwrap());
+                self.set_reg(10, buf.trim().parse::<i32>().unwrap());
             }
 
             x => unimplemented!("Ecall {} is not implemented", x),
         }
+        false
     }
 }
