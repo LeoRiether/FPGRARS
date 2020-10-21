@@ -82,6 +82,10 @@ pub fn one_arg(s: &str) -> IResult<&str, &str> {
     terminated(take_till1(|c| is_separator(c) || c == '('), separator0)(s)
 }
 
+pub fn one_reg<'a>(regs: &'a RegMap) -> impl Fn(&'a str) -> IResult<&str, u8> {
+    move |s: &'a str| map_res(one_arg, move |r| regs.try_get(r))(s)
+}
+
 /// Parses something like `0x10ab` or `-0xff` to a u32.
 /// For some reason, I can't get nom::number::complete::hex_u32 to work...
 fn hex_immediate(s: &str) -> IResult<&str, u32> {
@@ -119,72 +123,59 @@ fn immediate_with_sep(s: &str) -> IResult<&str, u32> {
 /// Expects the input without any separators in the prefix! For example:
 /// `args_type_r("a0, a1, a2")`
 pub fn args_type_r(s: &str, regs: &RegMap) -> Result<(u8, u8, u8), Error> {
-    // TODO: make sure there are no trailing arguments
-    let res = all_consuming_tuple!((
-        one_arg, // rd
-        one_arg, // rs1
-        one_arg, // rs2
-    ))(s);
+    let (_i, out) = all_consuming_tuple!((
+        one_reg(regs), // rd
+        one_reg(regs), // rs1
+        one_reg(regs), // rs2
+    ))(s)?;
 
-    // Map the register names to their indices
-    let (_i, (rd, rs1, rs2)) = res?;
-    let (rd, rs1, rs2) = (regs.try_get(rd)?, regs.try_get(rs1)?, regs.try_get(rs2)?);
-    Ok((rd, rs1, rs2))
+    Ok(out)
 }
 
 /// Parses the arguments for a `jal`.
 pub fn args_jal(s: &str, regs: &RegMap) -> Result<(u8, String), Error> {
-    let res = all_consuming_tuple!((
-        one_arg, // rd
-        one_arg, // label
-    ))(s);
+    let (_i, out) = all_consuming_tuple!((
+        one_reg(regs), // rd
+        map(one_arg, str::to_owned),
+    ))(s)?;
 
-    let (_i, (rd, label)) = res?;
-    let (rd, label) = (regs.try_get(rd)?, label.to_owned());
-    Ok((rd, label))
+    Ok(out)
 }
 
 /// Parses the arguments for a Type SB instruction, like `bge` or `blt`
 pub fn args_type_sb(s: &str, regs: &RegMap) -> Result<(u8, u8, String), Error> {
-    let res = all_consuming_tuple!((
-        one_arg, // rs1
-        one_arg, // rs2
-        one_arg, // label
-    ))(s);
+    let (_i, out) = all_consuming_tuple!((
+        one_reg(regs),               // rs1
+        one_reg(regs),               // rs2
+        map(one_arg, str::to_owned), // label
+    ))(s)?;
 
-    // Map the register names to their indices
-    let (_i, (rs1, rs2, label)) = res?;
-    let (rs1, rs2, label) = (regs.try_get(rs1)?, regs.try_get(rs2)?, label.to_owned());
-    Ok((rs1, rs2, label))
+    Ok(out)
 }
 
 /// Parses the arguments for a type I instruction, like `addi t0 t1 123`
 pub fn args_type_i(s: &str, regs: &RegMap) -> Result<(u8, u8, u32), Error> {
-    let res = all_consuming_tuple!((
-        one_arg, // rd
-        one_arg, // rs1
+    let (_i, out) = all_consuming_tuple!((
+        one_reg(regs), // rd
+        one_reg(regs), // rs1
         immediate_with_sep,
-    ))(s);
+    ))(s)?;
 
-    let (_i, (rd, rs1, imm)) = res?;
-    let (rd, rs1) = (regs.try_get(rd)?, regs.try_get(rs1)?);
-    Ok((rd, rs1, imm))
+    Ok(out)
 }
 
 pub fn args_li(s: &str, regs: &RegMap) -> Result<(u8, u32), Error> {
-    let res = all_consuming_tuple!((
-        one_arg, // rd
+    let (_i, out) = all_consuming_tuple!((
+        one_reg(regs), // rd
         immediate_with_sep,
-    ))(s);
+    ))(s)?;
 
-    let (_i, (rd, imm)) = res?;
-    let rd = regs.try_get(rd)?;
-    Ok((rd, imm))
+    Ok(out)
 }
 
 pub fn args_type_s(s: &str, regs: &RegMap) -> Result<(u8, u32, u8), Error> {
-    let res = all_consuming_tuple!((
-        one_arg,
+    let (_i, out) = all_consuming_tuple!((
+        one_reg(regs),
         immediate_with_sep,
         delimited(
             the_char('('),
@@ -196,19 +187,21 @@ pub fn args_type_s(s: &str, regs: &RegMap) -> Result<(u8, u32, u8), Error> {
             the_char(')')
         ),
         separator0,
-    ))(s);
+    ))(s)?;
 
-    let (_i, (r1, imm, r2, _)) = res?;
-    let (r1, r2) = (regs.try_get(r1)?, regs.try_get(r2)?);
+    let (r1, imm, r2, _) = out;
+    let r2 = regs.try_get(r2)?;
     Ok((r1, imm, r2))
 }
 
 pub fn args_mv(s: &str, regs: &RegMap) -> Result<(u8, u8), Error> {
-    let res = all_consuming_tuple!((one_arg, one_arg))(s);
+    let (_i, out) = all_consuming_tuple!((one_reg(regs), one_reg(regs)))(s)?;
+    Ok(out)
+}
 
-    let (_i, (rd, rs1)) = res?;
-    let (rd, rs1) = (regs.try_get(rd)?, regs.try_get(rs1)?);
-    Ok((rd, rs1))
+pub fn args_csr(s: &str, regs: &RegMap, status: &RegMap) -> Result<(u8, u8), Error> {
+    let (_i, out) = all_consuming_tuple!((one_reg(regs), one_reg(status)))(s)?;
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -344,6 +337,19 @@ mod tests {
         assert_eq!(
             args_type_s("x0 -1(zero)", &REGS).map_err(|_| ()),
             Ok((0, (-1i32) as u32, 0))
+        );
+    }
+
+    #[test]
+    fn test_args_csr() {
+        assert_eq!(
+            args_csr("x15 time", &REGS, &STATUS).map_err(|_| ()),
+            Ok((15, STATUS.get("time").copied().unwrap()))
+        );
+        assert_eq!(
+            // why would you csrr ra instret
+            args_csr("ra instret", &REGS, &STATUS).map_err(|_| ()),
+            Ok((1, STATUS.get("instret").copied().unwrap()))
         );
     }
 }
