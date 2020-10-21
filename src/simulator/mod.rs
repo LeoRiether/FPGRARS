@@ -6,6 +6,7 @@
 //!
 
 use std::sync::{Arc, Mutex};
+use std::time;
 
 const DATA_SIZE: usize = 0x201000; // TODO: this
 const MMIO_SIZE: usize = 0x201000;
@@ -89,8 +90,9 @@ impl Memory {
 pub struct Simulator {
     registers: [u32; 32],
     _floats: [f32; 32],
-    _status: Vec<u32>, // I'm not sure myself how many status register I'll use
+    status: Vec<u32>, // I'm not sure myself how many status register I'll use
     pc: usize,
+    started_at: time::Instant,
 
     pub memory: Memory,
     pub code: Vec<parser::Instruction>,
@@ -101,8 +103,9 @@ impl Simulator {
         Self {
             registers: [0; 32],
             _floats: [0.0; 32],
-            _status: Vec::new(),
+            status: Vec::new(),
             pc: 0,
+            started_at: time::Instant::now(), // Will be set again on run()
             memory: Memory::new(),
             code: Vec::new(),
         }
@@ -119,9 +122,17 @@ impl Simulator {
         }
     }
 
+    fn get_status(&self, i: u8) -> u32 {
+        if i == parser::register_names::TIME_INDEX {
+            self.started_at.elapsed().as_millis() as u32
+        } else {
+            self.status[i as usize]
+        }
+    }
+
     pub fn load_from_file(mut self, path: String) -> Result<Self, parser::Error> {
-        let pathbuf = std::path::PathBuf::from(&path);
         // TODO: some of this logic is duplicated from the Includer, try to dedup?
+        let pathbuf = std::path::PathBuf::from(&path);
         let error = format!("Can't open file: <{:?}>", pathbuf.to_str());
         let parser::Parsed { code, data } = parser::file_lines(&path)
             .expect(&error)
@@ -131,7 +142,13 @@ impl Simulator {
 
         self.code = code;
         self.memory.data = data;
-        self.set_reg(2, self.memory.data.len() as u32 - 4); // set stack pointer
+
+        // Set stack pointer
+        self.set_reg(2, self.memory.data.len() as u32 - 4);
+
+        // Create necessary status registers
+        self.status.resize(parser::register_names::status().len(), 0);
+
         Ok(self)
     }
 
@@ -148,6 +165,8 @@ impl Simulator {
                 }
             };
         }
+
+        self.started_at = time::Instant::now();
 
         loop {
             match self.code[self.pc / 4] {
@@ -308,6 +327,32 @@ impl Simulator {
                     self.set_reg(rd, (self.pc + 4) as u32);
                     self.pc = label;
                     continue;
+                }
+
+                // CSR
+                CsrRw(rd, fcsr, rs1) =>{
+                    self.set_reg(rd, self.get_status(fcsr));
+                    self.status[fcsr as usize] = self.get_reg::<u32>(rs1);
+                }
+                CsrRwi(rd, fcsr, imm) =>{
+                    self.set_reg(rd, self.get_status(fcsr));
+                    self.status[fcsr as usize] = imm;
+                }
+                CsrRs(rd, fcsr, rs1) =>{
+                    self.set_reg(rd, self.get_status(fcsr));
+                    self.status[fcsr as usize] |= self.get_reg::<u32>(rs1);
+                }
+                CsrRsi(rd, fcsr, imm) =>{
+                    self.set_reg(rd, self.get_status(fcsr));
+                    self.status[fcsr as usize] |= imm;
+                }
+                CsrRc(rd, fcsr, rs1) =>{
+                    self.set_reg(rd, self.get_status(fcsr));
+                    self.status[fcsr as usize] &= !self.get_reg::<u32>(rs1);
+                }
+                CsrRci(rd, fcsr, imm) =>{
+                    self.set_reg(rd, self.get_status(fcsr));
+                    self.status[fcsr as usize] &= !imm;
                 }
 
                 // Pseudoinstructions

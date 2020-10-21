@@ -199,8 +199,38 @@ pub fn args_mv(s: &str, regs: &RegMap) -> Result<(u8, u8), Error> {
     Ok(out)
 }
 
-pub fn args_csr(s: &str, regs: &RegMap, status: &RegMap) -> Result<(u8, u8), Error> {
-    let (_i, out) = all_consuming_tuple!((one_reg(regs), one_reg(status)))(s)?;
+pub fn args_csr_small(s: &str, regs: &RegMap, status: &RegMap) -> Result<(u8, u8), Error> {
+    let (_i, out) = all_consuming_tuple!((
+        one_reg(regs),   // rd
+        one_reg(status)  // fcsr
+    ))(s)?;
+
+    Ok(out)
+}
+pub fn args_csr(s: &str, regs: &RegMap, status: &RegMap) -> Result<(u8, u8, u8), Error> {
+    let (_i, out) = all_consuming_tuple!((
+        one_reg(regs),   // rd
+        one_reg(status), // fcsr
+        one_reg(regs)    // rs1
+    ))(s)?;
+
+    Ok(out)
+}
+pub fn args_csr_small_imm(s: &str, status: &RegMap) -> Result<(u8, u32), Error> {
+    let (_i, out) = all_consuming_tuple!((
+        one_reg(status),  // fcsr
+        immediate_with_sep
+    ))(s)?;
+
+    Ok(out)
+}
+pub fn args_csr_imm(s: &str, regs: &RegMap, status: &RegMap) -> Result<(u8, u8, u32), Error> {
+    let (_i, out) = all_consuming_tuple!((
+        one_reg(regs),   // rd
+        one_reg(status), // fcsr
+        immediate_with_sep
+    ))(s)?;
+
     Ok(out)
 }
 
@@ -343,13 +373,22 @@ mod tests {
     #[test]
     fn test_args_csr() {
         assert_eq!(
-            args_csr("x15 time", &REGS, &STATUS).map_err(|_| ()),
+            args_csr_small("x15 time", &REGS, &STATUS).map_err(|_| ()),
             Ok((15, STATUS.get("time").copied().unwrap()))
         );
         assert_eq!(
             // why would you csrr ra instret
-            args_csr("ra instret", &REGS, &STATUS).map_err(|_| ()),
+            args_csr_small("ra instret", &REGS, &STATUS).map_err(|_| ()),
             Ok((1, STATUS.get("instret").copied().unwrap()))
+        );
+        assert_eq!(
+            args_csr("x15 time x0", &REGS, &STATUS).map_err(|_| ()),
+            Ok((15, STATUS.get("time").copied().unwrap(), 0))
+        );
+        assert_eq!(
+            // why would you csrr ra instret
+            args_csr("ra instret, sp", &REGS, &STATUS).map_err(|_| ()),
+            Ok((1, STATUS.get("instret").copied().unwrap(), 2))
         );
     }
 }

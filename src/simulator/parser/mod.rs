@@ -5,7 +5,7 @@
 
 use radix_trie::Trie;
 
-mod register_names;
+pub mod register_names;
 use register_names::{self as reg_names, RegMap};
 
 mod combinators;
@@ -75,6 +75,16 @@ pub enum Instruction {
     Jalr(u8, u8, u32),
     /// rd, label
     Jal(u8, usize),
+
+    // CSR
+    /// rd, fcsr, rs1
+    CsrRw(u8, u8, u8),
+    CsrRs(u8, u8, u8),
+    CsrRc(u8, u8, u8),
+    /// rd, fcsr, imm
+    CsrRwi(u8, u8, u32),
+    CsrRsi(u8, u8, u32),
+    CsrRci(u8, u8, u32),
 
     // Some pseudoinstructions
     /// rd, imm
@@ -156,7 +166,6 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
         let mut data = Vec::with_capacity(data_segment_size);
 
         for line in self {
-            // TODO: extract this into a function
             let line = match parse_label(&line) {
                 Ok((rest, label)) => {
                     let label_pos = match directive {
@@ -189,8 +198,6 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
                 Directive::Text => code.push(parse_text(line, &regmaps)?),
                 Directive::Data => unimplemented!("No .data implementation yet"),
             }
-
-            println!("> {}", line);
         }
 
         let code: Result<Vec<Instruction>, Error> = code
@@ -211,7 +218,7 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
 }
 
 fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Error> {
-    let (regs, _floats, _status) = regmaps;
+    let (regs, _floats, status) = regmaps;
     use Instruction::*;
     use PreLabelInstruction as pre;
 
@@ -260,6 +267,30 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
     macro_rules! type_s {
         ($inst:expr) => {
             args_type_s(s, &regs).map(|(r1, imm, r2)| $inst(r1, imm, r2).into())?
+        };
+    }
+
+    macro_rules! csr {
+        ($inst:expr) => {
+            args_csr(s, &regs, &status).map(|(rd, fcsr, rs1)| $inst(rd, fcsr, rs1).into())?
+        };
+    }
+
+    macro_rules! csr_imm {
+        ($inst:expr) => {
+            args_csr_imm(s, &regs, &status).map(|(rd, fcsr, imm)| $inst(rd, fcsr, imm).into())?
+        };
+    }
+
+    macro_rules! csr_small {
+        ($inst:expr) => {
+            args_csr_small(s, &regs, &status).map(|(fcsr, rs1)| $inst(0, fcsr, rs1).into())?
+        };
+    }
+
+    macro_rules! csr_small_imm {
+        ($inst:expr) => {
+            args_csr_small_imm(s, &status).map(|(fcsr, imm)| $inst(0, fcsr, imm).into())?
         };
     }
 
@@ -325,6 +356,22 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "bgtz" => type_sb_reversed_z!(pre::Blt),
         "blez" => type_sb_reversed_z!(pre::Bge),
 
+        // CSR
+        "csrw" => csr_small!(CsrRw),
+        "csrc" => csr_small!(CsrRc),
+        "csrs" => csr_small!(CsrRs),
+        "csrwi" => csr_small_imm!(CsrRwi),
+        "csrci" => csr_small_imm!(CsrRci),
+        "csrsi" => csr_small_imm!(CsrRsi),
+        "csrrs" => csr!(CsrRs),
+        "csrrw" => csr!(CsrRw),
+        "csrrc" => csr!(CsrRc),
+        "csrrsi" => csr_imm!(CsrRsi),
+        "csrrwi" => csr_imm!(CsrRwi),
+        "csrrci" => csr_imm!(CsrRci),
+        "csrr" => args_csr_small(s, &regs, &status).map(|(rd, fcsr)| CsrRs(rd, fcsr, 0).into())?,
+
+        // Jumps
         "jal" => parse_jal(s, &regs)?,
         "call" => one_arg(s).map(|(_i, label)| pre::Jal(1, label.to_owned()))?,
         "j" | "tail" | "b" => one_arg(s).map(|(_i, label)| pre::Jal(0, label.to_owned()))?,

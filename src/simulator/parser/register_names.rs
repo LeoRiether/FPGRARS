@@ -1,5 +1,8 @@
 use fnv::FnvHashMap;
 
+pub const TIME_INDEX: u8 = 0;
+pub const MISA_INDEX: u8 = 1;
+
 use super::util::Error;
 
 pub type RegMap = FnvHashMap<String, u8>;
@@ -51,8 +54,13 @@ pub fn floats() -> RegMap {
 pub fn status() -> RegMap {
     let mut map = RegMap::default();
 
-    let names = vec!["ustatus", "utvec", "instret", "time"];
-    insert_names(&mut map, &names);
+    map.insert("time".to_owned(), TIME_INDEX);
+    map.insert("misa".to_owned(), MISA_INDEX);
+
+    let names = vec!["ustatus", "utvec", "uepc", "instret", "instreth", "timeh"];
+    for name in names {
+        map.insert(name.to_string(), map.len() as u8);
+    }
 
     map
 }
