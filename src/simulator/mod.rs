@@ -8,8 +8,8 @@
 use std::sync::{Arc, Mutex};
 use std::time;
 
-const DATA_SIZE: usize = 0x201000; // TODO: this
-const MMIO_SIZE: usize = 0x201000;
+const DATA_SIZE: usize = 0x400_000; // TODO: this, but I think it's about this much
+const MMIO_SIZE: usize = 0x201_000;
 const MMIO_START: usize = 0xff000000;
 
 pub mod parser;
@@ -87,6 +87,8 @@ impl Memory {
     }
 }
 
+/// Simulates a RISC-V CPU. Generally initialized by calling [load_from_file](struct.Simulator.html#method.load_from_file)
+/// and ran by calling [run](struct.Simulator.html#method.run).
 pub struct Simulator {
     registers: [u32; 32],
     _floats: [f32; 32],
@@ -105,7 +107,7 @@ impl Simulator {
             _floats: [0.0; 32],
             status: Vec::new(),
             pc: 0,
-            started_at: time::Instant::now(), // Will be set again on run()
+            started_at: time::Instant::now(), // Will be set again in run()
             memory: Memory::new(),
             code: Vec::new(),
         }
@@ -143,13 +145,18 @@ impl Simulator {
         self.code = code;
         self.memory.data = data;
 
-        // Set stack pointer
-        self.set_reg(2, self.memory.data.len() as u32 - 4);
+        Ok(self)
+    }
 
+    fn init(&mut self) {
         // Create necessary status registers
         self.status.resize(parser::register_names::status().len(), 0);
 
-        Ok(self)
+        // Set stack pointer
+        self.set_reg(2, self.memory.data.len() as u32 - 4);
+
+        self.started_at = time::Instant::now();
+        self.status[parser::register_names::MISA_INDEX as usize] = 0x40001128;
     }
 
     pub fn run(&mut self) {
@@ -166,7 +173,7 @@ impl Simulator {
             };
         }
 
-        self.started_at = time::Instant::now();
+        self.init();
 
         loop {
             match self.code[self.pc / 4] {
@@ -316,7 +323,7 @@ impl Simulator {
                     label
                 ),
                 Jalr(rd, rs1, imm) => {
-                    // This produces a weird result for `jalr s0 s0 label`. s0 is set to pc+4 before the jump occurs
+                    // This produces a weird result for `jalr s0 s0 0`. s0 is set to pc+4 before the jump occurs
                     // so it works as a nop. Maybe this is correct, maybe it's not, but I'll copy the behavior seen in
                     // RARS to be consistent.
                     self.set_reg(rd, (self.pc + 4) as u32);
@@ -381,6 +388,12 @@ impl Simulator {
                 let mut buf = String::new();
                 std::io::stdin().read_line(&mut buf).unwrap();
                 self.set_reg(10, buf.trim().parse::<i32>().unwrap());
+            }
+
+            32 => {
+                // sleep ms
+                let t = self.get_reg::<u32>(10);
+                std::thread::sleep(time::Duration::from_millis(t as u64));
             }
 
             x => unimplemented!("Ecall {} is not implemented", x),

@@ -4,6 +4,11 @@
 ##                                                                    ##
 ########################################################################
 
+.macro exit
+    li a7 10
+    ecall
+.end_macro
+
 .data
 
 .text
@@ -24,8 +29,7 @@ main.loop :
     j main.loop
 
 main.exit:
-    li a7 10
-    ecall
+    exit
 
 # a0 = color
 # a1 = frame

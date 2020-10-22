@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use fnv::FnvHashMap;
 use std::path::PathBuf;
 
 use super::combinators::*;
@@ -6,6 +6,8 @@ use super::util::*;
 
 /// Generally created by calling [parse_includes](trait.Includable.html#method.parse_includes)
 /// on an iterator of Strings
+// TODO: check for ciclic includes, preferably in a better way than RARS
+// (we should allow a file to be included more than once, maybe?)
 pub struct Includer<'a> {
     /// Stack of line iterators. Every time we encounter an .include,
     /// we push its iterator onto the stack.
@@ -46,20 +48,20 @@ impl<'a> Iterator for Includer<'a> {
         let line = strip_unneeded(&line).unwrap();
 
         if let Ok((_, file)) = include_directive(&line) {
-
             // Get the current path and push the filename
             let mut path = self.paths.last().unwrap().clone();
             path.push(file);
 
             // Push the new file line iterator onto the stack
             let error = format!("Can't open file: <{:?}>", path.to_str());
-            self.stack.push(Box::new(file_lines(path.clone()).expect(&error)));
+            self.stack
+                .push(Box::new(file_lines(path.clone()).expect(&error)));
 
             // Push the new current path onto the stack
             path.pop();
             self.paths.push(path);
 
-            Some(String::new())
+            self.next()
         } else {
             Some(line.into())
         }
@@ -85,6 +87,50 @@ impl<'a, I: Iterator<Item = String> + 'a> Includable<'a, I> for I {
     }
 }
 
+/// We store each line of a parsed macro in a similar manner to JavaScript's template strings.
+/// When the parameters are applied (in [build()](struct.MacroLine.html#method.build)),
+/// we output the concatenation `{ raw[0], param[0], raw[1], param[1], ..., raw[n-1], param[n-1], raw[n] }`
+struct MacroLine {
+    raw: Vec<String>,
+    param: Vec<u8>,
+}
+
+impl MacroLine {
+    fn from_string(s: &str, param_names: &FnvHashMap<String, u8>) -> Self {
+        todo!()
+    }
+
+    // TODO: should return a proper error
+    fn build(&self, params: &[String]) -> Result<String, ()> {
+        let mut ans = String::new();
+
+        for (r, &p) in self.raw.iter().zip(self.param.iter()) {
+            ans.extend(r.chars());
+            ans.extend(params[p as usize].chars());
+        }
+
+        ans.extend(self.raw.last().unwrap().chars());
+        Ok(ans)
+    }
+}
+
+/// Represents a parsed macro.
+struct Macro {
+    param_names: FnvHashMap<String, u8>,
+    lines: Vec<MacroLine>,
+}
+
+impl Macro {
+    fn push_line(&mut self, s: &str) {
+        self.lines
+            .push(MacroLine::from_string(s, &self.param_names));
+    }
+
+    fn build(&self, params: &[String]) -> Result<Vec<String>, ()> {
+        self.lines.iter().map(|m| m.build(params)).collect()
+    }
+}
+
 /// Generally created calling [parse_macros](trait.MacroParseable.html#method.parse_macros)
 /// on an iterator of Strings
 pub struct MacroParser<I>
@@ -92,7 +138,18 @@ where
     I: Iterator<Item = String>,
 {
     items: I,
-    buf: VecDeque<String>,
+
+    /// Stack of lines we should process before consuming items
+    buf: Vec<String>,
+
+    macros: FnvHashMap<(String, usize), Macro>,
+    current_macro: Option<Macro>,
+}
+
+impl<I: Iterator<Item = String>> MacroParser<I> {
+    fn parse_macro(&mut self, s: &str) -> Option<Vec<String>> {
+        todo!()
+    }
 }
 
 impl<I: Iterator<Item = String>> Iterator for MacroParser<I> {
@@ -100,7 +157,8 @@ impl<I: Iterator<Item = String>> Iterator for MacroParser<I> {
 
     fn next(&mut self) -> Option<Self::Item> {
         // Is there anything in the buffer?
-        if let Some(line) = self.buf.pop_front() {
+        if let Some(line) = self.buf.pop() {
+            match self.parse_macro(&line) {}
             return Some(line);
         }
 
@@ -119,7 +177,7 @@ impl<I: Sized + Iterator<Item = String>> MacroParseable<I> for I {
     fn parse_macros(self) -> MacroParser<I> {
         MacroParser {
             items: self,
-            buf: VecDeque::new(),
+            buf: Vec::new(),
         }
     }
 }
