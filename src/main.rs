@@ -15,6 +15,7 @@
 
 mod renderer;
 mod simulator;
+mod parser;
 
 use std::env;
 use std::error::Error;

@@ -1,108 +1,20 @@
 use nom::{
     self,
     branch::alt,
-    bytes::complete::{escaped_transform, is_not, tag, take_till, take_till1},
+    bytes::complete::{tag, take_till1},
     character::complete::{char as the_char, hex_digit1, space0},
-    combinator::{all_consuming, map, map_res, value},
-    multi::separated_list,
+    combinator::{all_consuming, map, map_res},
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
 
-pub type NomErr<'a> = nom::Err<(&'a str, nom::error::ErrorKind)>;
-
-use super::register_names::{RegMap, TryGetRegister};
-use super::util::Error;
+use super::shared::*;
+use crate::parser::register_names::{RegMap, TryGetRegister};
 
 macro_rules! all_consuming_tuple {
     ($tup:expr) => {
         all_consuming(tuple($tup))
     };
-}
-
-pub fn is_separator(c: char) -> bool {
-    c == ',' || c.is_whitespace()
-}
-
-pub fn separator0(s: &str) -> IResult<&str, ()> {
-    map(take_till(|c| !is_separator(c)), |_| ())(s)
-}
-pub fn separator1(s: &str) -> IResult<&str, ()> {
-    map(take_till1(|c| !is_separator(c)), |_| ())(s)
-}
-
-fn transform_escaped_char(c: &str) -> IResult<&str, &str> {
-    alt((
-        value("\\", the_char('\\')),
-        value("\"", the_char('"')),
-        value("\n", the_char('n')),
-        value("\t", the_char('t')),
-    ))(c)
-}
-
-pub fn quoted_string(s: &str) -> IResult<&str, String> {
-    delimited(
-        the_char('"'),
-        escaped_transform(is_not("\"\\"), '\\', transform_escaped_char),
-        the_char('"'),
-    )(s)
-}
-
-// TODO: remove duplicated logic, this is almost the same as fn quoted_string
-fn quoted_char(s: &str) -> IResult<&str, char> {
-    let parser = delimited(
-        the_char('\''),
-        escaped_transform(is_not("\'\\"), '\\', transform_escaped_char),
-        the_char('\''),
-    );
-
-    map(parser, |c| c.chars().next().unwrap())(s)
-}
-
-/// Parses `.include "file.s"` and outputs `file.s`
-pub fn include_directive(s: &str) -> IResult<&str, String> {
-    let parser = tuple((separator0, tag(".include"), separator0, quoted_string));
-    map(parser, |(_, _, _, file)| file)(s)
-}
-
-fn macro_tag(s: &str) -> IResult<&str, ()> {
-    map(terminated(tag(".macro"), separator1), |_| ())(s)
-}
-
-fn macro_arg_list(s: &str) -> IResult<&str, Vec<String>> {
-    separated_list(
-        separator1,
-        preceded(
-            the_char('%'),
-            map(take_till1(|c| is_separator(c) || c == ')'), str::to_owned),
-        ),
-    )(s)
-}
-
-/// Parses `.macro NAME(%arg1, %arg2)` into `("NAME", ["arg1", "arg2"])`
-pub fn declare_macro(s: &str) -> IResult<&str, (String, Vec<String>)> {
-    preceded(
-        macro_tag,
-        tuple((
-            map(one_arg, str::to_owned), // name
-            alt((
-                delimited(the_char('('), macro_arg_list, the_char(')')), // parenthesis enclosed args
-                map(all_consuming(separator0), |_| vec![]), // no args
-            )),
-        )),
-    )(s)
-}
-
-/// Recognizes`.end_macro`
-pub fn end_macro(s: &str) -> bool {
-    all_consuming(terminated(tag(".end_macro"), separator0))(s).is_ok()
-}
-
-/// Strips indentation and removes comments
-pub fn strip_unneeded(s: &str) -> Result<&str, NomErr> {
-    preceded(space0, take_till(|c| c == '#'))(s)
-        .map(|(_i, o)| o)
-        .map(|s| s.trim_end())
 }
 
 /// Parses a line that *begins* with a label
@@ -117,6 +29,10 @@ pub fn parse_label(s: &str) -> IResult<&str, &str> {
 /// Should work correctly for immediates, for example `one_arg("-4(sp)")` should only parse `-4`.
 pub fn one_arg(s: &str) -> IResult<&str, &str> {
     terminated(take_till1(|c| is_separator(c) || c == '('), separator0)(s)
+}
+
+pub fn owned_one_arg(s: &str) -> IResult<&str, String> {
+    map(one_arg, str::to_owned)(s)
 }
 
 pub fn one_reg<'a>(regs: &'a RegMap) -> impl Fn(&'a str) -> IResult<&str, u8> {
@@ -173,7 +89,7 @@ pub fn args_type_r(s: &str, regs: &RegMap) -> Result<(u8, u8, u8), Error> {
 pub fn args_jal(s: &str, regs: &RegMap) -> Result<(u8, String), Error> {
     let (_i, out) = all_consuming_tuple!((
         one_reg(regs), // rd
-        map(one_arg, str::to_owned),
+        owned_one_arg,
     ))(s)?;
 
     Ok(out)
@@ -182,9 +98,9 @@ pub fn args_jal(s: &str, regs: &RegMap) -> Result<(u8, String), Error> {
 /// Parses the arguments for a Type SB instruction, like `bge` or `blt`
 pub fn args_type_sb(s: &str, regs: &RegMap) -> Result<(u8, u8, String), Error> {
     let (_i, out) = all_consuming_tuple!((
-        one_reg(regs),               // rs1
-        one_reg(regs),               // rs2
-        map(one_arg, str::to_owned), // label
+        one_reg(regs), // rs1
+        one_reg(regs), // rs2
+        owned_one_arg, // label
     ))(s)?;
 
     Ok(out)
@@ -273,60 +189,14 @@ pub fn args_csr_imm(s: &str, regs: &RegMap, status: &RegMap) -> Result<(u8, u8, 
 
 #[cfg(test)]
 mod tests {
-    use super::super::register_names as reg_names;
     use super::*;
-
+    use crate::parser::register_names::{self as reg_names, RegMap};
     use lazy_static::*;
 
     lazy_static! {
         static ref REGS: RegMap = reg_names::regs();
         static ref FLOATS: RegMap = reg_names::floats();
         static ref STATUS: RegMap = reg_names::status();
-    }
-
-    #[test]
-    fn test_quoted_string() {
-        assert_eq!(
-            quoted_string("\"some quoted string\""),
-            Ok(("", "some quoted string".to_owned()))
-        );
-        assert_eq!(
-            quoted_string(r#""escape \"sequences\"\n parsed \t correctly""#),
-            Ok(("", "escape \"sequences\"\n parsed \t correctly".to_owned()))
-        );
-    }
-
-    #[test]
-    fn test_include_directive() {
-        assert_eq!(
-            include_directive(".include \"some file.s\""),
-            Ok(("", "some file.s".to_owned()))
-        );
-    }
-
-    #[test]
-    fn test_declare_macro() {
-        assert_eq!(
-            declare_macro(".macro NAME(%arg1, %arg2)").map_err(|_| ()),
-            Ok(("", ("NAME".into(), vec!["arg1".into(), "arg2".into()])))
-        );
-        assert_eq!(
-            declare_macro(".macro NAME").map_err(|_| ()),
-            Ok(("", ("NAME".into(), vec![])))
-        );
-        assert_eq!(
-            declare_macro(".macro MV(%rd %rs1)").map_err(|_| ()),
-            Ok(("", ("MV".into(), vec!["rd".into(), "rs1".into()])))
-        );
-    }
-
-    #[test]
-    fn test_strip_unneeded() {
-        assert_eq!(
-            strip_unneeded("     mv x0 x0 # does nothing"),
-            Ok("mv x0 x0"),
-        );
-        assert_eq!(strip_unneeded("j main # Does nothing"), Ok("j main"),)
     }
 
     #[test]

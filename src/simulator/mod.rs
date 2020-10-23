@@ -12,8 +12,7 @@ const DATA_SIZE: usize = 0x400_000; // TODO: this, but I think it's about this m
 const MMIO_SIZE: usize = 0x201_000;
 const MMIO_START: usize = 0xff000000;
 
-pub mod parser;
-use parser::{Includable, MacroParseable, RISCVParser};
+use crate::parser::{self, Includable, MacroParseable, RISCVParser};
 
 mod into_register;
 use into_register::*;
