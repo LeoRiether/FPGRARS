@@ -70,7 +70,7 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
         .state(MyState::new(mmio.clone()))
         .input(MyState::handle_input);
 
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "show_ms")]
     let canvas = canvas.show_ms(true);
 
     canvas.render(move |_state, image| {

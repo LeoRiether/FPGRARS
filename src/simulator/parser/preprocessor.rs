@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use std::mem;
 use std::path::PathBuf;
 
 use super::combinators::*;
@@ -87,47 +88,116 @@ impl<'a, I: Iterator<Item = String> + 'a> Includable<'a, I> for I {
     }
 }
 
+// can't implement this as a lambda because of lifetime issues
+fn ignore_char(s: &str) -> &str {
+    if s.len() >= 1 {
+        &s[1..]
+    } else {
+        s
+    }
+}
+
 /// We store each line of a parsed macro in a similar manner to JavaScript's template strings.
-/// When the parameters are applied (in [build()](struct.MacroLine.html#method.build)),
-/// we output the concatenation `{ raw[0], param[0], raw[1], param[1], ..., raw[n-1], param[n-1], raw[n] }`
+/// When the arguments are applied (in [build()](struct.MacroLine.html#method.build)),
+/// we output the concatenation `{ raw[0], arg[0], raw[1], arg[1], ..., raw[n-1], arg[n-1], raw[n] }`
+#[derive(Debug, Default, PartialEq, Eq)]
 struct MacroLine {
     raw: Vec<String>,
-    param: Vec<u8>,
+    args: Vec<usize>,
 }
 
 impl MacroLine {
-    fn from_string(s: &str, param_names: &FnvHashMap<String, u8>) -> Self {
-        todo!()
+    fn from_string(s: &str, arg_names: &FnvHashMap<String, usize>) -> Result<Self, Error> {
+        use nom::bytes::complete::take_till;
+        let take_raw = |s| take_till::<_, _, ()>(|c| c == '%')(s).unwrap();
+        let take_arg = |s| take_till::<_, _, ()>(|c| is_separator(c) || c == '(')(s).unwrap();
+
+        let mut res = Self::default();
+
+        let (mut s, prefix) = take_raw(s);
+        s = ignore_char(s); // ignore the %
+        res.raw.push(prefix.into());
+
+        while s.len() > 0 {
+            let (rest, arg) = take_arg(s);
+            let (rest, raw) = take_raw(rest);
+            s = ignore_char(rest);
+
+            let arg_index = match arg_names.get(arg) {
+                Some(x) => *x,
+                None => return Err(Error::ArgNotFoundMacro(arg.to_owned())),
+            };
+
+            res.args.push(arg_index);
+            res.raw.push(raw.into());
+        }
+
+        Ok(res)
     }
 
-    // TODO: should return a proper error
-    fn build(&self, params: &[String]) -> Result<String, ()> {
+    /// Builds a single line, replacing where arguments were by the actual values
+    fn build(&self, args: &[String]) -> String {
         let mut ans = String::new();
 
-        for (r, &p) in self.raw.iter().zip(self.param.iter()) {
+        for (r, &p) in self.raw.iter().zip(self.args.iter()) {
             ans.extend(r.chars());
-            ans.extend(params[p as usize].chars());
+            ans.extend(args[p].chars());
         }
 
         ans.extend(self.raw.last().unwrap().chars());
-        Ok(ans)
+        ans
+    }
+}
+
+/// Exists while we're inside a `.macro`, `.end_macro` definition, just to keep
+/// track of the argument names. After that we can discard arg_names and keep only thea
+/// lines: this is a [Macro](struct.Macro.html)
+struct MacroBuilder {
+    /// Maps a argument string to its index in the macro declaration
+    arg_names: FnvHashMap<String, usize>,
+
+    /// Stack of macro lines
+    lines: Vec<MacroLine>,
+
+    name: String,
+}
+
+impl MacroBuilder {
+    fn new(name: String, arg_names: Vec<String>) -> Self {
+        Self {
+            arg_names: arg_names
+                .into_iter()
+                .enumerate()
+                .map(|(i, s)| (s, i))
+                .collect(),
+            lines: Vec::new(),
+            name,
+        }
+    }
+
+    fn push_line(&mut self, s: &str) -> Result<(), Error> {
+        self.lines.push(MacroLine::from_string(s, &self.arg_names)?);
+        Ok(())
+    }
+
+    fn to_macro(self) -> Macro {
+        // We reverse the lines so we can get them in stack order later
+        Macro {
+            lines: self.lines.into_iter().rev().collect(),
+        }
     }
 }
 
 /// Represents a parsed macro.
 struct Macro {
-    param_names: FnvHashMap<String, u8>,
+    /// Stack of macro lines
     lines: Vec<MacroLine>,
 }
 
 impl Macro {
-    fn push_line(&mut self, s: &str) {
-        self.lines
-            .push(MacroLine::from_string(s, &self.param_names));
-    }
-
-    fn build(&self, params: &[String]) -> Result<Vec<String>, ()> {
-        self.lines.iter().map(|m| m.build(params)).collect()
+    /// Builds a stack of macro lines by building every line with [MacroLine.build](struct.MacroLine.html#method.build)
+    fn build(&self, args: &[String]) -> Vec<String> {
+        self.lines.iter().map(|m| m.build(args)).collect()
     }
 }
 
@@ -143,11 +213,38 @@ where
     buf: Vec<String>,
 
     macros: FnvHashMap<(String, usize), Macro>,
-    current_macro: Option<Macro>,
 }
 
 impl<I: Iterator<Item = String>> MacroParser<I> {
-    fn parse_macro(&mut self, s: &str) -> Option<Vec<String>> {
+    /// Parses a `.macro NAME(%args)` declaration and, if it encounters it, returns a MacroBuilder
+    fn parse_macro_declaration(&mut self, s: &str) -> Option<MacroBuilder> {
+        declare_macro(s)
+            .ok()
+            .map(|(_, (name, args))| MacroBuilder::new(name, args))
+    }
+
+    /// Consumes the lines until we find an `.end_macro`
+    fn parse_until_end(
+        &mut self,
+        mut builder: MacroBuilder,
+    ) -> Result<((String, usize), Macro), Error> {
+        loop {
+            match self.items.next() {
+                Some(line) if end_macro(&line) => {
+                    let arg_count = builder.arg_names.len();
+                    let name = mem::replace(&mut builder.name, String::new());
+                    return Ok(((name, arg_count), builder.to_macro()));
+                }
+                None => return Err(Error::UnendedMacro(builder.name)),
+
+                Some(line) => builder.push_line(&line)?,
+            };
+        }
+    }
+
+    /// Parses a macro usage and optionally returns the lines to be inlined
+    fn parse_macro_use(&mut self, s: &str) -> Option<Vec<String>> {
+        return None;
         todo!()
     }
 }
@@ -156,13 +253,25 @@ impl<I: Iterator<Item = String>> Iterator for MacroParser<I> {
     type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // Is there anything in the buffer?
-        if let Some(line) = self.buf.pop() {
-            match self.parse_macro(&line) {}
-            return Some(line);
+        let line = match self.buf.pop() {
+            Some(line) => line,
+            None => self.items.next()?,
+        };
+
+        // Is the line a macro usage?
+        if let Some(inlined) = self.parse_macro_use(&line) {
+            self.buf.extend(inlined);
+            return self.next();
         }
 
-        self.items.next()
+        // Is the line a macro declaration?
+        if let Some(builder) = self.parse_macro_declaration(&line) {
+            let (key, parsed_macro) = self.parse_until_end(builder).unwrap();
+            self.macros.insert(key, parsed_macro);
+            return self.next();
+        }
+
+        Some(line)
     }
 }
 
@@ -178,6 +287,36 @@ impl<I: Sized + Iterator<Item = String>> MacroParseable<I> for I {
         MacroParser {
             items: self,
             buf: Vec::new(),
+            macros: FnvHashMap::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_macros() {
+        let mut builder = MacroBuilder::new("Bob".into(), vec!["arg1".into(), "arg2".into()]);
+        builder.push_line("li %arg1 10").unwrap();
+        builder.push_line("%arg2").unwrap();
+
+        let m = builder.to_macro();
+
+        // notice the lines are in stack order
+        assert_eq!(
+            m.lines,
+            vec![
+                MacroLine {
+                    raw: vec!["".into(), "".into()],
+                    args: vec![1]
+                },
+                MacroLine {
+                    raw: vec!["li ".into(), " 10".into()],
+                    args: vec![0]
+                },
+            ]
+        );
     }
 }

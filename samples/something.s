@@ -29,7 +29,8 @@ main.loop :
     j main.loop
 
 main.exit:
-    exit
+    li a7 10
+    ecall
 
 # a0 = color
 # a1 = frame

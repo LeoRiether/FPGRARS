@@ -4,6 +4,7 @@ use nom::{
     bytes::complete::{escaped_transform, is_not, tag, take_till, take_till1},
     character::complete::{char as the_char, hex_digit1, space0},
     combinator::{all_consuming, map, map_res, value},
+    multi::separated_list,
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
@@ -25,6 +26,9 @@ pub fn is_separator(c: char) -> bool {
 
 pub fn separator0(s: &str) -> IResult<&str, ()> {
     map(take_till(|c| !is_separator(c)), |_| ())(s)
+}
+pub fn separator1(s: &str) -> IResult<&str, ()> {
+    map(take_till1(|c| !is_separator(c)), |_| ())(s)
 }
 
 fn transform_escaped_char(c: &str) -> IResult<&str, &str> {
@@ -59,6 +63,39 @@ fn quoted_char(s: &str) -> IResult<&str, char> {
 pub fn include_directive(s: &str) -> IResult<&str, String> {
     let parser = tuple((separator0, tag(".include"), separator0, quoted_string));
     map(parser, |(_, _, _, file)| file)(s)
+}
+
+fn macro_tag(s: &str) -> IResult<&str, ()> {
+    map(terminated(tag(".macro"), separator1), |_| ())(s)
+}
+
+fn macro_arg_list(s: &str) -> IResult<&str, Vec<String>> {
+    separated_list(
+        separator1,
+        preceded(
+            the_char('%'),
+            map(take_till1(|c| is_separator(c) || c == ')'), str::to_owned),
+        ),
+    )(s)
+}
+
+/// Parses `.macro NAME(%arg1, %arg2)` into `("NAME", ["arg1", "arg2"])`
+pub fn declare_macro(s: &str) -> IResult<&str, (String, Vec<String>)> {
+    preceded(
+        macro_tag,
+        tuple((
+            map(one_arg, str::to_owned), // name
+            alt((
+                delimited(the_char('('), macro_arg_list, the_char(')')), // parenthesis enclosed args
+                map(all_consuming(separator0), |_| vec![]), // no args
+            )),
+        )),
+    )(s)
+}
+
+/// Recognizes`.end_macro`
+pub fn end_macro(s: &str) -> bool {
+    all_consuming(terminated(tag(".end_macro"), separator0))(s).is_ok()
 }
 
 /// Strips indentation and removes comments
@@ -218,7 +255,7 @@ pub fn args_csr(s: &str, regs: &RegMap, status: &RegMap) -> Result<(u8, u8, u8),
 }
 pub fn args_csr_small_imm(s: &str, status: &RegMap) -> Result<(u8, u32), Error> {
     let (_i, out) = all_consuming_tuple!((
-        one_reg(status),  // fcsr
+        one_reg(status), // fcsr
         immediate_with_sep
     ))(s)?;
 
@@ -264,6 +301,22 @@ mod tests {
         assert_eq!(
             include_directive(".include \"some file.s\""),
             Ok(("", "some file.s".to_owned()))
+        );
+    }
+
+    #[test]
+    fn test_declare_macro() {
+        assert_eq!(
+            declare_macro(".macro NAME(%arg1, %arg2)").map_err(|_| ()),
+            Ok(("", ("NAME".into(), vec!["arg1".into(), "arg2".into()])))
+        );
+        assert_eq!(
+            declare_macro(".macro NAME").map_err(|_| ()),
+            Ok(("", ("NAME".into(), vec![])))
+        );
+        assert_eq!(
+            declare_macro(".macro MV(%rd %rs1)").map_err(|_| ()),
+            Ok(("", ("MV".into(), vec!["rd".into(), "rs1".into()])))
         );
     }
 

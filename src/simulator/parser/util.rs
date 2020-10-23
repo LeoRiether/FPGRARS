@@ -8,10 +8,14 @@ use std::path::Path;
 pub enum Error {
     /// Not the parser's fault, some std::io went wrong
     IO(io::Error),
+
     LabelNotFound(String),
     Nom(String, nom::error::ErrorKind), // I'm feeling lazy
     RegisterNotFound(String),
     InstructionNotFound(String),
+
+    UnendedMacro(String),
+    ArgNotFoundMacro(String),
 }
 
 impl From<io::Error> for Error {
