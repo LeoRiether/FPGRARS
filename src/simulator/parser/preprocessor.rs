@@ -88,15 +88,6 @@ impl<'a, I: Iterator<Item = String> + 'a> Includable<'a, I> for I {
     }
 }
 
-// can't implement this as a lambda because of lifetime issues
-fn ignore_char(s: &str) -> &str {
-    if s.len() >= 1 {
-        &s[1..]
-    } else {
-        s
-    }
-}
-
 /// We store each line of a parsed macro in a similar manner to JavaScript's template strings.
 /// When the arguments are applied (in [build()](struct.MacroLine.html#method.build)),
 /// we output the concatenation `{ raw[0], arg[0], raw[1], arg[1], ..., raw[n-1], arg[n-1], raw[n] }`
@@ -113,6 +104,14 @@ impl MacroLine {
         let take_arg = |s| take_till::<_, _, ()>(|c| is_separator(c) || c == '(')(s).unwrap();
 
         let mut res = Self::default();
+
+        fn ignore_char(t: &str) -> &str {
+            if t.len() >= 1 {
+                &t[1..]
+            } else {
+                t
+            }
+        }
 
         let (mut s, prefix) = take_raw(s);
         s = ignore_char(s); // ignore the %
@@ -181,6 +180,7 @@ impl MacroBuilder {
     }
 
     fn to_macro(self) -> Macro {
+        println!("built {}", &self.name);
         // We reverse the lines so we can get them in stack order later
         Macro {
             lines: self.lines.into_iter().rev().collect(),
