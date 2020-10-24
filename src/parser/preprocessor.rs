@@ -217,7 +217,7 @@ where
 
 impl<I: Iterator<Item = String>> MacroParser<I> {
     /// Parses a `.macro NAME(%args)` declaration and, if it encounters it, returns a MacroBuilder
-    fn parse_macro_declaration(&mut self, s: &str) -> Option<MacroBuilder> {
+    fn parse_macro_declaration(&self, s: &str) -> Option<MacroBuilder> {
         declare_macro(s)
             .ok()
             .map(|(_, (name, args))| MacroBuilder::new(name, args))
@@ -243,10 +243,18 @@ impl<I: Iterator<Item = String>> MacroParser<I> {
     }
 
     /// Parses a macro usage and optionally returns the lines to be inlined
-    fn parse_macro_use(&mut self, s: &str) -> Option<Vec<String>> {
+    fn parse_macro_use(&self, s: &str) -> Option<Vec<String>> {
         let (_, (name, args)) = macro_use(s).ok()?;
         let key = (name, args.len());
         self.macros.get(&key).map(|m| m.build(&args))
+    }
+
+    fn replace_eqvs(&self, s: String) -> String {
+        // There can't be any eqvs
+        if self.eqvs.len() == 0 {
+            return s;
+        }
+        s
     }
 }
 
@@ -278,10 +286,7 @@ impl<I: Iterator<Item = String>> Iterator for MacroParser<I> {
             return self.next();
         }
 
-        // Is the line an eqv usage?
-        // who knows
-
-        Some(line)
+        Some(self.replace_eqvs(line))
     }
 }
 

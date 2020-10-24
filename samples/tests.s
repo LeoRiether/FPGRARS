@@ -1,15 +1,3 @@
-.macro TWO(%f %g)
-    %f
-    %g
-.end_macro
+.eqv Z x0
 
-.macro EXIT(%1)
-    li a7 %1
-    ecall
-.end_macro
-
-.macro NOPE
-    nop
-.end_macro
-
-TWO(EXIT(10), NOPE)
+lw Z 0(Z)
