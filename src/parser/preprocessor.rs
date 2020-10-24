@@ -180,7 +180,6 @@ impl MacroBuilder {
     }
 
     fn to_macro(self) -> Macro {
-        println!("built {}", &self.name);
         // We reverse the lines so we can get them in stack order later
         Macro {
             lines: self.lines.into_iter().rev().collect(),
@@ -213,6 +212,7 @@ where
     buf: Vec<String>,
 
     macros: FnvHashMap<(String, usize), Macro>,
+    eqvs: FnvHashMap<String, String>,
 }
 
 impl<I: Iterator<Item = String>> MacroParser<I> {
@@ -244,8 +244,9 @@ impl<I: Iterator<Item = String>> MacroParser<I> {
 
     /// Parses a macro usage and optionally returns the lines to be inlined
     fn parse_macro_use(&mut self, s: &str) -> Option<Vec<String>> {
-        return None;
-        todo!()
+        let (_, (name, args)) = macro_use(s).ok()?;
+        let key = (name, args.len());
+        self.macros.get(&key).map(|m| m.build(&args))
     }
 }
 
@@ -258,18 +259,27 @@ impl<I: Iterator<Item = String>> Iterator for MacroParser<I> {
             None => self.items.next()?,
         };
 
-        // Is the line a macro usage?
-        if let Some(inlined) = self.parse_macro_use(&line) {
-            self.buf.extend(inlined);
-            return self.next();
-        }
-
         // Is the line a macro declaration?
         if let Some(builder) = self.parse_macro_declaration(&line) {
             let (key, parsed_macro) = self.parse_until_end(builder).unwrap();
             self.macros.insert(key, parsed_macro);
             return self.next();
         }
+
+        // Is the line a macro usage?
+        if let Some(inlined) = self.parse_macro_use(&line) {
+            self.buf.extend(inlined);
+            return self.next();
+        }
+
+        // Is the line an eqv declaration?
+        if let Ok((_, (key, value))) = declare_eqv(&line) {
+            self.eqvs.insert(key, value);
+            return self.next();
+        }
+
+        // Is the line an eqv usage?
+        // who knows
 
         Some(line)
     }
@@ -288,6 +298,7 @@ impl<I: Sized + Iterator<Item = String>> MacroParseable<I> for I {
             items: self,
             buf: Vec::new(),
             macros: FnvHashMap::default(),
+            eqvs: FnvHashMap::default(),
         }
     }
 }
