@@ -8,11 +8,11 @@ use pixel_canvas::{
 };
 use std::sync::{Arc, Mutex};
 
-const WIDTH: usize = 320;
-const HEIGHT: usize = 240;
-const FRAME_SELECT: usize = 0x200604;
-const FRAME_0: usize = 0;
-const FRAME_1: usize = 0x100000;
+pub const WIDTH: usize = 320;
+pub const HEIGHT: usize = 240;
+pub const FRAME_SELECT: usize = 0x200604;
+pub const FRAME_0: usize = 0;
+pub const FRAME_1: usize = 0x100000;
 const KEYBOARD: usize = 0x200000;
 
 struct MyState {
@@ -82,7 +82,7 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
         // Draw each MMIO pixel as a 2x2 square
         for (y, row) in image.chunks_mut(2 * WIDTH).enumerate() {
             for (x, pixel) in row.iter_mut().enumerate() {
-                let (x, y) = (x / 2, y / 2);
+                let (x, y) = (x / 2, HEIGHT - y / 2);
                 let index = start + y * WIDTH + x;
 
                 let col = if cfg!(debug_assertions) {

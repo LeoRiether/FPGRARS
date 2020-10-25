@@ -163,7 +163,7 @@ impl Simulator {
         self.set_reg(2, self.memory.data.len() as u32 - 4);
 
         // Set global pointer
-        self.set_reg(3, 0x10008000);
+        // self.set_reg(3, 0x10008000);
 
         self.started_at = time::Instant::now();
         self.status[parser::register_names::MISA_INDEX as usize] = 0x40001128;
@@ -240,9 +240,13 @@ impl Simulator {
                 Ecall => {
                     use EcallSignal::*;
                     match self.ecall() {
-                        Exit => { return; }
-                        Continue => { continue; }
-                        Nothing => { }
+                        Exit => {
+                            return;
+                        }
+                        Continue => {
+                            continue;
+                        }
+                        Nothing => {}
                     }
                 }
                 Addi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) + (imm as i32)),
@@ -402,6 +406,14 @@ impl Simulator {
                 // print int
                 println!("{}", self.get_reg::<i32>(10));
             }
+            4 => {
+                // print string
+                let start = self.get_reg::<u32>(10) as usize; // a0
+                (start..)
+                    .map(|i| self.memory.get_byte(i) as char)
+                    .take_while(|&c| c != '\0')
+                    .for_each(|c| print!("{}", c));
+            }
             5 => {
                 // read int
                 let mut buf = String::new();
@@ -413,6 +425,19 @@ impl Simulator {
                 // sleep ms
                 let t = self.get_reg::<u32>(10);
                 std::thread::sleep(time::Duration::from_millis(t as u64));
+            }
+
+            48 | 148 => {
+                // clear screen
+                let color = self.get_reg::<u8>(10); // a0
+                let frame_select = self.get_reg::<u32>(11); // a1
+
+                let mut mmio = self.memory.mmio.lock().unwrap();
+                use crate::renderer::{FRAME_0, FRAME_1, HEIGHT, WIDTH};
+                let frame = if frame_select == 0 { FRAME_0 } else { FRAME_1 };
+                for x in &mut mmio[frame..frame + WIDTH * HEIGHT] {
+                    *x = color;
+                }
             }
 
             // Does the user want to handle this ecall?
