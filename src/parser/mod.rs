@@ -320,6 +320,7 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "rem" => type_r!(Rem),
         "remu" => type_r!(Remu),
         "neg" => args_mv(s, &regs).map(|(rd, rs1)| Sub(rd, 0, rs1).into())?,
+        "not" => args_mv(s, &regs).map(|(rd, rs1)| Xori(rd, rs1, (-1i32) as u32).into())?,
         "mv" => args_mv(s, &regs).map(|(rd, rs1)| Mv(rd, rs1).into())?,
 
         // Type I
@@ -333,6 +334,7 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "ori" => type_i!(Ori),
         "andi" => type_i!(Andi),
         "jalr" => type_i!(Jalr),
+        "jr" => one_reg(&regs)(s).map(|(_i, rs1)| Jalr(0, rs1, 0).into())?,
 
         // Type I, loads from memory
         "lb" => type_s!(Lb),
