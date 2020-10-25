@@ -161,7 +161,7 @@ pub fn args_mv(s: &str, regs: &RegMap) -> Result<(u8, u8), Error> {
 
 pub fn args_csr_small(s: &str, regs: &RegMap, status: &RegMap) -> Result<(u8, u8), Error> {
     let (_i, out) = all_consuming_tuple!((
-        one_reg(regs),   // rd
+        one_reg(regs),   // rs1
         one_reg(status)  // fcsr
     ))(s)?;
 

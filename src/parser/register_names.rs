@@ -2,6 +2,10 @@ use fnv::FnvHashMap;
 
 pub const TIME_INDEX: u8 = 0;
 pub const MISA_INDEX: u8 = 1;
+pub const UEPC_INDEX: u8 = 2;
+pub const USTATUS_INDEX: u8 = 3;
+pub const UTVEC_INDEX: u8 = 4;
+pub const UCAUSE_INDEX: u8 = 5;
 
 use super::util::Error;
 
@@ -56,9 +60,13 @@ pub fn status() -> RegMap {
 
     map.insert("time".to_owned(), TIME_INDEX);
     map.insert("misa".to_owned(), MISA_INDEX);
+    map.insert("uepc".to_owned(), UEPC_INDEX);
+    map.insert("ustatus".to_owned(), USTATUS_INDEX);
+    map.insert("utvec".to_owned(), UTVEC_INDEX);
+    map.insert("ucause".to_owned(), UCAUSE_INDEX);
 
     let names = vec![
-        "ustatus", "ucause", "uscratch", "utvec", "utval", "uepc", "instret", "instreth", "timeh",
+        "uscratch", "utval", "instret", "instreth", "timeh",
     ];
     for name in names {
         map.insert(name.to_string(), map.len() as u8);

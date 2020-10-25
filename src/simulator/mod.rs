@@ -8,9 +8,9 @@
 use std::sync::{Arc, Mutex};
 use std::time;
 
-const DATA_SIZE: usize = 0x400_000; // TODO: this, but I think it's about this much
-const MMIO_SIZE: usize = 0x201_000;
-const MMIO_START: usize = 0xff000000;
+const DATA_SIZE: usize = 0x0040_0000; // TODO: this, but I think it's about this much
+const MMIO_SIZE: usize = 0x0021_0000;
+const MMIO_START: usize = 0xff00_0000;
 
 use crate::parser::{self, Includable, MacroParseable, RISCVParser};
 
@@ -86,6 +86,13 @@ impl Memory {
     }
 }
 
+/// Returned by the [ecall](struct.Simulator.html#method.ecall) procedure
+enum EcallSignal {
+    Nothing,
+    Exit,
+    Continue,
+}
+
 /// Simulates a RISC-V CPU. Generally initialized by calling [load_from_file](struct.Simulator.html#method.load_from_file)
 /// and ran by calling [run](struct.Simulator.html#method.run).
 pub struct Simulator {
@@ -154,6 +161,9 @@ impl Simulator {
 
         // Set stack pointer
         self.set_reg(2, self.memory.data.len() as u32 - 4);
+
+        // Set global pointer
+        self.set_reg(3, 0x10008000);
 
         self.started_at = time::Instant::now();
         self.status[parser::register_names::MISA_INDEX as usize] = 0x40001128;
@@ -228,9 +238,11 @@ impl Simulator {
 
                 // Type I
                 Ecall => {
-                    let signal = self.ecall();
-                    if signal == true {
-                        return;
+                    use EcallSignal::*;
+                    match self.ecall() {
+                        Exit => { return; }
+                        Continue => { continue; }
+                        Nothing => { }
                     }
                 }
                 Addi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) + (imm as i32)),
@@ -369,16 +381,23 @@ impl Simulator {
                     self.pc = self.registers[1] as usize;
                     continue;
                 }
+                URet => {
+                    use crate::parser::register_names::UEPC_INDEX;
+                    self.pc = self.status[UEPC_INDEX as usize] as usize;
+                    continue;
+                }
             }
 
             self.pc += 4;
         }
     }
 
-    fn ecall(&mut self) -> bool {
+    fn ecall(&mut self) -> EcallSignal {
+        use crate::parser::register_names::*;
+
         // 17 = a7
         match self.get_reg::<i32>(17) {
-            10 => return true, // exit
+            10 => return EcallSignal::Exit,
             1 => {
                 // print int
                 println!("{}", self.get_reg::<i32>(10));
@@ -396,8 +415,17 @@ impl Simulator {
                 std::thread::sleep(time::Duration::from_millis(t as u64));
             }
 
+            // Does the user want to handle this ecall?
+            _x if self.status[USTATUS_INDEX as usize] & 1 == 1 => {
+                self.status[UCAUSE_INDEX as usize] = 8; // ecall exception
+                self.status[UEPC_INDEX as usize] = self.pc as u32; // set uret location
+                self.pc = self.status[UTVEC_INDEX as usize] as usize; // jump to utvec
+                return EcallSignal::Continue;
+            }
+
             x => unimplemented!("Ecall {} is not implemented", x),
         }
-        false
+
+        EcallSignal::Nothing
     }
 }

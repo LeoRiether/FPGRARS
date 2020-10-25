@@ -93,6 +93,7 @@ pub enum Instruction {
     Mv(u8, u8),
 
     Ret,
+    URet,
 }
 
 /// Also giant enum that represents a single RISC-V instruction, but we save
@@ -291,7 +292,7 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
 
     macro_rules! csr_small {
         ($inst:expr) => {
-            args_csr_small(s, &regs, &status).map(|(fcsr, rs1)| $inst(0, fcsr, rs1).into())?
+            args_csr_small(s, &regs, &status).map(|(rs1, fcsr)| $inst(0, fcsr, rs1).into())?
         };
     }
 
@@ -423,7 +424,7 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "fmul.s" => Mv(0, 0).into(),
         "fneg.s" => Mv(0, 0).into(),
 
-        "uret" => Mv(0, 0).into(),
+        "uret" => URet.into(),
 
         dont_know => return Err(Error::InstructionNotFound(dont_know.to_owned())),
     };
