@@ -2,7 +2,7 @@ use nom::{
     self,
     branch::alt,
     bytes::complete::{tag, take_till1},
-    character::complete::{char as the_char, hex_digit1, space0},
+    character::complete::{char as the_char, hex_digit1},
     combinator::{all_consuming, map, map_res},
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
@@ -20,8 +20,8 @@ macro_rules! all_consuming_tuple {
 /// Parses a line that *begins* with a label
 pub fn parse_label(s: &str) -> IResult<&str, &str> {
     terminated(
-        take_till1(|c| c == ':' || c == ' '),
-        tuple((space0, tag(":"), space0)),
+        take_till1(|c| c == ':' || is_separator(c)),
+        tuple((separator0, the_char(':'), separator0)),
     )(s)
 }
 

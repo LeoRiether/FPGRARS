@@ -57,7 +57,9 @@ pub fn status() -> RegMap {
     map.insert("time".to_owned(), TIME_INDEX);
     map.insert("misa".to_owned(), MISA_INDEX);
 
-    let names = vec!["ustatus", "utvec", "uepc", "instret", "instreth", "timeh"];
+    let names = vec![
+        "ustatus", "ucause", "uscratch", "utvec", "utval", "uepc", "instret", "instreth", "timeh",
+    ];
     for name in names {
         map.insert(name.to_string(), map.len() as u8);
     }

@@ -249,12 +249,45 @@ impl<I: Iterator<Item = String>> MacroParser<I> {
         self.macros.get(&key).map(|m| m.build(&args))
     }
 
+    // TODO: this function copies every line, even when it doesn't find
+    // any eqvs, which is most of the time. We should optimize it a bit
+    // it also replaces matches inside a string, which is not desirable
+    /// Bad functon in dire need of a rewrite. Replaces eqvs by their correspondents
+    /// in an inneficient manner and replaces stuff it shouldn't. Will do for now.
     fn replace_eqvs(&self, s: String) -> String {
         // There can't be any eqvs
         if self.eqvs.len() == 0 {
             return s;
         }
-        s
+
+        let is_token = |c| !is_separator(c) && c != '(' && c != ')';
+        let mut buf = String::new();
+        let mut ans = String::new();
+        let mut found_eqv = false;
+
+        let mut push_buf = |buf: &mut String, ans: &mut String| {
+            if buf.len() > 0 {
+                let eqv_to = self.eqvs.get(buf);
+                found_eqv = found_eqv || eqv_to.is_some();
+                ans.push_str(eqv_to.unwrap_or(&buf));
+                buf.clear();
+            }
+        };
+
+        for c in s.chars() {
+            match is_token(c) {
+                true => buf.push(c),
+                false => {
+                    push_buf(&mut buf, &mut ans);
+                    ans.push(c);
+                }
+            }
+        }
+        push_buf(&mut buf, &mut ans);
+
+        // we won't support eqv aliasing for now, I might implement them whenever I feel like
+        // detecting some eqv cycles
+        ans
     }
 }
 

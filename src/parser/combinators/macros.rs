@@ -1,7 +1,7 @@
 use nom::{
     self,
     branch::alt,
-    bytes::complete::{tag, take_till1},
+    bytes::complete::{tag, take_till1, take_while1},
     character::complete::char as the_char,
     combinator::{all_consuming, map},
     multi::separated_list,
@@ -9,7 +9,7 @@ use nom::{
     IResult,
 };
 
-use super::riscv::{one_arg, owned_one_arg};
+use super::riscv::{one_arg, owned_one_arg, parse_label};
 use super::shared::*;
 
 fn macro_tag(s: &str) -> IResult<&str, &str> {
@@ -61,7 +61,7 @@ fn use_arg_list(s: &str) -> IResult<&str, Vec<String>> {
 /// will not identify this as a macro usage and pass the line onwards to the riscv parser
 pub fn macro_use(s: &str) -> IResult<&str, (String, Vec<String>)> {
     let res = all_consuming(delimited(
-        separator0,
+        alt((map(parse_label, |_| ()), separator0)),
         alt((
             // MACRO(...args)
             tuple((
@@ -81,7 +81,10 @@ pub fn macro_use(s: &str) -> IResult<&str, (String, Vec<String>)> {
 pub fn declare_eqv(s: &str) -> IResult<&str, (String, String)> {
     preceded(
         delimited(separator0, tag(".eqv"), separator1),
-        tuple((owned_one_arg, owned_one_arg)),
+        tuple((
+            owned_one_arg,
+            map(take_while1(|_| true), |tok: &str| tok.trim_end().to_owned()),
+        )),
     )(s)
 }
 
@@ -116,6 +119,10 @@ mod tests {
         );
         assert_eq!(macro_use(" MACRO "), Ok(("", ("MACRO".into(), vec![]))));
         assert_eq!(macro_use(" MACRO()"), Ok(("", ("MACRO".into(), vec![]))));
+        assert_eq!(
+            macro_use("label: DE1(s8,Label.L0)"),
+            Ok(("", ("DE1".into(), vec!["s8".into(), "Label.L0".into()])))
+        );
     }
 
     #[test]

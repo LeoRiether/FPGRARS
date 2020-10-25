@@ -1,3 +1,7 @@
-.eqv Z x0
+.include "../../RARS/utf8_MACROSv21.s"
 
-lw Z 0(Z)
+.data
+
+.text
+
+.include "../../RARS/utf8_SYSTEMv21.s"

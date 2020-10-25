@@ -196,7 +196,8 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
 
             match directive {
                 Directive::Text => code.push(parse_text(line, &regmaps)?),
-                Directive::Data => unimplemented!("No .data implementation yet"),
+                // Directive::Data => unimplemented!("No .data implementation yet"),
+                Directive::Data => {},
             }
         }
 
@@ -386,6 +387,31 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
 
         "mv" => args_mv(s, &regs).map(|(rd, rs1)| Mv(rd, rs1).into())?,
         "nop" => Mv(0, 0).into(),
+
+        // TODO
+        "fadd.s" => Mv(0, 0).into(),
+        "fclass.s" => Mv(0, 0).into(),
+        "fcvt.s.w" => Mv(0, 0).into(),
+        "fcvt.s.wu" => Mv(0, 0).into(),
+        "fcvt.w.s" => Mv(0, 0).into(),
+        "fcvt.wu.s" => Mv(0, 0).into(),
+        "fdiv.s" => Mv(0, 0).into(),
+        "feq.s" => Mv(0, 0).into(),
+        "fle.s" => Mv(0, 0).into(),
+        "flt.s" => Mv(0, 0).into(),
+        "flw" => Mv(0, 0).into(),
+        "fmax.s" => Mv(0, 0).into(),
+        "fmin.s" => Mv(0, 0).into(),
+        "fmv.s.x" => Mv(0, 0).into(),
+        "fmv.x.s" => Mv(0, 0).into(),
+        "fsgnj.s" => Mv(0, 0).into(),
+        "fsgnjn.s" => Mv(0, 0).into(),
+        "fsgnjx.s" => Mv(0, 0).into(),
+        "fsqrt.s" => Mv(0, 0).into(),
+        "fsub.s" => Mv(0, 0).into(),
+        "fsw" => Mv(0, 0).into(),
+
+        "uret" => Mv(0, 0).into(),
 
         dont_know => return Err(Error::InstructionNotFound(dont_know.to_owned())),
     };
