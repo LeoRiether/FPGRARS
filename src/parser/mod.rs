@@ -195,7 +195,13 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
             }
 
             match directive {
-                Directive::Text => code.push(parse_text(line, &regmaps)?),
+                Directive::Text => {
+                    let instruction = match parse_text(line, &regmaps) {
+                        Ok(x) => x,
+                        Err(e) => return Err(Error::OnLine(line.to_owned(), Box::new(e))),
+                    };
+                    code.push(instruction);
+                }
                 // Directive::Data => unimplemented!("No .data implementation yet"),
                 Directive::Data => {},
             }
@@ -312,6 +318,8 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "divu" => type_r!(Divu),
         "rem" => type_r!(Rem),
         "remu" => type_r!(Remu),
+        "neg" => args_mv(s, &regs).map(|(rd, rs1)| Sub(rd, 0, rs1).into())?,
+        "mv" => args_mv(s, &regs).map(|(rd, rs1)| Mv(rd, rs1).into())?,
 
         // Type I
         "addi" => type_i!(Addi),
@@ -385,7 +393,6 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
 
         "li" => args_li(s, &regs).map(|(rd, imm)| Li(rd, imm).into())?,
 
-        "mv" => args_mv(s, &regs).map(|(rd, rs1)| Mv(rd, rs1).into())?,
         "nop" => Mv(0, 0).into(),
 
         // TODO

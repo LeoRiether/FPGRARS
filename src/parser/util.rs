@@ -16,6 +16,8 @@ pub enum Error {
 
     UnendedMacro(String),
     ArgNotFoundMacro(String),
+
+    OnLine(String, Box<Error>),
 }
 
 impl From<io::Error> for Error {

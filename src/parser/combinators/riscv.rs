@@ -3,7 +3,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_till1},
     character::complete::{char as the_char, hex_digit1},
-    combinator::{all_consuming, map, map_res},
+    combinator::{all_consuming, map, map_res, opt},
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
@@ -72,6 +72,13 @@ fn immediate_with_sep(s: &str) -> IResult<&str, u32> {
     terminated(immediate, separator0)(s)
 }
 
+fn opt_immediate_with_sep(s: &str) -> IResult<&str, u32> {
+    map(
+        opt(immediate_with_sep),
+        |x| x.unwrap_or(0)
+    )(s)
+}
+
 /// Parses the arguments for a Type R instruction.
 /// Expects the input without any separators in the prefix! For example:
 /// `args_type_r("a0, a1, a2")`
@@ -129,7 +136,7 @@ pub fn args_li(s: &str, regs: &RegMap) -> Result<(u8, u32), Error> {
 pub fn args_type_s(s: &str, regs: &RegMap) -> Result<(u8, u32, u8), Error> {
     let (_i, out) = all_consuming_tuple!((
         one_reg(regs),
-        immediate_with_sep,
+        opt_immediate_with_sep,
         delimited(
             the_char('('),
             delimited(
@@ -208,7 +215,7 @@ mod tests {
 
     #[test]
     fn test_one_arg() {
-        assert_eq!(one_arg("li a7 10"), Ok(("a7 10", "li")));
+        assert_eq!(one_arg("li\t a7 10"), Ok(("a7 10", "li")));
         assert_eq!(one_arg("ecall"), Ok(("", "ecall")));
         assert_eq!(one_arg("mv, x0, x0"), Ok(("x0, x0", "mv")));
         assert_eq!(one_arg("something else"), Ok(("else", "something")));
@@ -290,6 +297,11 @@ mod tests {
         assert_eq!(
             args_type_s("x0 -1(zero)", &REGS).map_err(|_| ()),
             Ok((0, (-1i32) as u32, 0))
+        );
+        assert_eq!(
+            // Why is this a thing?
+            args_type_s("t1 (t0)", &REGS).map_err(|_| ()),
+            Ok((6, 0, 5))
         );
     }
 
