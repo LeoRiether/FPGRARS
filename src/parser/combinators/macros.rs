@@ -9,7 +9,7 @@ use nom::{
     IResult,
 };
 
-use super::riscv::{one_arg, owned_one_arg, parse_label};
+use super::riscv::{one_arg, owned_one_arg};
 use super::shared::*;
 
 fn macro_tag(s: &str) -> IResult<&str, &str> {
@@ -61,7 +61,7 @@ fn use_arg_list(s: &str) -> IResult<&str, Vec<String>> {
 /// will not identify this as a macro usage and pass the line onwards to the riscv parser
 pub fn macro_use(s: &str) -> IResult<&str, (String, Vec<String>)> {
     let res = all_consuming(delimited(
-        alt((map(parse_label, |_| ()), separator0)),
+        separator0,
         alt((
             // MACRO(...args)
             tuple((
@@ -119,9 +119,12 @@ mod tests {
         );
         assert_eq!(macro_use(" MACRO "), Ok(("", ("MACRO".into(), vec![]))));
         assert_eq!(macro_use(" MACRO()"), Ok(("", ("MACRO".into(), vec![]))));
+
+        // Parsing the label is the job of MacroParser::parse_macro_use
+        // because we need to keep it and pass it to the riscv parser
         assert_eq!(
-            macro_use("label: DE1(s8,Label.L0)"),
-            Ok(("", ("DE1".into(), vec!["s8".into(), "Label.L0".into()])))
+            macro_use("label: DE1(s8,Label.L0)").is_err(),
+            true
         );
     }
 

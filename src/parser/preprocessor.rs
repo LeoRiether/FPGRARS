@@ -244,9 +244,15 @@ impl<I: Iterator<Item = String>> MacroParser<I> {
 
     /// Parses a macro usage and optionally returns the lines to be inlined
     fn parse_macro_use(&self, s: &str) -> Option<Vec<String>> {
+        let (s, label) = nom::combinator::opt(parse_label)(s).unwrap();
+        let label = label.map(|l| format!("{}:", l));
+
         let (_, (name, args)) = macro_use(s).ok()?;
         let key = (name, args.len());
-        self.macros.get(&key).map(|m| m.build(&args))
+        self.macros.get(&key).map(|m| m.build(&args)).map(|mut v| {
+            v.extend(label);
+            v
+        })
     }
 
     // TODO: this function copies every line, even when it doesn't find

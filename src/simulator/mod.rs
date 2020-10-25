@@ -149,7 +149,8 @@ impl Simulator {
 
     fn init(&mut self) {
         // Create necessary status registers
-        self.status.resize(parser::register_names::status().len(), 0);
+        self.status
+            .resize(parser::register_names::status().len(), 0);
 
         // Set stack pointer
         self.set_reg(2, self.memory.data.len() as u32 - 4);
@@ -336,27 +337,27 @@ impl Simulator {
                 }
 
                 // CSR
-                CsrRw(rd, fcsr, rs1) =>{
+                CsrRw(rd, fcsr, rs1) => {
                     self.set_reg(rd, self.get_status(fcsr));
                     self.status[fcsr as usize] = self.get_reg::<u32>(rs1);
                 }
-                CsrRwi(rd, fcsr, imm) =>{
+                CsrRwi(rd, fcsr, imm) => {
                     self.set_reg(rd, self.get_status(fcsr));
                     self.status[fcsr as usize] = imm;
                 }
-                CsrRs(rd, fcsr, rs1) =>{
+                CsrRs(rd, fcsr, rs1) => {
                     self.set_reg(rd, self.get_status(fcsr));
                     self.status[fcsr as usize] |= self.get_reg::<u32>(rs1);
                 }
-                CsrRsi(rd, fcsr, imm) =>{
+                CsrRsi(rd, fcsr, imm) => {
                     self.set_reg(rd, self.get_status(fcsr));
                     self.status[fcsr as usize] |= imm;
                 }
-                CsrRc(rd, fcsr, rs1) =>{
+                CsrRc(rd, fcsr, rs1) => {
                     self.set_reg(rd, self.get_status(fcsr));
                     self.status[fcsr as usize] &= !self.get_reg::<u32>(rs1);
                 }
-                CsrRci(rd, fcsr, imm) =>{
+                CsrRci(rd, fcsr, imm) => {
                     self.set_reg(rd, self.get_status(fcsr));
                     self.status[fcsr as usize] &= !imm;
                 }
@@ -377,7 +378,7 @@ impl Simulator {
     fn ecall(&mut self) -> bool {
         // 17 = a7
         match self.get_reg::<i32>(17) {
-            10 =>  return true, // exit
+            10 => return true, // exit
             1 => {
                 // print int
                 println!("{}", self.get_reg::<i32>(10));

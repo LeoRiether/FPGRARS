@@ -33,10 +33,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .spawn(move || {
             let mut sim = sim.load_from_file(file).unwrap(); // TODO: not unwrap
 
-            for instruction in sim.code.iter() {
-                println!("{:?}", instruction);
-            }
-
             let start_time = std::time::Instant::now();
             sim.run();
             println!("Finished in {}ms", start_time.elapsed().as_millis());

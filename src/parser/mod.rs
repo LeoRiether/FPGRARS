@@ -392,6 +392,7 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "la" => args_jal(s, &regs).map(|(rd, label)| pre::La(rd, label.to_owned()))?,
 
         "li" => args_li(s, &regs).map(|(rd, imm)| Li(rd, imm).into())?,
+        "lui" => args_li(s, &regs).map(|(rd, imm)| Li(rd, imm << 12).into())?,
 
         "nop" => Mv(0, 0).into(),
 
@@ -417,6 +418,10 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         "fsqrt.s" => Mv(0, 0).into(),
         "fsub.s" => Mv(0, 0).into(),
         "fsw" => Mv(0, 0).into(),
+        "fabs.s" => Mv(0, 0).into(),
+        "fmv.s" => Mv(0, 0).into(),
+        "fmul.s" => Mv(0, 0).into(),
+        "fneg.s" => Mv(0, 0).into(),
 
         "uret" => Mv(0, 0).into(),
 
