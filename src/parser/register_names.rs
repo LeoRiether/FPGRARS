@@ -39,16 +39,16 @@ pub fn regs() -> RegMap {
 pub fn floats() -> RegMap {
     let mut map = RegMap::with_capacity_and_hasher(64, Default::default());
 
-    // Insert x-prefixed registers
+    // Insert f-prefixed registers
     for i in 0..32 {
         map.insert(format!("f{}", i), i);
     }
 
     // Insert named registers
     let names = vec![
-        "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", "fs0", "fs1", "fa0", "fa2", "fa2",
-        "fa3", "fa4", "fa5", "fa6", "fa7", "fs2", "fs3", "fs4", "fs5", "fs6", "fs7", "fs8", "fs9",
-        "fs10", "fs11", "ft8", "ft9", "ft10", "ft11",
+        "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", "fs0", "fs1", "fa0", "fa1", "fa2",
+        "fa3", "fa4", "fa5", "fa6", "fa7", "fs2", "fs3", "fs4", "fs5", "fs6", "fs7", "fs8",
+        "fs9", "fs10", "fs11", "ft8", "ft9", "ft10", "ft11",
     ];
     insert_names(&mut map, &names);
 
@@ -65,9 +65,7 @@ pub fn status() -> RegMap {
     map.insert("utvec".to_owned(), UTVEC_INDEX);
     map.insert("ucause".to_owned(), UCAUSE_INDEX);
 
-    let names = vec![
-        "uscratch", "utval", "instret", "instreth", "timeh",
-    ];
+    let names = vec!["uscratch", "utval", "instret", "instreth", "timeh"];
     for name in names {
         map.insert(name.to_string(), map.len() as u8);
     }

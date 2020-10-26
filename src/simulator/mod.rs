@@ -523,6 +523,10 @@ impl Simulator {
                 std::io::stdin().read_line(&mut buf).unwrap();
                 self.set_reg(10, buf.trim().parse::<i32>().unwrap());
             }
+            6 => {
+                // print float
+                println!("{}", self.floats[10]);
+            }
 
             32 => {
                 // sleep ms
@@ -541,6 +545,14 @@ impl Simulator {
                 for x in &mut mmio[frame..frame + WIDTH * HEIGHT] {
                     *x = color;
                 }
+            }
+
+            // These two should only be here temporarily for convenience
+            0xff00 => {
+                self.floats[10] = self.floats[10].sin();
+            }
+            0xff01 => {
+                self.floats[10] = self.floats[10].cos();
             }
 
             // Does the user want to handle this ecall?

@@ -246,7 +246,7 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
                     };
                     code.push(instruction);
                 }
-                // Directive::Data => unimplemented!("No .data implementation yet"),
+                // Directive::Data => todo!(),
                 Directive::Data => {}
             }
         }
@@ -290,7 +290,8 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
             args_float_r(s, &floats).map(|(rd, rs1, rs2)| $inst(rd, rs1, rs2).into())?
         };
         (mixed $inst:expr) => {
-            args_float_r_mixed(s, &regs, &floats).map(|(rd, rs1, rs2)| $inst(rd, rs1, rs2).into())?
+            args_float_r_mixed(s, &regs, &floats)
+                .map(|(rd, rs1, rs2)| $inst(rd, rs1, rs2).into())?
         };
     }
 

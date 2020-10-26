@@ -31,7 +31,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     thread::Builder::new()
         .name("FPGRARS Simulator".into())
         .spawn(move || {
-            let mut sim = sim.load_from_file(file).unwrap(); // TODO: not unwrap
+            let mut sim = match sim.load_from_file(file) {
+                Ok(x) => x,
+                Err(e) => {
+                    eprintln!("An error occurred while parsing your code:\n{:?}", e);
+                    std::process::exit(0);
+                }
+            };
 
             let start_time = std::time::Instant::now();
             sim.run();

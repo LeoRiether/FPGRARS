@@ -2,6 +2,7 @@
 /// [RISC-V spec](https://riscv.org//wp-content/uploads/2019/06/riscv-spec.pdf).
 /// The definition can be found at the "Single Precision Floating-Point Classify Instruction",
 /// but I'll copy the table here anyway:
+///
 /// | _rd_ bit | Meaning |
 /// |---------:|---------|
 /// 0| _rs1_ is −∞.
@@ -17,7 +18,7 @@
 ///
 /// The last 2 bits may or may not be wrong in some (hopefully older) architectures
 /// because of encoding shenanigans I don't know how to deal with.
-/// See https://en.wikipedia.org/wiki/NaN#Encoding
+/// See [https://en.wikipedia.org/wiki/NaN#Encoding](https://en.wikipedia.org/wiki/NaN#Encoding)
 pub fn class_mask(f: f32) -> u32 {
     use std::num::FpCategory::*;
     let neg = f.is_sign_negative();

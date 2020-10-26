@@ -1,5 +1,7 @@
 .include "../../RARS/utf8_MACROSv21.s"
 
+li a123 123
+
 .data
 
 .text
@@ -8,7 +10,7 @@ main:
     li s1 0 # frame
 
 main.loop:
-    li s10 1000
+    li s10 100
 stall:
     li a7 48
     li a0 0
