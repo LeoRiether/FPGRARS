@@ -73,10 +73,7 @@ fn immediate_with_sep(s: &str) -> IResult<&str, u32> {
 }
 
 fn opt_immediate_with_sep(s: &str) -> IResult<&str, u32> {
-    map(
-        opt(immediate_with_sep),
-        |x| x.unwrap_or(0)
-    )(s)
+    map(opt(immediate_with_sep), |x| x.unwrap_or(0))(s)
 }
 
 /// Parses the arguments for a Type R instruction.
@@ -133,9 +130,9 @@ pub fn args_li(s: &str, regs: &RegMap) -> Result<(u8, u32), Error> {
     Ok(out)
 }
 
-pub fn args_type_s(s: &str, regs: &RegMap) -> Result<(u8, u32, u8), Error> {
+pub fn args_type_s_mixed(s: &str, rs2_regs: &RegMap, rs1_regs: &RegMap) -> Result<(u8, u32, u8), Error> {
     let (_i, out) = all_consuming_tuple!((
-        one_reg(regs),
+        one_reg(rs2_regs),
         opt_immediate_with_sep,
         delimited(
             the_char('('),
@@ -150,8 +147,12 @@ pub fn args_type_s(s: &str, regs: &RegMap) -> Result<(u8, u32, u8), Error> {
     ))(s)?;
 
     let (r1, imm, r2, _) = out;
-    let r2 = regs.try_get(r2)?;
+    let r2 = rs1_regs.try_get(r2)?;
     Ok((r1, imm, r2))
+}
+
+pub fn args_type_s(s: &str, regs: &RegMap) -> Result<(u8, u32, u8), Error> {
+    args_type_s_mixed(s, regs, regs)
 }
 
 pub fn args_mv(s: &str, regs: &RegMap) -> Result<(u8, u8), Error> {
@@ -189,6 +190,36 @@ pub fn args_csr_imm(s: &str, regs: &RegMap, status: &RegMap) -> Result<(u8, u8, 
         one_reg(regs),   // rd
         one_reg(status), // fcsr
         immediate_with_sep
+    ))(s)?;
+
+    Ok(out)
+}
+pub fn args_float_r_mixed(s: &str, regs: &RegMap, floats: &RegMap) -> Result<(u8, u8, u8), Error> {
+    let (_i, out) = all_consuming(terminated(
+        tuple((
+            one_reg(regs), // rd
+            one_reg(floats), // rs1
+            one_reg(floats), // rs2
+        )),
+        opt(one_arg), // rounding mode
+    ))(s)?;
+
+    Ok(out)
+}
+
+/// Almost the same as args_type_r, but accepts a rounding mode at the end
+/// (and ignores it)
+pub fn args_float_r(s: &str, floats: &RegMap) -> Result<(u8, u8, u8), Error> {
+    args_float_r_mixed(s, floats, floats)
+}
+
+pub fn float_two_regs(s: &str, rd_regs: &RegMap, rs1_regs: &RegMap) -> Result<(u8, u8), Error> {
+    let (_i, out) = all_consuming(terminated(
+        tuple((
+            one_reg(rd_regs), // rd
+            one_reg(rs1_regs), // rs1
+        )),
+        opt(one_arg), // rounding mode
     ))(s)?;
 
     Ok(out)
@@ -324,6 +355,18 @@ mod tests {
             // why would you csrr ra instret
             args_csr("ra instret, sp", &REGS, &STATUS).map_err(|_| ()),
             Ok((1, STATUS.get("instret").copied().unwrap(), 2))
+        );
+    }
+
+    #[test]
+    fn test_args_float_r() {
+        assert_eq!(
+            args_float_r("ft0 ft1 ft2", &FLOATS).map_err(|_| ()),
+            Ok((0, 1, 2))
+        );
+        assert_eq!(
+            args_float_r("ft0 ft1 ft2 dyn", &FLOATS).map_err(|_| ()),
+            Ok((0, 1, 2))
         );
     }
 }

@@ -39,12 +39,12 @@ pub enum FloatInstruction {
 
     /// rd, rs1
     Class(u8, u8),
-    CvtSW(u8, u8), // fcvt.s.w
+    CvtSW(u8, u8),  // fcvt.s.w
     CvtSWu(u8, u8), // fcvt.s.wu
-    CvtWS(u8, u8), // fcvt.w.s
+    CvtWS(u8, u8),  // fcvt.w.s
     CvtWuS(u8, u8), // fcvw.wu.s
-    MvSX(u8, u8), // fmv.s.x
-    MvXS(u8, u8), // fmv.x.s
+    MvSX(u8, u8),   // fmv.s.x
+    MvXS(u8, u8),   // fmv.x.s
     Sqrt(u8, u8),
 
     Lw(u8, u32, u8),
@@ -247,7 +247,7 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
                     code.push(instruction);
                 }
                 // Directive::Data => unimplemented!("No .data implementation yet"),
-                Directive::Data => {},
+                Directive::Data => {}
             }
         }
 
@@ -269,7 +269,8 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
 }
 
 fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Error> {
-    let (regs, _floats, status) = regmaps;
+    let (regs, floats, status) = regmaps;
+    use FloatInstruction as F;
     use Instruction::*;
     use PreLabelInstruction as pre;
 
@@ -284,6 +285,12 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
     macro_rules! type_r {
         ($inst:expr) => {
             args_type_r(s, &regs).map(|(rd, rs1, rs2)| $inst(rd, rs1, rs2).into())?
+        };
+        (float $inst:expr) => {
+            args_float_r(s, &floats).map(|(rd, rs1, rs2)| $inst(rd, rs1, rs2).into())?
+        };
+        (mixed $inst:expr) => {
+            args_float_r_mixed(s, &regs, &floats).map(|(rd, rs1, rs2)| $inst(rd, rs1, rs2).into())?
         };
     }
 
@@ -319,6 +326,9 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
         ($inst:expr) => {
             args_type_s(s, &regs).map(|(r1, imm, r2)| $inst(r1, imm, r2).into())?
         };
+        (float $inst:expr) => {
+            args_type_s_mixed(s, &floats, &regs).map(|(r1, imm, r2)| $inst(r1, imm, r2).into())?
+        };
     }
 
     macro_rules! csr {
@@ -342,6 +352,12 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
     macro_rules! csr_small_imm {
         ($inst:expr) => {
             args_csr_small_imm(s, &status).map(|(fcsr, imm)| $inst(0, fcsr, imm).into())?
+        };
+    }
+
+    macro_rules! float_two_regs {
+        ($inst:expr, $rd_regmap:expr, $rs1_regmap:expr) => {
+            float_two_regs(s, $rd_regmap, $rs1_regmap).map(|(rd, rs1)| $inst(rd, rs1).into())?
         };
     }
 
@@ -442,32 +458,37 @@ fn parse_text(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Erro
 
         "nop" => Mv(0, 0).into(),
 
-        // TODO
-        "fadd.s" => Mv(0, 0).into(),
-        "fclass.s" => Mv(0, 0).into(),
-        "fcvt.s.w" => Mv(0, 0).into(),
-        "fcvt.s.wu" => Mv(0, 0).into(),
-        "fcvt.w.s" => Mv(0, 0).into(),
-        "fcvt.wu.s" => Mv(0, 0).into(),
-        "fdiv.s" => Mv(0, 0).into(),
-        "feq.s" => Mv(0, 0).into(),
-        "fle.s" => Mv(0, 0).into(),
-        "flt.s" => Mv(0, 0).into(),
-        "flw" => Mv(0, 0).into(),
-        "fmax.s" => Mv(0, 0).into(),
-        "fmin.s" => Mv(0, 0).into(),
-        "fmv.s.x" => Mv(0, 0).into(),
-        "fmv.x.s" => Mv(0, 0).into(),
-        "fsgnj.s" => Mv(0, 0).into(),
-        "fsgnjn.s" => Mv(0, 0).into(),
-        "fsgnjx.s" => Mv(0, 0).into(),
-        "fsqrt.s" => Mv(0, 0).into(),
-        "fsub.s" => Mv(0, 0).into(),
-        "fsw" => Mv(0, 0).into(),
-        "fabs.s" => Mv(0, 0).into(),
-        "fmv.s" => Mv(0, 0).into(),
-        "fmul.s" => Mv(0, 0).into(),
-        "fneg.s" => Mv(0, 0).into(),
+        "fadd.s" => type_r!(float F::Add),
+        "fsub.s" => type_r!(float F::Sub),
+        "fmul.s" => type_r!(float F::Mul),
+        "fdiv.s" => type_r!(float F::Div),
+        "feq.s" => type_r!(mixed F::Equ),
+        "fle.s" => type_r!(mixed F::Le),
+        "flt.s" => type_r!(mixed F::Lt),
+        "fmax.s" => type_r!(float F::Max),
+        "fmin.s" => type_r!(float F::Min),
+        "fsgnj.s" => type_r!(float F::SgnjS),
+        "fsgnjn.s" => type_r!(float F::SgnjNS),
+        "fsgnjx.s" => type_r!(float F::SgnjXS),
+        "fclass.s" => float_two_regs!(F::Class, &regs, &floats),
+        "fcvt.s.w" => float_two_regs!(F::CvtSW, &floats, &regs),
+        "fcvt.s.wu" => float_two_regs!(F::CvtSWu, &floats, &regs),
+        "fcvt.w.s" => float_two_regs!(F::CvtWS, &regs, &floats),
+        "fcvt.wu.s" => float_two_regs!(F::CvtWuS, &regs, &floats),
+        "fmv.s.x" => float_two_regs!(F::MvSX, &floats, &regs),
+        "fmv.x.s" => float_two_regs!(F::MvXS, &regs, &floats),
+        "fsqrt.s" => float_two_regs!(F::Sqrt, &floats, &floats),
+        "fabs.s" => {
+            float_two_regs(s, &floats, &floats).map(|(rd, rs1)| F::SgnjXS(rd, rs1, rs1).into())?
+        }
+        "fmv.s" => {
+            float_two_regs(s, &floats, &floats).map(|(rd, rs1)| F::SgnjS(rd, rs1, rs1).into())?
+        }
+        "fneg.s" => {
+            float_two_regs(s, &floats, &floats).map(|(rd, rs1)| F::SgnjNS(rd, rs1, rs1).into())?
+        }
+        "flw" => type_s!(float F::Lw),
+        "fsw" => type_s!(float F::Sw),
 
         "uret" => URet.into(),
 
