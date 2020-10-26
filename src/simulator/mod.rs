@@ -17,6 +17,8 @@ use crate::parser::{self, Includable, MacroParseable, RISCVParser};
 mod into_register;
 use into_register::*;
 
+mod util;
+
 use byteorder::{ByteOrder, LittleEndian};
 
 pub struct Memory {
@@ -97,7 +99,7 @@ enum EcallSignal {
 /// and ran by calling [run](struct.Simulator.html#method.run).
 pub struct Simulator {
     registers: [u32; 32],
-    _floats: [f32; 32],
+    floats: [f32; 32],
     status: Vec<u32>, // I'm not sure myself how many status register I'll use
     pc: usize,
     started_at: time::Instant,
@@ -110,7 +112,7 @@ impl Simulator {
     pub fn new() -> Self {
         Self {
             registers: [0; 32],
-            _floats: [0.0; 32],
+            floats: [0.0; 32],
             status: Vec::new(),
             pc: 0,
             started_at: time::Instant::now(), // Will be set again in run()
@@ -170,6 +172,7 @@ impl Simulator {
     }
 
     pub fn run(&mut self) {
+        use parser::FloatInstruction as F;
         use parser::Instruction::*;
 
         let to_1 = |b| if b { 1 } else { 0 };
@@ -292,6 +295,13 @@ impl Simulator {
                         .get_half((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
                         as u16 as u32,
                 ),
+                Float(F::Lw(rd, imm, rs1)) => {
+                    let rd = rd as usize;
+                    let x = self
+                        .memory
+                        .get_word(self.get_reg::<u32>(rs1).wrapping_add(imm) as usize);
+                    self.floats[rd] = f32::from_bits(x);
+                }
 
                 // Type S
                 Sb(rs2, imm, rs1) => self.memory.set_byte(
@@ -306,6 +316,11 @@ impl Simulator {
                     (self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize,
                     self.get_reg::<u32>(rs2),
                 ),
+                Float(F::Sw(rs2, imm, rs1)) => {
+                    let bits = self.floats[rs2 as usize].to_bits();
+                    self.memory
+                        .set_word(self.get_reg::<u32>(rs1).wrapping_add(imm) as usize, bits);
+                }
 
                 // Type SB + jumps
                 Beq(rs1, rs2, label) => branch!(
@@ -376,6 +391,94 @@ impl Simulator {
                 CsrRci(rd, fcsr, imm) => {
                     self.set_reg(rd, self.get_status(fcsr));
                     self.status[fcsr as usize] &= !imm;
+                }
+
+                // Floating point
+                Float(F::Add(rd, rs1, rs2)) => {
+                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                    self.floats[rd] = self.floats[rs1] + self.floats[rs2];
+                }
+                Float(F::Sub(rd, rs1, rs2)) => {
+                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                    self.floats[rd] = self.floats[rs1] - self.floats[rs2];
+                }
+                Float(F::Mul(rd, rs1, rs2)) => {
+                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                    self.floats[rd] = self.floats[rs1] * self.floats[rs2];
+                }
+                Float(F::Div(rd, rs1, rs2)) => {
+                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                    self.floats[rd] = self.floats[rs1] / self.floats[rs2];
+                }
+                Float(F::Equ(rd, rs1, rs2)) => {
+                    let (rs1, rs2) = (rs1 as usize, rs2 as usize);
+                    self.set_reg(rd, to_1(self.floats[rs1] == self.floats[rs2]));
+                }
+                Float(F::Le(rd, rs1, rs2)) => {
+                    let (rs1, rs2) = (rs1 as usize, rs2 as usize);
+                    self.set_reg(rd, to_1(self.floats[rs1] <= self.floats[rs2]));
+                }
+                Float(F::Lt(rd, rs1, rs2)) => {
+                    let (rs1, rs2) = (rs1 as usize, rs2 as usize);
+                    self.set_reg(rd, to_1(self.floats[rs1] < self.floats[rs2]));
+                }
+                Float(F::Max(rd, rs1, rs2)) => {
+                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                    self.floats[rd] = self.floats[rs1].max(self.floats[rs2]);
+                }
+                Float(F::Min(rd, rs1, rs2)) => {
+                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                    self.floats[rd] = self.floats[rs1].min(self.floats[rs2]);
+                }
+                Float(F::SgnjS(rd, rs1, rs2)) => {
+                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                    self.floats[rd] = self.floats[rs1].copysign(self.floats[rs2]);
+                }
+                Float(F::SgnjNS(rd, rs1, rs2)) => {
+                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                    self.floats[rd] = self.floats[rs1].copysign(-self.floats[rs2]);
+                }
+                Float(F::SgnjXS(rd, rs1, rs2)) => {
+                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                    let (a, b) = (self.floats[rs1], self.floats[rs2]);
+                    self.floats[rd] = a.copysign(a * b);
+                }
+
+                // I didn't even know this existed before this project
+                Float(F::Class(rd, rs1)) => {
+                    let rs1 = rs1 as usize;
+                    self.set_reg(rd, util::class_mask(self.floats[rs1]));
+                }
+
+                Float(F::CvtSW(rd, rs1)) => {
+                    let rd = rd as usize;
+                    self.floats[rd] = self.get_reg::<i32>(rs1) as f32;
+                }
+                Float(F::CvtSWu(rd, rs1)) => {
+                    let rd = rd as usize;
+                    self.floats[rd] = self.get_reg::<u32>(rs1) as f32;
+                }
+                Float(F::CvtWS(rd, rs1)) => {
+                    let rs1 = rs1 as usize;
+                    self.set_reg(rd, self.floats[rs1] as i32);
+                }
+                Float(F::CvtWuS(rd, rs1)) => {
+                    let rs1 = rs1 as usize;
+                    self.set_reg(rd, self.floats[rs1] as u32);
+                }
+
+                Float(F::MvSX(rd, rs1)) => {
+                    let rd = rd as usize;
+                    self.floats[rd] = f32::from_bits(self.get_reg::<u32>(rs1));
+                }
+                Float(F::MvXS(rd, rs1)) => {
+                    let rs1 = rs1 as usize;
+                    self.set_reg(rd, self.floats[rs1].to_bits());
+                }
+
+                Float(F::Sqrt(rd, rs1)) => {
+                    let (rd, rs1) = (rd as usize, rs1 as usize);
+                    self.floats[rd] = self.floats[rs1].sqrt();
                 }
 
                 // Pseudoinstructions

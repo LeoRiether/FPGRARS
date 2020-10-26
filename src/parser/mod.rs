@@ -17,6 +17,40 @@ pub use preprocessor::*;
 mod util;
 pub use util::*;
 
+/// Floating point instructions.
+/// In a separate enum because maybe someday I'll have a cargo feature to disable
+/// floating point instructions.
+/// Everything here is single precision, no doubles allowed.
+#[derive(Debug, PartialEq, Eq)]
+pub enum FloatInstruction {
+    /// rd, rs1, rs2
+    Add(u8, u8, u8),
+    Sub(u8, u8, u8),
+    Mul(u8, u8, u8),
+    Div(u8, u8, u8),
+    Equ(u8, u8, u8), // Eq was taken
+    Le(u8, u8, u8),
+    Lt(u8, u8, u8),
+    Max(u8, u8, u8),
+    Min(u8, u8, u8),
+    SgnjS(u8, u8, u8),
+    SgnjNS(u8, u8, u8),
+    SgnjXS(u8, u8, u8),
+
+    /// rd, rs1
+    Class(u8, u8),
+    CvtSW(u8, u8), // fcvt.s.w
+    CvtSWu(u8, u8), // fcvt.s.wu
+    CvtWS(u8, u8), // fcvt.w.s
+    CvtWuS(u8, u8), // fcvw.wu.s
+    MvSX(u8, u8), // fmv.s.x
+    MvXS(u8, u8), // fmv.x.s
+    Sqrt(u8, u8),
+
+    Lw(u8, u32, u8),
+    Sw(u8, u32, u8),
+}
+
 /// Giant enum that represents a single RISC-V instruction and its arguments
 #[derive(Debug, PartialEq, Eq)]
 pub enum Instruction {
@@ -86,6 +120,9 @@ pub enum Instruction {
     CsrRsi(u8, u8, u32),
     CsrRci(u8, u8, u32),
 
+    // Floating point
+    Float(FloatInstruction),
+
     // Some pseudoinstructions
     /// rd, imm
     Li(u8, u32),
@@ -120,6 +157,12 @@ enum PreLabelInstruction {
 impl From<Instruction> for PreLabelInstruction {
     fn from(i: Instruction) -> PreLabelInstruction {
         PreLabelInstruction::Other(i)
+    }
+}
+
+impl From<FloatInstruction> for PreLabelInstruction {
+    fn from(i: FloatInstruction) -> PreLabelInstruction {
+        PreLabelInstruction::Other(Instruction::Float(i))
     }
 }
 
