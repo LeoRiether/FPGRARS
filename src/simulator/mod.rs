@@ -441,7 +441,9 @@ impl Simulator {
                 Float(F::SgnjXS(rd, rs1, rs2)) => {
                     let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
                     let (a, b) = (self.floats[rs1], self.floats[rs2]);
-                    self.floats[rd] = a.copysign(a * b);
+
+                    // I'm pretty sure this is correct (for most architectures anyway)
+                    self.floats[rd] = f32::from_bits(a.to_bits() ^ (b.to_bits() & (1 << 31)));
                 }
 
                 // I didn't even know this existed before this project
