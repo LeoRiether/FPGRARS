@@ -86,6 +86,24 @@ impl Memory {
             LittleEndian::write_u32(&mut self.data[i..], x);
         }
     }
+
+    pub fn get_float(&self, i: usize) -> f32 {
+        if i >= MMIO_START {
+            let mmio = self.mmio.lock().unwrap();
+            LittleEndian::read_f32(&mmio[i - MMIO_START..])
+        } else {
+            LittleEndian::read_f32(&self.data[i..])
+        }
+    }
+
+    pub fn set_float(&mut self, i: usize, x: f32) {
+        if i >= MMIO_START {
+            let mut mmio = self.mmio.lock().unwrap();
+            LittleEndian::write_f32(&mut mmio[i - MMIO_START..], x);
+        } else {
+            LittleEndian::write_f32(&mut self.data[i..], x);
+        }
+    }
 }
 
 /// Returned by the [ecall](struct.Simulator.html#method.ecall) procedure
@@ -299,8 +317,8 @@ impl Simulator {
                     let rd = rd as usize;
                     let x = self
                         .memory
-                        .get_word(self.get_reg::<u32>(rs1).wrapping_add(imm) as usize);
-                    self.floats[rd] = f32::from_bits(x);
+                        .get_float(self.get_reg::<u32>(rs1).wrapping_add(imm) as usize);
+                    self.floats[rd] = x;
                 }
 
                 // Type S
@@ -317,9 +335,9 @@ impl Simulator {
                     self.get_reg::<u32>(rs2),
                 ),
                 Float(F::Sw(rs2, imm, rs1)) => {
-                    let bits = self.floats[rs2 as usize].to_bits();
+                    let x = self.floats[rs2 as usize];
                     self.memory
-                        .set_word(self.get_reg::<u32>(rs1).wrapping_add(imm) as usize, bits);
+                        .set_float(self.get_reg::<u32>(rs1).wrapping_add(imm) as usize, x);
                 }
 
                 // Type SB + jumps
@@ -509,7 +527,7 @@ impl Simulator {
             10 => return EcallSignal::Exit,
             1 => {
                 // print int
-                println!("{}", self.get_reg::<i32>(10));
+                print!("{}", self.get_reg::<i32>(10));
             }
             4 => {
                 // print string
@@ -527,7 +545,7 @@ impl Simulator {
             }
             6 => {
                 // print float
-                println!("{}", self.floats[10]);
+                print!("{}", self.floats[10]);
             }
 
             32 => {

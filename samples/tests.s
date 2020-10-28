@@ -1,7 +1,5 @@
 .include "../../RARS/utf8_MACROSv21.s"
 
-li a123 123
-
 .data
 
 .text

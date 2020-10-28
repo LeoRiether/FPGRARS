@@ -54,7 +54,7 @@ fn hex_immediate(s: &str) -> IResult<&str, u32> {
 
 /// Parses an immediate u32, i32 or char.
 /// For example, in `li a7 100`, the last argument is the "immediate" 100
-fn immediate(s: &str) -> IResult<&str, u32> {
+pub fn immediate(s: &str) -> IResult<&str, u32> {
     alt((
         // numeric immediate
         map_res(one_arg, |token| {

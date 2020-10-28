@@ -17,6 +17,11 @@ pub enum Error {
     UnendedMacro(String),
     ArgNotFoundMacro(String),
 
+    /// Didn't recognize a type/directive in the `.data` directive
+    /// (like `.double` or `.nothing`)
+    UnrecognizedDataType(String),
+    FloatError(std::num::ParseFloatError),
+
     OnLine(String, Box<Error>),
 }
 

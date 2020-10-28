@@ -10,6 +10,7 @@ pub const UCAUSE_INDEX: u8 = 5;
 use super::util::Error;
 
 pub type RegMap = FnvHashMap<String, u8>;
+pub type FullRegMap = (RegMap, RegMap, RegMap);
 
 fn insert_names(map: &mut RegMap, names: &[&'static str]) {
     for (i, name) in names.into_iter().enumerate() {

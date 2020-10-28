@@ -82,7 +82,7 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
         // Draw each MMIO pixel as a 2x2 square
         for (y, row) in image.chunks_mut(2 * WIDTH).enumerate() {
             for (x, pixel) in row.iter_mut().enumerate() {
-                let (x, y) = (x / 2, HEIGHT - y / 2);
+                let (x, y) = (x / 2, HEIGHT-1 - y / 2);
                 let index = start + y * WIDTH + x;
 
                 let col = if cfg!(debug_assertions) {
