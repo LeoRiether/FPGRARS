@@ -58,9 +58,9 @@ fn mmio_color_to_rgb(x: u8) -> Color {
     let g = (x >> 3) & 0b111;
     let b = x >> 6;
     Color {
-        r: r * 32,
-        g: g * 32,
-        b: b * 64,
+        r: r * 36,
+        g: g * 36,
+        b: b * 85,
     }
 }
 
