@@ -36,6 +36,12 @@ impl Memory {
 
     pub fn get_byte(&self, i: usize) -> u8 {
         if i >= MMIO_START {
+            // TODO: delete this hack
+            if i == 0xff200004 {
+                let mut mmio = self.mmio.lock().unwrap();
+                mmio[0x200000] = 0;
+                return mmio[0x200004];
+            }
             self.mmio.lock().unwrap()[i - MMIO_START]
         } else {
             self.data[i]

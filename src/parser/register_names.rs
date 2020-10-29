@@ -71,6 +71,14 @@ pub fn status() -> RegMap {
         map.insert(name.to_string(), map.len() as u8);
     }
 
+    map.insert("0".to_owned(), USTATUS_INDEX);
+    map.insert("3073".to_owned(), TIME_INDEX);
+    map.insert("769".to_owned(), MISA_INDEX);
+    map.insert("65".to_owned(), UEPC_INDEX);
+    map.insert("0".to_owned(), USTATUS_INDEX);
+    map.insert("5".to_owned(), UTVEC_INDEX);
+    map.insert("66".to_owned(), UCAUSE_INDEX);
+
     map
 }
 
