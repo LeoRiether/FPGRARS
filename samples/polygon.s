@@ -262,7 +262,7 @@ sin.exit:
 	ret
 
 stall:
-    li t0 80000
+    li t0 400000
 stall.loop:
     blez t0 stall.exit
     addi t0 t0 -1

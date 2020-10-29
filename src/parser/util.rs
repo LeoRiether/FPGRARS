@@ -35,7 +35,9 @@ impl<'a> From<nom::Err<(&'a str, nom::error::ErrorKind)>> for Error {
     fn from(err: nom::Err<(&'a str, nom::error::ErrorKind)>) -> Self {
         use nom::Err as e;
         match err {
-            e::Incomplete(_) => unreachable!("nom::Err::Incomplete should only exist in streaming parsers"),
+            e::Incomplete(_) => {
+                unreachable!("nom::Err::Incomplete should only exist in streaming parsers")
+            }
             e::Error((i, e)) => Error::Nom(i.into(), e),
             e::Failure((i, e)) => Error::Nom(i.into(), e),
         }
@@ -49,6 +51,17 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+pub trait WrapMeta<T> {
+    fn wrap_meta(self, s: &str) -> Result<T, Error>;
+}
+
+impl<T, E: Into<Error>> WrapMeta<T> for Result<T, E> {
+    /// Wraps an Err in an OnLine(line_string, Err)
+    fn wrap_meta(self, s: &str) -> Result<T, Error> {
+        self.map_err(|e| Error::OnLine(s.to_owned(), Box::new(e.into())))
+    }
+}
 
 /// Returns an iterator over the lines of a file
 pub fn file_lines<P: AsRef<Path>>(filepath: P) -> Result<impl Iterator<Item = String>, Error> {

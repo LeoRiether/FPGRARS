@@ -521,6 +521,7 @@ impl Simulator {
 
     fn ecall(&mut self) -> EcallSignal {
         use crate::parser::register_names::*;
+        use rand::{thread_rng, Rng};
 
         // 17 = a7
         match self.get_reg::<i32>(17) {
@@ -548,10 +549,32 @@ impl Simulator {
                 print!("{}", self.floats[10]);
             }
 
+            31 | 33 => {
+                // midi stuff, but nops for now
+            }
+
             32 => {
                 // sleep ms
                 let t = self.get_reg::<u32>(10);
                 std::thread::sleep(time::Duration::from_millis(t as u64));
+            }
+
+            // RNG stuff
+            40 => {
+                // TODO: seed the RNG
+            }
+            41 => {
+                // rand int
+                self.set_reg(10, thread_rng().gen::<i32>());
+            }
+            42 => {
+                // rand int in [0, a1)
+                let upper = self.get_reg::<u32>(11);
+                self.set_reg(10, thread_rng().gen_range::<u32, _, _>(0, upper));
+            }
+            43 => {
+                // rand float in [0, 1)
+                self.floats[10] = thread_rng().gen_range(0f32, 1f32);
             }
 
             48 | 148 => {

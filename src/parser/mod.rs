@@ -16,8 +16,8 @@ pub use preprocessor::*;
 mod util;
 pub use util::*;
 
-mod text;
 mod data;
+mod text;
 
 /// Floating point instructions.
 /// In a separate enum because maybe someday I'll have a cargo feature to disable
@@ -198,7 +198,6 @@ pub trait RISCVParser {
     fn parse_riscv(self, data_segment_size: usize) -> ParseResult;
 }
 
-
 impl<I: Iterator<Item = String>> RISCVParser for I {
     fn parse_riscv(self, data_segment_size: usize) -> ParseResult {
         use combinators::*;
@@ -213,6 +212,8 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
         let mut current_data_type = data::Type::default();
 
         for line in self {
+            let full_line = &line;
+
             let line = match parse_label(&line) {
                 Ok((rest, label)) => {
                     let label_pos = match directive {
@@ -243,13 +244,12 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
 
             match directive {
                 Directive::Text => {
-                    let instruction = match text::parse_instruction(line, &regmaps) {
-                        Ok(x) => x,
-                        Err(e) => return Err(Error::OnLine(line.to_owned(), Box::new(e))),
-                    };
+                    let instruction =
+                        text::parse_instruction(line, &regmaps).wrap_meta(full_line)?;
                     code.push(instruction);
                 }
-                Directive::Data => data::parse_line(line, &mut data, &mut current_data_type)?,
+                Directive::Data => data::parse_line(line, &mut data, &mut current_data_type)
+                    .wrap_meta(full_line)?,
             }
         }
 

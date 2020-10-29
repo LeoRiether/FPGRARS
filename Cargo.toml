@@ -17,6 +17,7 @@ panic = "abort"
 
 [dependencies]
 lazy_static = "1.4.0"
+rand = "0.7.3"
 
 pixel-canvas = { git = "https://github.com/LeoRiether/pixel-canvas", branch = "develop" }
 glium = "0.28.0"
