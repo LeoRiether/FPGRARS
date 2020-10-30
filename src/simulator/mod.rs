@@ -221,9 +221,10 @@ impl Simulator {
                 Sub(rd, rs1, rs2) => {
                     self.set_reg(rd, self.get_reg::<i32>(rs1) - self.get_reg::<i32>(rs2))
                 }
-                Sll(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) << self.get_reg::<i32>(rs2))
-                }
+                Sll(rd, rs1, rs2) => self.set_reg(
+                    rd,
+                    self.get_reg::<u32>(rs1) << (self.get_reg::<i32>(rs2) & 0x1f),
+                ),
                 Slt(rd, rs1, rs2) => self.set_reg(
                     rd,
                     to_1(self.get_reg::<i32>(rs1) < self.get_reg::<i32>(rs2)),
@@ -235,12 +236,14 @@ impl Simulator {
                 Xor(rd, rs1, rs2) => {
                     self.set_reg(rd, self.get_reg::<u32>(rs1) ^ self.get_reg::<u32>(rs2))
                 }
-                Srl(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) >> self.get_reg::<i32>(rs2))
-                }
-                Sra(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<i32>(rs1) >> self.get_reg::<i32>(rs2))
-                }
+                Srl(rd, rs1, rs2) => self.set_reg(
+                    rd,
+                    self.get_reg::<u32>(rs1) >> (self.get_reg::<i32>(rs2) & 0x1f),
+                ),
+                Sra(rd, rs1, rs2) => self.set_reg(
+                    rd,
+                    self.get_reg::<i32>(rs1) >> (self.get_reg::<i32>(rs2) & 0x1f),
+                ),
                 Or(rd, rs1, rs2) => {
                     self.set_reg(rd, self.get_reg::<u32>(rs1) | self.get_reg::<u32>(rs2))
                 }
@@ -277,14 +280,14 @@ impl Simulator {
                     }
                 }
                 Addi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) + (imm as i32)),
-                Slli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) << imm),
+                Slli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) << (imm & 0x1f)),
                 Slti(rd, rs1, imm) => {
                     self.set_reg(rd, to_1(self.get_reg::<i32>(rs1) < (imm as i32)))
                 }
                 Sltiu(rd, rs1, imm) => self.set_reg(rd, to_1(self.get_reg::<u32>(rs1) < imm)),
                 Xori(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) ^ imm),
-                Srli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) >> imm),
-                Srai(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) >> imm),
+                Srli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) >> (imm & 0x1f)),
+                Srai(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) >> (imm & 0x1f)),
                 Ori(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) | imm),
                 Andi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) & imm),
 

@@ -132,11 +132,3 @@ pub(super) fn parse_line(s: &str, data: &mut Vec<u8>, dtype: &mut Type) -> Resul
 
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_line() {}
-}
