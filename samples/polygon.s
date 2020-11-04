@@ -261,13 +261,29 @@ sin.cos.control:
 sin.exit:
 	ret
 
+# busy sleep for 8ms
 stall:
-    li t0 400000
+	li t0 8
+	csrr a0 time
 stall.loop:
-    blez t0 stall.exit
-    addi t0 t0 -1
-    j stall.loop
+	csrr a1 time
+	sub a1 a1 a0
+
+	bge a1 t0 stall.exit
+
+	j stall.loop
+
 stall.exit:
-    ret
+	ret
+
+
+# stall:
+#     li t0 400000
+# stall.loop:
+#     blez t0 stall.exit
+#     addi t0 t0 -1
+#     j stall.loop
+# stall.exit:
+#     ret
 
 .include "../../RARS/SYSTEMv21.s"
