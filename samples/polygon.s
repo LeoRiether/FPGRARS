@@ -1,4 +1,4 @@
-.include "../../RARS/utf8_MACROSv21.s"
+.include "../../RARS/MACROSv21.s"
 
 .data
 raio: .word 110
@@ -270,4 +270,4 @@ stall.loop:
 stall.exit:
     ret
 
-.include "../../RARS/utf8_SYSTEMv21.s"
+.include "../../RARS/SYSTEMv21.s"

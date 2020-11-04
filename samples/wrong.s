@@ -5,25 +5,21 @@
 something: .word 1, 2, 3, 4
 something_else: .string "Something: ", "Something else: "
 
-.text
-	li a0 0
-	li a1 1234
-	li a7 40
-	ecall
+linebreak_str: .ascii "\n"
 
-	li s0 10
-loop:
-	blez s0 exit
-	li a7 42
-	li a0 0
-	li a1 2
+.macro linebreak
+	li a7 4
+	la a0 linebreak_str
 	ecall
+.end_macro
 
+.macro print_int
 	li a7 1
 	ecall
+	linebreak()
+.end_macro
 
-	addi s0 s0 -1
-	j loop
-exit:
-	li a7 10
-	ecall
+.text
+	li a0 1
+	slli a0 a0 1025
+	print_int()
