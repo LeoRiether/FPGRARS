@@ -19,7 +19,12 @@ linebreak_str: .ascii "\n"
 	linebreak()
 .end_macro
 
+.macro print_int(%reg)
+	mv a0 %reg
+	print_int
+.end_macro
+
 .text
-	li a0 1
-	slli a0 a0 1025
-	print_int()
+	li t0 1
+	slli t0 t0 1025
+	print_int(t0)

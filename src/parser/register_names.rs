@@ -66,7 +66,7 @@ pub fn status() -> RegMap {
     map.insert("utvec".to_owned(), UTVEC_INDEX);
     map.insert("ucause".to_owned(), UCAUSE_INDEX);
 
-    let names = vec!["uscratch", "utval", "instret", "instreth", "timeh"];
+    let names = vec!["uscratch", "utval", "instret", "instreth", "cycle", "timeh"];
     for name in names {
         map.insert(name.to_string(), map.len() as u8);
     }

@@ -173,7 +173,7 @@ impl Simulator {
         self.set_reg(2, self.memory.data.len() as u32 - 4);
 
         // Set global pointer
-        // self.set_reg(3, 0x10008000);
+        self.set_reg(3, 0x10008000);
 
         self.started_at = time::Instant::now();
         self.status[parser::register_names::MISA_INDEX as usize] = 0x40001128;
@@ -540,6 +540,15 @@ impl Simulator {
             6 => {
                 // print float
                 print!("{}", self.floats[10]);
+            }
+
+            30 => {
+                // get time
+                let epoch = time::SystemTime::UNIX_EPOCH;
+                let duration = time::SystemTime::now().duration_since(epoch).unwrap();
+                let ms = duration.as_millis() as u64;
+                self.set_reg(10, ms as u32);
+                self.set_reg(11, (ms >> 32) as u32);
             }
 
             31 | 33 => {
