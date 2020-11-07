@@ -11,6 +11,8 @@ use std::time;
 const DATA_SIZE: usize = 0x0040_0000; // TODO: this, but I think it's about this much
 const MMIO_SIZE: usize = 0x0021_0000;
 const MMIO_START: usize = 0xff00_0000;
+const KBMMIO_CONTROL: usize = 0xff20_0000;
+const KBMMIO_DATA: usize = 0xff20_0004;
 
 use crate::parser::{self, Includable, MacroParseable, RISCVParser};
 
@@ -34,81 +36,63 @@ impl Memory {
         }
     }
 
-    pub fn get_byte(&self, i: usize) -> u8 {
+    fn get_with<T, F>(&self, i: usize, read: F) -> T
+    where
+        F: FnOnce(&[u8]) -> T,
+    {
         if i >= MMIO_START {
-            // TODO: delete this hack
-            if i == 0xff200004 {
-                let mut mmio = self.mmio.lock().unwrap();
-                mmio[0x200000] = 0;
-                return mmio[0x200004];
+            let mut mmio = self.mmio.lock().unwrap();
+            if i == KBMMIO_DATA {
+                mmio[KBMMIO_CONTROL - MMIO_START] = 0;
             }
-            self.mmio.lock().unwrap()[i - MMIO_START]
+            read(&mmio[i - MMIO_START..])
         } else {
-            self.data[i]
+            read(&self.data[i..])
         }
+    }
+
+    fn set_with<T, F>(&mut self, i: usize, x: T, write: F)
+    where
+        F: FnOnce(&mut [u8], T),
+    {
+        if i >= MMIO_START {
+            let mut mmio = self.mmio.lock().unwrap();
+            write(&mut mmio[i - MMIO_START..], x);
+        } else {
+            write(&mut self.data[i..], x);
+        }
+    }
+
+    pub fn get_byte(&self, i: usize) -> u8 {
+        self.get_with(i, |v| v[0])
     }
 
     pub fn set_byte(&mut self, i: usize, x: u8) {
-        if i >= MMIO_START {
-            let mut mmio = self.mmio.lock().unwrap();
-            (*mmio)[i - MMIO_START] = x;
-        } else {
-            self.data[i] = x;
-        }
+        self.set_with(i, x, |v, x| v[0] = x)
     }
 
     pub fn get_half(&self, i: usize) -> u16 {
-        if i >= MMIO_START {
-            let mmio = self.mmio.lock().unwrap();
-            LittleEndian::read_u16(&mmio[i - MMIO_START..])
-        } else {
-            LittleEndian::read_u16(&self.data[i..])
-        }
+        self.get_with(i, LittleEndian::read_u16)
     }
 
     pub fn set_half(&mut self, i: usize, x: u16) {
-        if i >= MMIO_START {
-            let mut mmio = self.mmio.lock().unwrap();
-            LittleEndian::write_u16(&mut mmio[i - MMIO_START..], x);
-        } else {
-            LittleEndian::write_u16(&mut self.data[i..], x);
-        }
+        self.set_with(i, x, LittleEndian::write_u16)
     }
 
     pub fn get_word(&self, i: usize) -> u32 {
-        if i >= MMIO_START {
-            let mmio = self.mmio.lock().unwrap();
-            LittleEndian::read_u32(&mmio[i - MMIO_START..])
-        } else {
-            LittleEndian::read_u32(&self.data[i..])
-        }
+        self.get_with(i, LittleEndian::read_u32)
     }
 
     pub fn set_word(&mut self, i: usize, x: u32) {
-        if i >= MMIO_START {
-            let mut mmio = self.mmio.lock().unwrap();
-            LittleEndian::write_u32(&mut mmio[i - MMIO_START..], x);
-        } else {
-            LittleEndian::write_u32(&mut self.data[i..], x);
-        }
+        self.set_with(i, x, LittleEndian::write_u32)
     }
 
     pub fn get_float(&self, i: usize) -> f32 {
-        if i >= MMIO_START {
-            let mmio = self.mmio.lock().unwrap();
-            LittleEndian::read_f32(&mmio[i - MMIO_START..])
-        } else {
-            LittleEndian::read_f32(&self.data[i..])
-        }
+        self.get_with(i, LittleEndian::read_f32)
     }
 
     pub fn set_float(&mut self, i: usize, x: f32) {
-        if i >= MMIO_START {
-            let mut mmio = self.mmio.lock().unwrap();
-            LittleEndian::write_f32(&mut mmio[i - MMIO_START..], x);
-        } else {
-            LittleEndian::write_f32(&mut self.data[i..], x);
-        }
+        self.set_with(i, x, LittleEndian::write_f32)
     }
 }
 
