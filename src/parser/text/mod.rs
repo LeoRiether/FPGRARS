@@ -119,6 +119,9 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
         "neg" => args_mv(s, &regs).map(|(rd, rs1)| Sub(rd, 0, rs1).into())?,
         "not" => args_mv(s, &regs).map(|(rd, rs1)| Xori(rd, rs1, (-1i32) as u32).into())?,
         "mv" => args_mv(s, &regs).map(|(rd, rs1)| Mv(rd, rs1).into())?,
+        "snez" => args_mv(s, &regs).map(|(rd, rs1)| Sltu(rd, 0, rs1).into())?,
+        "sltz" => args_mv(s, &regs).map(|(rd, rs1)| Slt(rd, rs1, 0).into())?,
+        "sgtz" => args_mv(s, &regs).map(|(rd, rs1)| Slt(rd, 0, rs1).into())?,
 
         // Type I
         "addi" => type_i!(Addi),
@@ -132,6 +135,7 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
         "andi" => type_i!(Andi),
         "jalr" => type_i!(Jalr),
         "jr" => one_reg(&regs)(s).map(|(_i, rs1)| Jalr(0, rs1, 0).into())?,
+        "seqz" => args_mv(s, &regs).map(|(rd, rs1)| Sltiu(rd, rs1, 1).into())?,
 
         // Type I, loads from memory
         "lb" => type_s!(Lb),
