@@ -22,6 +22,9 @@ main.loop:
 	li a7 48 # clear screen
 	ecall
 
+	# Check if the user wants to change the number of sides
+	jal check_input
+
 	# Circunferencia:
 	la t0 raio
 	lw a0 0(t0)
@@ -261,6 +264,27 @@ sin.cos.control:
 sin.exit:
 	ret
 
+check_input:
+	li t0 0xff200000
+	lb a0 0(t0)
+	andi a0 a0 1
+	beqz a0 check_input.exit
+
+	lb a0 4(t0)
+	li a1 '0'
+	sub a0 a0 a1
+
+	# Make sure the number is at least 2
+	li a1 2
+	blt a0 a1 check_input.exit
+
+	la t0 lados
+	sw a0 0(t0)
+
+check_input.exit:
+	ret
+
+
 # busy sleep for 8ms
 stall:
 	li t0 8
@@ -275,15 +299,5 @@ stall.loop:
 
 stall.exit:
 	ret
-
-
-# stall:
-#     li t0 400000
-# stall.loop:
-#     blez t0 stall.exit
-#     addi t0 t0 -1
-#     j stall.loop
-# stall.exit:
-#     ret
 
 .include "../../RARS/SYSTEMv21.s"

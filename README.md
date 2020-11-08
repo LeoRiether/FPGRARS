@@ -14,7 +14,9 @@ Print integer | 1  | a0 = integer to print | |
 Print string | 4 | a0 = address of the string | |
 Read int | 5 | | a0 = the read integer |
 Print float | 6 | a0 = float to print | |
+Print char | 11 | a0 = the char | |
 Exit | 10 | | |
+Stop execution | 110 | |
 Time | 30 | | a0 = low bits of milliseconds since unix epoch, a1 = high bits |
 Midi out | 31 | does nothing for now | |
 Sleep ms | 32 | a0 = number of milliseconds to sleep | |

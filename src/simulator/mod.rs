@@ -519,6 +519,11 @@ impl Simulator {
         // 17 = a7
         match self.get_reg::<i32>(17) {
             10 => return EcallSignal::Exit,
+            110 => {
+                loop {
+                    std::thread::sleep(time::Duration::from_millis(500));
+                }
+            }
             1 => {
                 // print int
                 print!("{}", self.get_reg::<i32>(10));
@@ -540,6 +545,10 @@ impl Simulator {
             6 => {
                 // print float
                 print!("{}", self.floats[10]);
+            }
+            11 => {
+                // print char
+                print!("{}", self.get_reg::<u32>(10) as u8 as char);
             }
 
             30 => {
