@@ -93,7 +93,9 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
                     unsafe { *mmio.get_unchecked(index) }
                 };
 
-                *pixel = mmio_color_to_rgb(col);
+                if col != 0xc7 {
+                    *pixel = mmio_color_to_rgb(col);
+                }
             }
         }
 
