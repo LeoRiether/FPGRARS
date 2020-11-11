@@ -26,3 +26,8 @@ Rand int | 41 | | a0 = random integer |
 Rand int range | 42 | a0 is discarded, a1 = upper bound | a0 = random integer in [0, a1) |
 Rand float | 43 | | fa0 = random float in [0, 1) |
 Clear screen | 48 or 148 | a0 = color, a1 = frame | |
+Open file | 1024 | a0 = address of the null-terminated string for the path, a1 = 0 (read mode), 1 (write mode) or 9 (append mode) | a0 = the file descriptor or -1 if error |
+Close file | 57 | a0 = a file descriptor | |
+Seek | 62 | a0 = a file descriptor, a1 = the offset to seek, a2 = 0 (seek from the start of the file), 1 (from the current position) or 2 (from the end) | a0 = the selected position from the start of the file |
+Read | 63 | a0 = a file descriptor, a1 = address of the buffer, a2 = maximum length to read | a0 = number of bytes read or -1 if error |
+Write | 64 | a0 = a file descriptor, a1 = address of the buffer, a2 = length to write | a0 = number of bytes written of -1 if error |
