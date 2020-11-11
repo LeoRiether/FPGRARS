@@ -19,6 +19,8 @@ use crate::parser::{self, Includable, MacroParseable, RISCVParser};
 mod into_register;
 use into_register::*;
 
+mod files;
+
 mod util;
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -36,7 +38,7 @@ impl Memory {
         }
     }
 
-    fn get_with<T, F>(&self, i: usize, read: F) -> T
+    pub fn get_with<T, F>(&self, i: usize, read: F) -> T
     where
         F: FnOnce(&[u8]) -> T,
     {
@@ -51,15 +53,15 @@ impl Memory {
         }
     }
 
-    fn set_with<T, F>(&mut self, i: usize, x: T, write: F)
+    pub fn set_with<T, F, R>(&mut self, i: usize, x: T, write: F) -> R
     where
-        F: FnOnce(&mut [u8], T),
+        F: FnOnce(&mut [u8], T) -> R,
     {
         if i >= MMIO_START {
             let mut mmio = self.mmio.lock().unwrap();
-            write(&mut mmio[i - MMIO_START..], x);
+            write(&mut mmio[i - MMIO_START..], x)
         } else {
-            write(&mut self.data[i..], x);
+            write(&mut self.data[i..], x)
         }
     }
 
@@ -112,6 +114,8 @@ pub struct Simulator {
     pc: usize,
     started_at: time::Instant,
 
+    open_files: files::FileHolder,
+
     pub memory: Memory,
     pub code: Vec<parser::Instruction>,
 }
@@ -124,6 +128,7 @@ impl Simulator {
             status: Vec::new(),
             pc: 0,
             started_at: time::Instant::now(), // Will be set again in run()
+            open_files: files::FileHolder::new(),
             memory: Memory::new(),
             code: Vec::new(),
         }
@@ -516,14 +521,22 @@ impl Simulator {
         use crate::parser::register_names::*;
         use rand::{thread_rng, Rng};
 
-        // 17 = a7
-        match self.get_reg::<i32>(17) {
+        let a7 = self.get_reg::<u32>(17);
+
+        if files::handle_ecall(
+            a7,
+            &mut self.open_files,
+            &mut self.registers,
+            &mut self.memory,
+        ) {
+            return EcallSignal::Nothing;
+        }
+
+        match a7 {
             10 => return EcallSignal::Exit,
-            110 => {
-                loop {
-                    std::thread::sleep(time::Duration::from_millis(500));
-                }
-            }
+            110 => loop {
+                std::thread::sleep(time::Duration::from_millis(500));
+            },
             1 => {
                 // print int
                 print!("{}", self.get_reg::<i32>(10));
