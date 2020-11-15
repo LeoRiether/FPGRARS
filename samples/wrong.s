@@ -28,10 +28,3 @@ linebreak_str: .ascii "\n"
 	li t0 1
 	slli t0 t0 1025
 	print_int(t0)
-
-	li a7 1024
-	la a0 something_else
-	ecall
-
-	li a7 1
-	ecall

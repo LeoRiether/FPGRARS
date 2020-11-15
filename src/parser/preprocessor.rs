@@ -101,7 +101,7 @@ impl MacroLine {
     fn from_string(s: &str, arg_names: &FnvHashMap<String, usize>) -> Result<Self, Error> {
         use nom::bytes::complete::take_till;
         let take_raw = |s| take_till::<_, _, ()>(|c| c == '%')(s).unwrap();
-        let take_arg = |s| take_till::<_, _, ()>(|c| is_separator(c) || c == '(')(s).unwrap();
+        let take_arg = |s| take_till::<_, _, ()>(|c| is_separator(c) || c == '(' || c == ')')(s).unwrap();
 
         let mut res = Self::default();
 

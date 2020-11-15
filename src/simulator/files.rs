@@ -7,6 +7,9 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom, Write};
 
+/// Maximum number of simultaneous open files
+const MAX_DESCRIPTORS: i32 = 1 << 30;
+
 /// Data structure to add, remove and fetch [Files](struct.File.html)
 pub struct FileHolder {
     next: i32,
@@ -21,11 +24,23 @@ impl FileHolder {
         }
     }
 
+    fn gen_next_key(&mut self) {
+        if self.items.len() >= MAX_DESCRIPTORS as usize {
+            self.next = -1; // too many simultaneous descriptors, can't generate next key
+            return;
+        }
+
+        self.next = (self.next + 1) % MAX_DESCRIPTORS;
+        while self.items.contains_key(&self.next) {
+            self.next = (self.next + 1) % MAX_DESCRIPTORS;
+        }
+    }
+
     /// Adds a file to the holder and returns its ID/descriptor
     pub fn add(&mut self, f: fs::File) -> i32 {
         let fd = self.next;
         self.items.insert(fd, f);
-        self.next = (self.next + 1) % (1 << 30);
+        self.gen_next_key();
         fd
     }
 
