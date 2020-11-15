@@ -7,7 +7,9 @@ something_else: .string "Something: ", "Something else: "
 
 linebreak_str: .ascii "\n"
 
-number: .word 1234
+number: .word -1234
+
+hello_str: .string "Hello World!"
 
 .macro linebreak
 	li a7 4
@@ -26,11 +28,22 @@ number: .word 1234
 	print_int
 .end_macro
 
-.text
-	li t0 1
-	slli t0 t0 1025
-	print_int(t0)
+.macro	mjal(%label)
+	la tp, %label
+	jalr ra, tp, 0
+.end_macro
 
-	la a0 number
-	lb a0 0(a0)
-	print_int()
+.text
+	mjal(say_hello)
+
+	lw a0 number
+
+	li a7 10
+	ecall
+
+	say_hello:
+		la a0 hello_str
+		li a7 4
+		ecall
+		ret
+

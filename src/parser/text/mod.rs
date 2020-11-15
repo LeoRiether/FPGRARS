@@ -5,8 +5,43 @@ use super::{
     FloatInstruction, Instruction, PreLabelInstruction,
 };
 
+/// Parses a line that produces many instructions at a time, like `lw a0 label`.
+pub(super) fn parse_multi_instruction(s: &str, regmaps: &FullRegMap) -> Option<Vec<PreLabelInstruction>> {
+    let (regs, _floats, _status) = regmaps;
+
+    use PreLabelInstruction as pre;
+    use Instruction::*;
+
+    let (s, instruction) = match one_arg(s) {
+        Ok((s, i)) => (s, i),
+        Err(_) => { return None; }
+    };
+
+    macro_rules! load {
+        ($inst:ident) => {
+            args_jal(s, &regs)
+                .map(|(rd, label)| vec![
+                    pre::La(rd, label),
+                    $inst(rd, 0, rd).into(),
+                ])
+                .ok()
+        }
+    }
+
+    match instruction {
+        "lb" => load!(Lb),
+        "lh" => load!(Lh),
+        "lw" => load!(Lw),
+        "lbu" => load!(Lbu),
+        "lhu" => load!(Lhu),
+        _ => None
+    }
+}
+
+/// Parses a line that produces a single instruction
 pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Error> {
     let (regs, floats, status) = regmaps;
+
     use FloatInstruction as F;
     use Instruction::*;
     use PreLabelInstruction as pre;
@@ -67,15 +102,6 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
         (float $inst:expr) => {
             args_type_s_mixed(s, &floats, &regs).map(|(r1, imm, r2)| $inst(r1, imm, r2).into())?
         };
-    }
-
-    macro_rules! args_load {
-        ($instRegister:expr, $instLabel:expr) => {
-            match args_load(s, &regs)? {
-                ArgsLoad::FromRegister(rd, imm, rs1) => $instRegister(rd, imm, rs1).into(),
-                ArgsLoad::FromLabel(rd, label) => $instLabel(rd, label).into(),
-            }
-        }
     }
 
     macro_rules! csr {
@@ -147,11 +173,11 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
         "seqz" => args_mv(s, &regs).map(|(rd, rs1)| Sltiu(rd, rs1, 1).into())?,
 
         // Type I, loads from memory
-        "lb" => args_load!(Lb, pre::Lb),
-        "lh" => args_load!(Lh, pre::Lh),
-        "lw" => args_load!(Lw, pre::Lw),
-        "lbu" => args_load!(Lbu, pre::Lbu),
-        "lhu" => args_load!(Lhu, pre::Lhu),
+        "lb" => type_s!(Lb),
+        "lh" => type_s!(Lh),
+        "lw" => type_s!(Lw),
+        "lbu" => type_s!(Lbu),
+        "lhu" => type_s!(Lhu),
 
         // Type S
         "sb" => type_s!(Sb),
@@ -258,24 +284,16 @@ fn parse_jal<'a>(s: &'a str, regs: &RegMap) -> Result<PreLabelInstruction, Error
         .map_err(|e| e.into())
 }
 
-/// Return type of [args_load](fn.args_load.html)
-enum ArgsLoad {
-    /// rd, imm, rs1
-    FromRegister(u8, u32, u8),
+/// Parses a single line of RISC-V code and pushes one or more instructions to the `code` vector
+pub(super) fn parse_line(s: &str, regmaps: &FullRegMap, code: &mut Vec<PreLabelInstruction>) -> Result<(), Error> {
+    if let Some(instructions) = parse_multi_instruction(s, regmaps) {
+        code.extend(instructions);
+        return Ok(());
+    }
 
-    /// rd, label
-    FromLabel(u8, String),
-}
-
-/// Parses the arguments for a load instruction (`lb`, `lh`, `lw`, `lbu`, `lhu`).
-/// For example, the instruction could be `lw s1 0(s2)` or `lw s1 label`
-fn args_load(s: &str, regs: &RegMap) -> Result<ArgsLoad, Error> {
-    use ArgsLoad::*;
-
-    args_type_s(s, regs)
-        .map(|(rd, imm, rs1)| FromRegister(rd, imm, rs1))
-        .or_else(|_| args_jal(s, regs).map(|(rd, label)| FromLabel(rd, label)))
-        .map_err(|e| e.into())
+    let i = parse_instruction(s, regmaps)?;
+    code.push(i);
+    Ok(())
 }
 
 #[cfg(test)]

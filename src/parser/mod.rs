@@ -3,8 +3,8 @@
 //! We use a lot of mnemonics here, I'll try to link to a cheatsheet here later.
 //!
 
-use radix_trie::Trie;
 use either::Either::{self, Left, Right};
+use radix_trie::Trie;
 use std::iter::once;
 
 pub mod register_names;
@@ -155,12 +155,6 @@ enum PreLabelInstruction {
     /// Gets mapped to an Instruction::Li(rd, position) after unlabeling
     La(u8, String),
 
-    Lb(u8, String),
-    Lh(u8, String),
-    Lw(u8, String),
-    Lbu(u8, String),
-    Lhu(u8, String),
-
     Other(Instruction),
 }
 
@@ -250,15 +244,12 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
                 continue;
             }
 
-            match directive {
-                Directive::Text => {
-                    let instruction =
-                        text::parse_instruction(line, &regmaps).wrap_meta(full_line)?;
-                    code.push(instruction);
-                }
-                Directive::Data => data::parse_line(line, &mut data, &mut current_data_type)
-                    .wrap_meta(full_line)?,
-            }
+            let res = match directive {
+                Directive::Text => text::parse_line(line, &regmaps, &mut code),
+                Directive::Data => data::parse_line(line, &mut data, &mut current_data_type),
+            };
+
+            res.wrap_meta(full_line)?;
         }
 
         type InstOrVec = Either<Instruction, Vec<Instruction>>;
@@ -313,19 +304,6 @@ fn unlabel_instruction(
         };
     }
 
-    macro_rules! unlabel_load {
-        ($inst:ident, $rd:ident, $label:ident) => {
-            labels
-                .get(&$label)
-                .map(|&pos| vec![
-                    Li($rd, pos as u32),
-                    $inst($rd, 0, $rd)
-                ])
-                .map(Right)
-                .ok_or(Error::LabelNotFound($label))
-        };
-    }
-
     match instruction {
         p::Jal(rd, label) => unlabel!(Jal, rd, label),
         p::Beq(rs1, rs2, label) => unlabel!(Beq, rs1, rs2, label),
@@ -340,12 +318,6 @@ fn unlabel_instruction(
             .map(|&pos| Li(rd, pos as u32))
             .map(Left)
             .ok_or(Error::LabelNotFound(label)),
-
-        p::Lb(rd, label) => unlabel_load!(Lb, rd, label),
-        p::Lh(rd, label) => unlabel_load!(Lh, rd, label),
-        p::Lw(rd, label) => unlabel_load!(Lw, rd, label),
-        p::Lbu(rd, label) => unlabel_load!(Lbu, rd, label),
-        p::Lhu(rd, label) => unlabel_load!(Lhu, rd, label),
 
         p::Other(instruction) => Ok(Left(instruction)),
     }
