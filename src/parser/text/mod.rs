@@ -69,6 +69,15 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
         };
     }
 
+    macro_rules! args_load {
+        ($instRegister:expr, $instLabel:expr) => {
+            match args_load(s, &regs)? {
+                ArgsLoad::FromRegister(rd, imm, rs1) => $instRegister(rd, imm, rs1).into(),
+                ArgsLoad::FromLabel(rd, label) => $instLabel(rd, label).into(),
+            }
+        }
+    }
+
     macro_rules! csr {
         ($inst:expr) => {
             args_csr(s, &regs, &status).map(|(rd, fcsr, rs1)| $inst(rd, fcsr, rs1).into())?
@@ -138,11 +147,11 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
         "seqz" => args_mv(s, &regs).map(|(rd, rs1)| Sltiu(rd, rs1, 1).into())?,
 
         // Type I, loads from memory
-        "lb" => type_s!(Lb),
-        "lh" => type_s!(Lh),
-        "lw" => type_s!(Lw),
-        "lbu" => type_s!(Lbu),
-        "lhu" => type_s!(Lhu),
+        "lb" => args_load!(Lb, pre::Lb),
+        "lh" => args_load!(Lh, pre::Lh),
+        "lw" => args_load!(Lw, pre::Lw),
+        "lbu" => args_load!(Lbu, pre::Lbu),
+        "lhu" => args_load!(Lhu, pre::Lhu),
 
         // Type S
         "sb" => type_s!(Sb),
@@ -246,6 +255,26 @@ fn parse_jal<'a>(s: &'a str, regs: &RegMap) -> Result<PreLabelInstruction, Error
     args_jal(s, regs)
         .map(|(rd, label)| pre::Jal(rd, label.to_owned()))
         .or_else(|_| one_arg(s).map(|(_i, label)| pre::Jal(1, label.to_owned())))
+        .map_err(|e| e.into())
+}
+
+/// Return type of [args_load](fn.args_load.html)
+enum ArgsLoad {
+    /// rd, imm, rs1
+    FromRegister(u8, u32, u8),
+
+    /// rd, label
+    FromLabel(u8, String),
+}
+
+/// Parses the arguments for a load instruction (`lb`, `lh`, `lw`, `lbu`, `lhu`).
+/// For example, the instruction could be `lw s1 0(s2)` or `lw s1 label`
+fn args_load(s: &str, regs: &RegMap) -> Result<ArgsLoad, Error> {
+    use ArgsLoad::*;
+
+    args_type_s(s, regs)
+        .map(|(rd, imm, rs1)| FromRegister(rd, imm, rs1))
+        .or_else(|_| args_jal(s, regs).map(|(rd, label)| FromLabel(rd, label)))
         .map_err(|e| e.into())
 }
 

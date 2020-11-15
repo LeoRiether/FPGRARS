@@ -4,6 +4,8 @@
 //!
 
 use radix_trie::Trie;
+use either::Either::{self, Left, Right};
+use std::iter::once;
 
 pub mod register_names;
 use register_names::{self as reg_names, FullRegMap};
@@ -153,6 +155,12 @@ enum PreLabelInstruction {
     /// Gets mapped to an Instruction::Li(rd, position) after unlabeling
     La(u8, String),
 
+    Lb(u8, String),
+    Lh(u8, String),
+    Lw(u8, String),
+    Lbu(u8, String),
+    Lhu(u8, String),
+
     Other(Instruction),
 }
 
@@ -253,13 +261,22 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
             }
         }
 
-        let code: Result<Vec<Instruction>, Error> = code
+        type InstOrVec = Either<Instruction, Vec<Instruction>>;
+        let code: Result<Vec<InstOrVec>, Error> = code
             .into_iter()
             .map(|i| unlabel_instruction(i, &labels))
             .collect();
-        let mut code = code?;
+
+        let code: Vec<Instruction> = code?
+            .into_iter()
+            .flat_map(|i| match i {
+                Left(x) => Left(once(x)),
+                Right(v) => Right(v.into_iter()),
+            })
+            .collect();
 
         // If the program ever drops off bottom, we make an "exit" ecall and terminate execution
+        let mut code = code;
         code.extend(vec![
             Instruction::Li(17, 10), // li a7 10
             Instruction::Ecall,
@@ -275,7 +292,7 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
 fn unlabel_instruction(
     instruction: PreLabelInstruction,
     labels: &Trie<String, usize>,
-) -> Result<Instruction, Error> {
+) -> Result<Either<Instruction, Vec<Instruction>>, Error> {
     use Instruction::*;
     use PreLabelInstruction as p;
 
@@ -284,12 +301,27 @@ fn unlabel_instruction(
             labels
                 .get(&$label)
                 .map(|&pos| $inst($rd, pos))
+                .map(Left)
                 .ok_or(Error::LabelNotFound($label))
         };
         ($inst:ident, $rs1:ident, $rs2:ident, $label:ident) => {
             labels
                 .get(&$label)
                 .map(|&pos| $inst($rs1, $rs2, pos))
+                .map(Left)
+                .ok_or(Error::LabelNotFound($label))
+        };
+    }
+
+    macro_rules! unlabel_load {
+        ($inst:ident, $rd:ident, $label:ident) => {
+            labels
+                .get(&$label)
+                .map(|&pos| vec![
+                    Li($rd, pos as u32),
+                    $inst($rd, 0, $rd)
+                ])
+                .map(Right)
                 .ok_or(Error::LabelNotFound($label))
         };
     }
@@ -302,10 +334,19 @@ fn unlabel_instruction(
         p::Blt(rs1, rs2, label) => unlabel!(Blt, rs1, rs2, label),
         p::Bltu(rs1, rs2, label) => unlabel!(Bltu, rs1, rs2, label),
         p::Bgeu(rs1, rs2, label) => unlabel!(Bgeu, rs1, rs2, label),
+
         p::La(rd, label) => labels
             .get(&label)
             .map(|&pos| Li(rd, pos as u32))
+            .map(Left)
             .ok_or(Error::LabelNotFound(label)),
-        p::Other(instruction) => Ok(instruction),
+
+        p::Lb(rd, label) => unlabel_load!(Lb, rd, label),
+        p::Lh(rd, label) => unlabel_load!(Lh, rd, label),
+        p::Lw(rd, label) => unlabel_load!(Lw, rd, label),
+        p::Lbu(rd, label) => unlabel_load!(Lbu, rd, label),
+        p::Lhu(rd, label) => unlabel_load!(Lhu, rd, label),
+
+        p::Other(instruction) => Ok(Left(instruction)),
     }
 }
