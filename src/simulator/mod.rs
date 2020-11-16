@@ -14,6 +14,10 @@ const MMIO_START: usize = 0xff00_0000;
 const KBMMIO_CONTROL: usize = 0xff20_0000;
 const KBMMIO_DATA: usize = 0xff20_0004;
 
+use crate::renderer::{FRAME_0, FRAME_1, HEIGHT, WIDTH};
+// const VIDEO_START: usize = MMIO_START + FRAME_0;
+// const VIDEO_END: usize = MMIO_START + FRAME_1 + WIDTH * HEIGHT;
+
 use crate::parser::{self, Includable, MacroParseable, RISCVParser};
 
 mod into_register;
@@ -607,7 +611,6 @@ impl Simulator {
                 let frame_select = self.get_reg::<u32>(11); // a1
 
                 let mut mmio = self.memory.mmio.lock().unwrap();
-                use crate::renderer::{FRAME_0, FRAME_1, HEIGHT, WIDTH};
                 let frame = if frame_select == 0 { FRAME_0 } else { FRAME_1 };
                 for x in &mut mmio[frame..frame + WIDTH * HEIGHT] {
                     *x = color;

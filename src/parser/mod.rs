@@ -3,9 +3,7 @@
 //! We use a lot of mnemonics here, I'll try to link to a cheatsheet here later.
 //!
 
-use either::Either::{self, Left, Right};
 use radix_trie::Trie;
-use std::iter::once;
 
 pub mod register_names;
 use register_names::{self as reg_names, FullRegMap};
@@ -252,22 +250,13 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
             res.wrap_meta(full_line)?;
         }
 
-        type InstOrVec = Either<Instruction, Vec<Instruction>>;
-        let code: Result<Vec<InstOrVec>, Error> = code
+        let code: Result<Vec<Instruction>, Error> = code
             .into_iter()
             .map(|i| unlabel_instruction(i, &labels))
             .collect();
-
-        let code: Vec<Instruction> = code?
-            .into_iter()
-            .flat_map(|i| match i {
-                Left(x) => Left(once(x)),
-                Right(v) => Right(v.into_iter()),
-            })
-            .collect();
+        let mut code = code?;
 
         // If the program ever drops off bottom, we make an "exit" ecall and terminate execution
-        let mut code = code;
         code.extend(vec![
             Instruction::Li(17, 10), // li a7 10
             Instruction::Ecall,
@@ -283,7 +272,7 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
 fn unlabel_instruction(
     instruction: PreLabelInstruction,
     labels: &Trie<String, usize>,
-) -> Result<Either<Instruction, Vec<Instruction>>, Error> {
+) -> Result<Instruction, Error> {
     use Instruction::*;
     use PreLabelInstruction as p;
 
@@ -292,14 +281,12 @@ fn unlabel_instruction(
             labels
                 .get(&$label)
                 .map(|&pos| $inst($rd, pos))
-                .map(Left)
                 .ok_or(Error::LabelNotFound($label))
         };
         ($inst:ident, $rs1:ident, $rs2:ident, $label:ident) => {
             labels
                 .get(&$label)
                 .map(|&pos| $inst($rs1, $rs2, pos))
-                .map(Left)
                 .ok_or(Error::LabelNotFound($label))
         };
     }
@@ -316,9 +303,8 @@ fn unlabel_instruction(
         p::La(rd, label) => labels
             .get(&label)
             .map(|&pos| Li(rd, pos as u32))
-            .map(Left)
             .ok_or(Error::LabelNotFound(label)),
 
-        p::Other(instruction) => Ok(Left(instruction)),
+        p::Other(instruction) => Ok(instruction),
     }
 }
