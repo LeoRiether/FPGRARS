@@ -4,6 +4,7 @@
 //!
 
 use radix_trie::Trie;
+use byteorder::{ByteOrder, LittleEndian};
 
 pub mod register_names;
 use register_names::{self as reg_names, FullRegMap};
@@ -210,6 +211,7 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
 
         let mut data = Vec::with_capacity(data_segment_size);
         let mut current_data_type = data::Type::default();
+        let mut data_labels: Vec<data::Label> = Vec::new();
 
         for line in self {
             let full_line = &line;
@@ -244,11 +246,15 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
 
             let res = match directive {
                 Directive::Text => text::parse_line(line, &regmaps, &mut code),
-                Directive::Data => data::parse_line(line, &mut data, &mut current_data_type),
+                Directive::Data => {
+                    data::parse_line(line, &mut data, &mut data_labels, &mut current_data_type)
+                }
             };
 
             res.wrap_meta(full_line)?;
         }
+
+        unlabel_data(data_labels, &mut data, &labels)?;
 
         let code: Result<Vec<Instruction>, Error> = code
             .into_iter()
@@ -307,4 +313,27 @@ fn unlabel_instruction(
 
         p::Other(instruction) => Ok(instruction),
     }
+}
+
+/// Replaces all positions in the `.data` that had labels with their
+/// actual values
+fn unlabel_data(data_labels: Vec<data::Label>, data: &mut Vec<u8>, labels: &Trie<String, usize>) -> Result<(), Error> {
+    for dl in data_labels {
+        let data::Label{ pos, dtype, label } = dl;
+
+        let value = match labels.get(&label) {
+            Some(x) => *x,
+            None => return Err(Error::LabelNotFound(label)),
+        };
+
+        use data::Type::*;
+        match dtype {
+            Byte => { data[pos] = value as u8; }
+            Half => LittleEndian::write_u16(&mut data[pos..], value as u16),
+            Word => LittleEndian::write_u32(&mut data[pos..], value as u32),
+            _ => unreachable!("label can only be parsed in .byte, .half or .word"),
+        }
+    }
+
+    Ok(())
 }

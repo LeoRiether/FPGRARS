@@ -42,6 +42,15 @@ impl FromStr for Type {
     }
 }
 
+/// Stores the information of a label we found in the `.data` directive, so we can
+/// later populate the memory with the actual label values
+pub(super) struct Label {
+    /// Position in memory
+    pub(super) pos: usize,
+    pub(super) dtype: Type,
+    pub(super) label: String,
+}
+
 fn store_integer(x: u32, data: &mut Vec<u8>, dtype: Type) {
     use Type::*;
     match dtype {
@@ -65,10 +74,42 @@ fn store_integer(x: u32, data: &mut Vec<u8>, dtype: Type) {
     }
 }
 
-fn store_token(s: &str, data: &mut Vec<u8>, dtype: Type) -> Result<(), Error> {
+/// Pushes a [Label](struct.Label.html) onto a vector and resizes the data accordingly
+fn push_label(labels: &mut Vec<Label>, data: &mut Vec<u8>, dtype: Type, label: &str) {
+    use Type::*;
+
+    let pos = data.len();
+
+    match dtype {
+        Byte => data.resize(pos + 1, 0),
+        Half => data.resize(pos + 2, 0),
+        Word => data.resize(pos + 4, 0),
+        _ => unreachable!("push_label should only be called with byte, half, or word directive"),
+    }
+
+    labels.push(Label {
+        pos,
+        dtype,
+        label: label.to_owned(),
+    });
+}
+
+fn store_token(
+    s: &str,
+    data: &mut Vec<u8>,
+    found_labels: &mut Vec<Label>,
+    dtype: Type,
+) -> Result<(), Error> {
     use Type::*;
     match dtype {
-        Byte | Half | Word | Align => {
+        Byte | Half | Word => match immediate(s) {
+            // .word <immediate>
+            Ok((_, x)) => store_integer(x, data, dtype),
+
+            // might be a .word <label>, might be .word <junk>
+            Err(_) => push_label(found_labels, data, dtype, s),
+        },
+        Align => {
             let (_, x) = immediate(s)?;
             store_integer(x, data, dtype);
         }
@@ -114,7 +155,14 @@ fn one_token(dtype: Type) -> impl Fn(&str) -> nom::IResult<&str, Cow<str>> {
 
 /// Parses a line in the `.data` directive, puts the desired vales in `data` and
 /// updates the `type` parameter.
-pub(super) fn parse_line(s: &str, data: &mut Vec<u8>, dtype: &mut Type) -> Result<(), Error> {
+/// If we find something that could be a label, we should store a [Label](struct.Label.html)
+/// so we can calculate the value to put in that position after parsing has been completed.
+pub(super) fn parse_line(
+    s: &str,
+    data: &mut Vec<u8>,
+    found_labels: &mut Vec<Label>,
+    dtype: &mut Type,
+) -> Result<(), Error> {
     let (s, opt_new_dtype) = match directive_to_type(s) {
         Ok((rest, new_dtype)) => (rest, Some(new_dtype)),
         Err(_) => (s, None),
@@ -127,7 +175,7 @@ pub(super) fn parse_line(s: &str, data: &mut Vec<u8>, dtype: &mut Type) -> Resul
     let (_i, tokens) = separated_list(separator1, one_token(*dtype))(s)?;
 
     for tok in tokens {
-        store_token(tok.borrow(), data, *dtype)?;
+        store_token(tok.borrow(), data, found_labels, *dtype)?;
     }
 
     Ok(())
