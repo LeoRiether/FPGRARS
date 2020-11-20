@@ -21,6 +21,7 @@ Time | 30 | | a0 = low bits of milliseconds since unix epoch, a1 = high bits |
 Midi out | 31 | does nothing for now | |
 Sleep ms | 32 | a0 = number of milliseconds to sleep | |
 Midi out sync | 33 | does nothing for now |
+Print hex integer | 34 | a0 = integer to print | |
 Print unsigned integer | 36 | a0 = unsigned integer to print | |
 Rand seed | 40 | does nothing for now | |
 Rand int | 41 | | a0 = random integer |

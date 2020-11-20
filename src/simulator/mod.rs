@@ -587,6 +587,11 @@ impl Simulator {
                 std::thread::sleep(time::Duration::from_millis(t as u64));
             }
 
+            34 => {
+                // print hex int
+                print!("{:#X}", self.get_reg::<u32>(10));
+            }
+
             36 => {
                 // print unsigned int
                 print!("{}", self.get_reg::<u32>(10));
