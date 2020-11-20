@@ -587,6 +587,11 @@ impl Simulator {
                 std::thread::sleep(time::Duration::from_millis(t as u64));
             }
 
+            36 => {
+                // print unsigned int
+                print!("{}", self.get_reg::<u32>(10));
+            }
+
             // RNG stuff
             40 => {
                 // TODO: seed the RNG
