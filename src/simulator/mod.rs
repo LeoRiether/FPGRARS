@@ -9,12 +9,13 @@ use std::sync::{Arc, Mutex};
 use std::time;
 
 const DATA_SIZE: usize = 0x0040_0000; // TODO: this, but I think it's about this much
-const MMIO_SIZE: usize = 0x0021_0000;
 const MMIO_START: usize = 0xff00_0000;
 const KBMMIO_CONTROL: usize = 0xff20_0000;
 const KBMMIO_DATA: usize = 0xff20_0004;
+const FRAME_SIZE: usize = 0x0010_0000;
+const MMIO_SEC2_SIZE: usize = 0x0001_0000;
 
-use crate::renderer::{FRAME_0, FRAME_1, HEIGHT, WIDTH};
+use crate::renderer::{HEIGHT, WIDTH};
 // const VIDEO_START: usize = MMIO_START + FRAME_0;
 // const VIDEO_END: usize = MMIO_START + FRAME_1 + WIDTH * HEIGHT;
 
@@ -29,15 +30,31 @@ mod util;
 
 use byteorder::{ByteOrder, LittleEndian};
 
+pub struct MMIO {
+    pub sections: [Mutex<Vec<u8>>; 3],
+}
+
+impl MMIO {
+    pub fn new() -> Self {
+        Self {
+            sections: [
+                Mutex::new(vec![0; FRAME_SIZE]),
+                Mutex::new(vec![0; FRAME_SIZE]),
+                Mutex::new(vec![0; MMIO_SEC2_SIZE]),
+            ]
+        }
+    }
+}
+
 pub struct Memory {
-    pub mmio: Arc<Mutex<Vec<u8>>>,
+    pub mmio: Arc<MMIO>,
     data: Vec<u8>,
 }
 
 impl Memory {
     pub fn new() -> Self {
         Self {
-            mmio: Arc::new(Mutex::new(vec![0; MMIO_SIZE])),
+            mmio: Arc::new(MMIO::new()),
             data: vec![0; DATA_SIZE],
         }
     }
@@ -46,11 +63,22 @@ impl Memory {
     where
         F: FnOnce(&[u8]) -> T,
     {
-        if i >= MMIO_START {
-            let mut mmio = self.mmio.lock().unwrap();
+        if i >= MMIO_START + 2 * FRAME_SIZE {
+            // section 2
+            let mut mmio = self.mmio.sections[2].lock().unwrap();
             if i == KBMMIO_DATA {
-                mmio[KBMMIO_CONTROL - MMIO_START] = 0;
+                mmio[KBMMIO_CONTROL - MMIO_START - 2*FRAME_SIZE] = 0;
             }
+            read(&mmio[i - MMIO_START - 2*FRAME_SIZE..])
+        }
+        else if i >= MMIO_START + FRAME_SIZE {
+            // frame 1
+            let mmio = self.mmio.sections[1].lock().unwrap();
+            read(&mmio[i - MMIO_START - FRAME_SIZE..])
+        }
+        else if i >= MMIO_START {
+            // frame 0
+            let mmio = self.mmio.sections[0].lock().unwrap();
             read(&mmio[i - MMIO_START..])
         } else {
             read(&self.data[i..])
@@ -61,8 +89,19 @@ impl Memory {
     where
         F: FnOnce(&mut [u8], T) -> R,
     {
-        if i >= MMIO_START {
-            let mut mmio = self.mmio.lock().unwrap();
+        if i >= MMIO_START + 2 * FRAME_SIZE {
+            // section 2
+            let mut mmio = self.mmio.sections[2].lock().unwrap();
+            write(&mut mmio[i - MMIO_START - 2*FRAME_SIZE..], x)
+        }
+        else if i >= MMIO_START + FRAME_SIZE {
+            // frame 1
+            let mut mmio = self.mmio.sections[1].lock().unwrap();
+            write(&mut mmio[i - MMIO_START - FRAME_SIZE..], x)
+        }
+        else if i >= MMIO_START {
+            // frame 0
+            let mut mmio = self.mmio.sections[0].lock().unwrap();
             write(&mut mmio[i - MMIO_START..], x)
         } else {
             write(&mut self.data[i..], x)
@@ -618,11 +657,10 @@ impl Simulator {
             48 | 148 => {
                 // clear screen
                 let color = self.get_reg::<u8>(10); // a0
-                let frame_select = self.get_reg::<u32>(11); // a1
+                let frame_select = self.get_reg::<u32>(11) as usize; // a1
 
-                let mut mmio = self.memory.mmio.lock().unwrap();
-                let frame = if frame_select == 0 { FRAME_0 } else { FRAME_1 };
-                for x in &mut mmio[frame..frame + WIDTH * HEIGHT] {
+                let mut mmio = self.memory.mmio.sections[frame_select].lock().unwrap();
+                for x in &mut mmio[..WIDTH * HEIGHT] {
                     *x = color;
                 }
             }

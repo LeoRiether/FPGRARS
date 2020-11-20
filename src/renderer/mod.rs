@@ -8,19 +8,18 @@ use pixel_canvas::{
 };
 use std::sync::{Arc, Mutex};
 
+use crate::simulator::MMIO;
+
 pub const WIDTH: usize = 320;
 pub const HEIGHT: usize = 240;
-pub const FRAME_SELECT: usize = 0x200604;
-pub const FRAME_0: usize = 0;
-pub const FRAME_1: usize = 0x100000;
-const KEYBOARD: usize = 0x200000;
+pub const FRAME_SELECT: usize = 0x604;
 
 struct MyState {
-    mmio: Arc<Mutex<Vec<u8>>>,
+    mmio: Arc<MMIO>,
 }
 
 impl MyState {
-    fn new(mmio: Arc<Mutex<Vec<u8>>>) -> Self {
+    fn new(mmio: Arc<MMIO>) -> Self {
         Self { mmio }
     }
 
@@ -41,9 +40,9 @@ impl MyState {
                     },
                 ..
             } => {
-                let mut mmio = state.mmio.lock().unwrap();
-                mmio[KEYBOARD] = 1;
-                mmio[KEYBOARD + 4] = scancode::to_ascii(*key);
+                let mut mmio = state.mmio.sections[2].lock().unwrap();
+                mmio[0] = 1;
+                mmio[4] = scancode::to_ascii(*key);
                 true
             }
 
@@ -64,7 +63,7 @@ fn mmio_color_to_rgb(x: u8) -> Color {
     }
 }
 
-pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
+pub fn init(mmio: Arc<MMIO>) {
     let canvas = Canvas::new(2 * WIDTH, 2 * HEIGHT)
         .title("FPGRARS")
         .state(MyState::new(mmio.clone()))
@@ -74,16 +73,16 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
     let canvas = canvas.show_ms(true);
 
     canvas.render(move |_state, image| {
-        let mmio = mmio.lock().unwrap();
+        let sec2 = mmio.sections[2].lock().unwrap();
 
-        let frame = mmio[FRAME_SELECT];
-        let start = if frame == 0 { FRAME_0 } else { FRAME_1 };
+        let frame = if sec2[FRAME_SELECT] == 0 { 0 } else { 1 };
+        let mmio = mmio.sections[frame].lock().unwrap();
 
         // Draw each MMIO pixel as a 2x2 square
         for (y, row) in image.chunks_mut(2 * WIDTH).enumerate() {
             for (x, pixel) in row.iter_mut().enumerate() {
                 let (x, y) = (x / 2, HEIGHT-1 - y / 2);
-                let index = start + y * WIDTH + x;
+                let index = y * WIDTH + x;
 
                 let col = if cfg!(debug_assertions) {
                     *mmio
