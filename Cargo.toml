@@ -19,8 +19,8 @@ panic = "abort"
 lazy_static = "1.4.0"
 rand = "0.7.3"
 
-pixel-canvas = { git = "https://github.com/LeoRiether/pixel-canvas", branch = "develop" }
-glium = "0.28.0"
+pixel-canvas = "0.2.1"
+glium = "0.26.0"
 
 nom = "5.1.2"
 
