@@ -51,6 +51,12 @@ pub(super) struct Label {
     pub(super) label: String,
 }
 
+/// Resizes the data to a multiple of `bytes`.
+fn align(bytes: usize, data: &mut Vec<u8>) {
+    let len = (data.len() + bytes - 1) / bytes * bytes;
+    data.resize(len, 0);
+}
+
 fn store_integer(x: u32, data: &mut Vec<u8>, dtype: Type) {
     use Type::*;
     match dtype {
@@ -58,11 +64,13 @@ fn store_integer(x: u32, data: &mut Vec<u8>, dtype: Type) {
             data.push(x as u8);
         }
         Half => {
+            align(2, data);
             let pos = data.len();
             data.resize(pos + 2, 0);
             LittleEndian::write_u16(&mut data[pos..], x as u16);
         }
         Word => {
+            align(4, data);
             let pos = data.len();
             data.resize(pos + 4, 0);
             LittleEndian::write_u32(&mut data[pos..], x as u32);
@@ -77,6 +85,12 @@ fn store_integer(x: u32, data: &mut Vec<u8>, dtype: Type) {
 /// Pushes a [Label](struct.Label.html) onto a vector and resizes the data accordingly
 fn push_label(labels: &mut Vec<Label>, data: &mut Vec<u8>, dtype: Type, label: &str) {
     use Type::*;
+
+    match dtype {
+        Half => align(2, data),
+        Word => align(4, data),
+        _ => {}
+    }
 
     let pos = data.len();
 
@@ -119,6 +133,7 @@ fn store_token(
                 Err(e) => return Err(Error::FloatError(e)),
             };
 
+            align(4, data);
             let pos = data.len();
             data.resize(pos + 4, 0);
             LittleEndian::write_f32(&mut data[pos..], x);
