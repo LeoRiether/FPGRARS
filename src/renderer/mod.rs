@@ -13,7 +13,30 @@ pub const HEIGHT: usize = 240;
 pub const FRAME_SELECT: usize = 0x200604;
 pub const FRAME_0: usize = 0;
 pub const FRAME_1: usize = 0x100000;
-const KEYBOARD: usize = 0x200000;
+const KEYBOARD: usize = 0x20_0000;
+const KEYBUFFER: usize = 0x20_0100;
+const KEYBUFFER_SIZE: usize = 8;
+const KEYMAP: usize = 0x20_0520;
+
+fn push_key_to_buffer(mmio: &mut [u8], key: u8) {
+    // Shift buffer
+    for i in (KEYBUFFER + 1..KEYBUFFER + KEYBUFFER_SIZE).rev() {
+        mmio[i] = mmio[i - 1];
+    }
+
+    // Push key to mmio[KEYBUFFER]
+    mmio[KEYBUFFER] = key;
+}
+
+fn push_key_to_map(mmio: &mut [u8], key: u8) {
+    let (byte, bit) = (key / 8, key % 8);
+    mmio[KEYMAP + byte as usize] |= 1 << bit;
+}
+
+fn remove_key_from_map(mmio: &mut [u8], key: u8) {
+    let (byte, bit) = (key / 8, key % 8);
+    mmio[KEYMAP + byte as usize] &= !(1 << bit);
+}
 
 struct MyState {
     mmio: Arc<Mutex<Vec<u8>>>,
@@ -44,6 +67,35 @@ impl MyState {
                 let mut mmio = state.mmio.lock().unwrap();
                 mmio[KEYBOARD] = 1;
                 mmio[KEYBOARD + 4] = scancode::to_ascii(*key);
+
+                push_key_to_buffer(&mut mmio, *key as u8);
+                push_key_to_map(&mut mmio, *key as u8);
+
+                true
+            }
+
+            // Match a keyup with scancode "key"
+            Event::WindowEvent {
+                event:
+                    WindowEvent::KeyboardInput {
+                        input:
+                            glutin::event::KeyboardInput {
+                                state: glutin::event::ElementState::Released,
+                                scancode: key,
+                                ..
+                            },
+                        is_synthetic: false,
+                        ..
+                    },
+                ..
+            } => {
+                let mut mmio = state.mmio.lock().unwrap();
+
+                push_key_to_buffer(&mut mmio, 0xF0);
+                push_key_to_buffer(&mut mmio, *key as u8);
+
+                remove_key_from_map(&mut mmio, *key as u8);
+
                 true
             }
 
@@ -82,7 +134,7 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
         // Draw each MMIO pixel as a 2x2 square
         for (y, row) in image.chunks_mut(2 * WIDTH).enumerate() {
             for (x, pixel) in row.iter_mut().enumerate() {
-                let (x, y) = (x / 2, HEIGHT-1 - y / 2);
+                let (x, y) = (x / 2, HEIGHT - 1 - y / 2);
                 let index = start + y * WIDTH + x;
 
                 let col = if cfg!(debug_assertions) {
@@ -94,7 +146,7 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
                 };
 
                 // if col != 0xc7 {
-                    *pixel = mmio_color_to_rgb(col);
+                *pixel = mmio_color_to_rgb(col);
                 // }
             }
         }
