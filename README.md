@@ -6,6 +6,9 @@
 
 FPGRARS aims to provide a RISC-V assembly simulator with 8-bit color graphics display and keyboard input, similar to [RARS](https://github.com/TheThirdOne/rars), but faster.
 
+## Running FPGRARS
+First, head over to the [latest release](github.com/LeoRiether/FPGRARS/releases/latest) and download the appropriate executable. Then, you can run a RISC-V assembly file either by running `./fpgrars your_riscv_file.s` in a terminal or by dragging the `.s` onto the executable. If you're on Linux, you might need to `chmod +x fpgrars-x86_64-unknown-linux-gnu` for FPGRARS to work.
+
 ## Supported ecalls
 
 | Description | a7 | Input | Output |

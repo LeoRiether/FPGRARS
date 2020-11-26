@@ -10,9 +10,9 @@ use std::sync::{Arc, Mutex};
 
 pub const WIDTH: usize = 320;
 pub const HEIGHT: usize = 240;
-pub const FRAME_SELECT: usize = 0x200604;
+pub const FRAME_SELECT: usize = 0x20_0604;
 pub const FRAME_0: usize = 0;
-pub const FRAME_1: usize = 0x100000;
+pub const FRAME_1: usize = 0x10_0000;
 const KEYBOARD: usize = 0x20_0000;
 const KEYBUFFER: usize = 0x20_0100;
 const KEYBUFFER_SIZE: usize = 8;
