@@ -15,8 +15,8 @@ const KBMMIO_CONTROL: usize = 0xff20_0000;
 const KBMMIO_DATA: usize = 0xff20_0004;
 
 use crate::renderer::{FRAME_0, FRAME_1, HEIGHT, WIDTH};
-// const VIDEO_START: usize = MMIO_START + FRAME_0;
-// const VIDEO_END: usize = MMIO_START + FRAME_1 + WIDTH * HEIGHT;
+const VIDEO_START: usize = MMIO_START + FRAME_0;
+const VIDEO_END: usize = MMIO_START + FRAME_1 + WIDTH * HEIGHT;
 
 use crate::parser::{self, Includable, MacroParseable, RISCVParser};
 
@@ -40,6 +40,27 @@ impl Memory {
             mmio: Arc::new(Mutex::new(vec![0; MMIO_SIZE])),
             data: vec![0; DATA_SIZE],
         }
+    }
+
+    /// Sets N bytes in the video memory, but ignores bytes equal to 0xC7.
+    fn set_with_transparency(&mut self, i: usize, mut x: u32, n: usize) -> bool {
+        if i < VIDEO_START || i >= VIDEO_END {
+            return false;
+        }
+
+        let mut mmio = self.mmio.lock().unwrap();
+        let i = i - MMIO_START;
+
+        for data in &mut mmio[i..i+n] {
+            let byte = x as u8;
+            if byte != 0xC7 {
+                *data = byte;
+            }
+
+            x >>= 8;
+        }
+
+        true
     }
 
     pub fn get_with<T, F>(&self, i: usize, read: F) -> T
@@ -74,6 +95,9 @@ impl Memory {
     }
 
     pub fn set_byte(&mut self, i: usize, x: u8) {
+        if self.set_with_transparency(i, x as u32, 1) {
+            return;
+        }
         self.set_with(i, x, |v, x| v[0] = x)
     }
 
@@ -82,6 +106,9 @@ impl Memory {
     }
 
     pub fn set_half(&mut self, i: usize, x: u16) {
+        if self.set_with_transparency(i, x as u32, 2) {
+            return;
+        }
         self.set_with(i, x, LittleEndian::write_u16)
     }
 
@@ -90,6 +117,9 @@ impl Memory {
     }
 
     pub fn set_word(&mut self, i: usize, x: u32) {
+        if self.set_with_transparency(i, x, 4) {
+            return;
+        }
         self.set_with(i, x, LittleEndian::write_u32)
     }
 
