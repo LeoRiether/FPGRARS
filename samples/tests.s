@@ -1,15 +1,10 @@
 .data
 
+    label: .word 123
+
 .text
-    li a0 0xfc
-    li a1 0
-    li a7 48
-    ecall
 
-    li a0 0xcf
-    li a1 0
-    li a7 48
-    ecall
-
-    li a7 110
-    ecall
+    la a0 label
+    sw a1 0(a0)
+    sw a1 (a0)
+    sw a1 label a0

@@ -28,12 +28,27 @@ pub(super) fn parse_multi_instruction(s: &str, regmaps: &FullRegMap) -> Option<V
         }
     }
 
+    macro_rules! store {
+        ($inst:ident) => {
+            args_multi_store(s, &regs)
+                .map(|(rs2, label, tmp)| vec![
+                    pre::La(tmp, label),
+                    $inst(rs2, 0, tmp).into(),
+                ])
+                .ok()
+        }
+    }
+
     match instruction {
         "lb" => load!(Lb),
         "lh" => load!(Lh),
         "lw" => load!(Lw),
         "lbu" => load!(Lbu),
         "lhu" => load!(Lhu),
+
+        "sb" => store!(Sb),
+        "sh" => store!(Sh),
+        "sw" => store!(Sw),
         _ => None
     }
 }

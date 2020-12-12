@@ -194,6 +194,19 @@ pub fn args_csr_imm(s: &str, regs: &RegMap, status: &RegMap) -> Result<(u8, u8, 
 
     Ok(out)
 }
+
+/// Parses the args for a `sw t0 label t1`, which stores `t0` in the address of `label`
+/// using `t1` as a temporary
+pub fn args_multi_store(s: &str, regs: &RegMap) -> Result<(u8, String, u8), Error> {
+    let (_i, out) = all_consuming_tuple!((
+        one_reg(regs), // rs2
+        owned_one_arg, // label
+        one_reg(regs)  // temporary
+    ))(s)?;
+
+    Ok(out)
+}
+
 pub fn args_float_r_mixed(s: &str, regs: &RegMap, floats: &RegMap) -> Result<(u8, u8, u8), Error> {
     let (_i, out) = all_consuming(terminated(
         tuple((
