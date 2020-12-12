@@ -1,5 +1,3 @@
-mod scancode;
-
 use glium::glutin;
 use pixel_canvas::{
     canvas::CanvasInfo,
@@ -49,6 +47,21 @@ impl MyState {
 
     fn handle_input(_info: &CanvasInfo, state: &mut MyState, event: &Event<()>) -> bool {
         match event {
+            // Match a received character
+            Event::WindowEvent {
+                event: WindowEvent::ReceivedCharacter(chr),
+                ..
+            } => {
+                let chr = if *chr == '\r' { '\n' } else { *chr };
+
+                let mut mmio = state.mmio.lock().unwrap();
+
+                mmio[KEYBOARD] = 1;
+                mmio[KEYBOARD + 4] = chr as u8;
+
+                true
+            }
+
             // Match a keypress with scancode "key"
             Event::WindowEvent {
                 event:
@@ -65,8 +78,6 @@ impl MyState {
                 ..
             } => {
                 let mut mmio = state.mmio.lock().unwrap();
-                mmio[KEYBOARD] = 1;
-                mmio[KEYBOARD + 4] = scancode::to_ascii(*key);
 
                 push_key_to_buffer(&mut mmio, *key as u8);
                 push_key_to_map(&mut mmio, *key as u8);
