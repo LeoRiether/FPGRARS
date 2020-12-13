@@ -319,13 +319,13 @@ impl Simulator {
                     rd,
                     self.memory
                         .get_byte((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
-                        as u32,
+                        as i8 as u32,
                 ),
                 Lh(rd, imm, rs1) => self.set_reg(
                     rd,
                     self.memory
                         .get_half((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
-                        as u32,
+                        as i16 as u32,
                 ),
                 Lw(rd, imm, rs1) => self.set_reg(
                     rd,
