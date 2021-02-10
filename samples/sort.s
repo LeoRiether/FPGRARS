@@ -33,6 +33,9 @@ pcontrol:
 	lw a0 0(s1)
 	li a7 1
 	ecall
+	li a0 ' '
+	li a7 11
+	ecall
 
 	addi s1 s1 4
 	j pcontrol

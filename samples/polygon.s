@@ -1,4 +1,4 @@
-.include "../../RARS/MACROSv21.s"
+.include "MACROSv21.s"
 
 .data
 raio: .word 110
@@ -300,4 +300,4 @@ stall.loop:
 stall.exit:
 	ret
 
-.include "../../RARS/SYSTEMv21.s"
+.include "SYSTEMv21.s"

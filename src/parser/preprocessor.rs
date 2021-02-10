@@ -7,7 +7,7 @@ use super::util::*;
 
 /// Generally created by calling [parse_includes](trait.Includable.html#method.parse_includes)
 /// on an iterator of Strings
-// TODO: check for ciclic includes, preferably in a better way than RARS
+// TODO: check for cyclic includes, preferably in a better way than RARS
 // (we should allow a file to be included more than once, maybe?)
 pub struct Includer<'a> {
     /// Stack of line iterators. Every time we encounter an .include,
@@ -298,7 +298,7 @@ impl<I: Iterator<Item = String>> MacroParser<I> {
 }
 
 impl<I: Iterator<Item = String>> Iterator for MacroParser<I> {
-    type Item = String;
+    type Item = Result<String, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let line = match self.buf.pop() {
@@ -308,7 +308,10 @@ impl<I: Iterator<Item = String>> Iterator for MacroParser<I> {
 
         // Is the line a macro declaration?
         if let Some(builder) = self.parse_macro_declaration(&line) {
-            let (key, parsed_macro) = self.parse_until_end(builder).unwrap();
+            let (key, parsed_macro) = match self.parse_until_end(builder) {
+                Ok(res) => res,
+                Err(e) => return Some(Err(e)),
+            };
             self.macros.insert(key, parsed_macro);
             return self.next();
         }
@@ -325,7 +328,7 @@ impl<I: Iterator<Item = String>> Iterator for MacroParser<I> {
             return self.next();
         }
 
-        Some(self.replace_eqvs(line))
+        Some(Ok(self.replace_eqvs(line)))
     }
 }
 

@@ -199,7 +199,7 @@ pub trait RISCVParser {
     fn parse_riscv(self, data_segment_size: usize) -> ParseResult;
 }
 
-impl<I: Iterator<Item = String>> RISCVParser for I {
+impl<I: Iterator<Item = Result<String, Error>>> RISCVParser for I {
     fn parse_riscv(self, data_segment_size: usize) -> ParseResult {
         use combinators::*;
 
@@ -214,6 +214,7 @@ impl<I: Iterator<Item = String>> RISCVParser for I {
         let mut data_labels: Vec<data::Label> = Vec::new();
 
         for line in self {
+            let line = line?;
             let full_line = &line;
 
             let line = match parse_label(&line) {
