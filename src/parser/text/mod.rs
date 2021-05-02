@@ -321,7 +321,7 @@ mod tests {
     use lazy_static::*;
     lazy_static! {
         static ref FULLREG: FullRegMap =
-            { (reg_names::regs(), reg_names::floats(), reg_names::status()) };
+             (reg_names::regs(), reg_names::floats(), reg_names::status()) ;
     }
 
     #[test]

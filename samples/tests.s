@@ -1,10 +1,13 @@
 .data
-
-    label: .word 123
+    LABEL: .string "Hello World!!!\n"
 
 .text
 
-    la a0 label
-    sw a1 0(a0)
-    sw a1 (a0)
-    sw a1 label a0
+.macro load_half(%register,%var_address)
+    li %register,4 # Comments here
+    la a0,%var_address # Comments there
+    ecall
+.end_macro
+
+    load_half(a7,LABEL )
+

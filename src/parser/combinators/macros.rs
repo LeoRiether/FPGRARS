@@ -50,9 +50,13 @@ pub fn end_macro(s: &str) -> bool {
 }
 
 fn use_arg_list(s: &str) -> IResult<&str, Vec<String>> {
-    separated_list(
-        separator1,
-        map(take_till1(|c| is_separator(c) || c == ')'), str::to_owned),
+    delimited(
+        separator0,
+        separated_list(
+            separator1,
+            map(take_till1(|c| is_separator(c) || c == ')'), str::to_owned),
+        ),
+        separator0
     )(s)
 }
 
@@ -119,6 +123,11 @@ mod tests {
         );
         assert_eq!(macro_use(" MACRO "), Ok(("", ("MACRO".into(), vec![]))));
         assert_eq!(macro_use(" MACRO()"), Ok(("", ("MACRO".into(), vec![]))));
+        assert_eq!(macro_use(" MACRO( )"), Ok(("", ("MACRO".into(), vec![]))));
+
+        assert_eq!(macro_use("MACRO( a0, a1 )"), Ok(("", ("MACRO".into(), vec!["a0".into(), "a1".into()]))));
+        assert_eq!(macro_use("MACRO(a0, a1 )"), Ok(("", ("MACRO".into(), vec!["a0".into(), "a1".into()]))));
+        assert_eq!(macro_use("MACRO( a0, a1)"), Ok(("", ("MACRO".into(), vec!["a0".into(), "a1".into()]))));
 
         // Parsing the label is the job of MacroParser::parse_macro_use
         // because we need to keep it and pass it to the riscv parser
