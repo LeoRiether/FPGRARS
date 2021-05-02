@@ -18,6 +18,8 @@ use crate::renderer::{FRAME_0, FRAME_1, HEIGHT, WIDTH};
 const VIDEO_START: usize = MMIO_START + FRAME_0;
 const VIDEO_END: usize = MMIO_START + FRAME_1 + WIDTH * HEIGHT;
 
+const HEAP_START: usize = 0x1004_0000;
+
 use crate::parser::{self, Includable, MacroParseable, RISCVParser};
 
 mod into_register;
@@ -32,6 +34,9 @@ use byteorder::{ByteOrder, LittleEndian};
 pub struct Memory {
     pub mmio: Arc<Mutex<Vec<u8>>>,
     data: Vec<u8>,
+
+    /// Memory allocated by `sbrk`
+    dynamic: Vec<u8>,
 }
 
 impl Memory {
@@ -39,6 +44,7 @@ impl Memory {
         Self {
             mmio: Arc::new(Mutex::new(vec![0; MMIO_SIZE])),
             data: vec![0; DATA_SIZE],
+            dynamic: vec![],
         }
     }
 
@@ -51,7 +57,7 @@ impl Memory {
         let mut mmio = self.mmio.lock().unwrap();
         let i = i - MMIO_START;
 
-        for data in &mut mmio[i..i+n] {
+        for data in &mut mmio[i..i + n] {
             let byte = x as u8;
             if byte != 0xC7 {
                 *data = byte;
@@ -68,12 +74,17 @@ impl Memory {
         F: FnOnce(&[u8]) -> T,
     {
         if i >= MMIO_START {
+            // MMIO
             let mut mmio = self.mmio.lock().unwrap();
             if i == KBMMIO_DATA {
                 mmio[KBMMIO_CONTROL - MMIO_START] = 0;
             }
             read(&mmio[i - MMIO_START..])
+        } else if i >= HEAP_START {
+            // Heap/dynamic memory
+            read(&self.dynamic[i - HEAP_START..])
         } else {
+            // Data memory
             read(&self.data[i..])
         }
     }
@@ -83,9 +94,14 @@ impl Memory {
         F: FnOnce(&mut [u8], T) -> R,
     {
         if i >= MMIO_START {
+            // MMIO
             let mut mmio = self.mmio.lock().unwrap();
             write(&mut mmio[i - MMIO_START..], x)
+        } else if i >= HEAP_START {
+            // Heap/dynamic memory
+            write(&mut self.dynamic[i - HEAP_START..], x)
         } else {
+            // Data memory
             write(&mut self.data[i..], x)
         }
     }
@@ -593,6 +609,27 @@ impl Simulator {
                 // print float
                 print!("{}", self.floats[10]);
             }
+
+            9 => {
+                // sbrk
+                // Like RARS, negative increments are not allowed
+                let bytes = self.get_reg::<i32>(10); // a0
+
+                if bytes < 0 {
+                    panic!("`sbrk` does not allow negative increments");
+                }
+
+                let padding = (4 - bytes % 4) % 4; // makes sure we're always allocating full words
+                let bytes = (bytes + padding) as usize;
+
+                self.set_reg(10, (HEAP_START + self.memory.dynamic.len()) as u32);
+
+                self.memory.dynamic.reserve(bytes); // may reserve more than `bytes`
+                self.memory
+                    .dynamic
+                    .resize(self.memory.dynamic.len() + bytes, 0);
+            }
+
             11 => {
                 // print char
                 print!("{}", self.get_reg::<u32>(10) as u8 as char);
