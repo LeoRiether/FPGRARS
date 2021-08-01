@@ -117,13 +117,13 @@ impl MyState {
 
 // TODO: change the color format in pixel-canvas to ClientFormat::U8
 fn mmio_color_to_rgb(x: u8) -> Color {
-    let r = x & 0b111;
-    let g = (x >> 3) & 0b111;
-    let b = x >> 6;
+    let r = x ;
+    //let g = (x >> 3) & 0b111;
+    //let b = x >> 6;
     Color {
-        r: r * 36,
-        g: g * 36,
-        b: b * 85,
+        r: r ,
+        g: 0,
+        b: 0,
     }
 }
 
