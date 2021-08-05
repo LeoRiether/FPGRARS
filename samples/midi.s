@@ -8,7 +8,7 @@
 	li a1 %dur # Duration
 	li a2 150
 	mul a1 a1 a2 # Duration times 150
-	li a2 29 # Instrument
+	li a2 0 # Instrument
 	li a3 110 # Volume/Velocity
 	ecall
 .end_macro
