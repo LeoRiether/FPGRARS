@@ -22,9 +22,9 @@ Exit | 10 | | |
 Stop execution | 110 | |
 Print char | 11 | a0 = the char | |
 Time | 30 | | a0 = low bits of milliseconds since unix epoch, a1 = high bits |
-Midi out | 31 | does nothing for now | |
+Midi out | 31 | a0 = pitch (note), a1 = duration in ms, a2 = instrument (in range 0-127), a3 = volume (also 0-127) | Async sound |
 Sleep ms | 32 | a0 = number of milliseconds to sleep | |
-Midi out sync | 33 | does nothing for now |
+Midi out sync | 33 | a0 = pitch (note), a1 = duration in ms, a2 = instrument (in range 0-127), a3 = volume (also 0-127) | Synchronous sound |
 Print hex integer | 34 | a0 = integer to print | |
 Print unsigned integer | 36 | a0 = unsigned integer to print | |
 Rand seed | 40 | does nothing for now | |
