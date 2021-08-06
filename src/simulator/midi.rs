@@ -48,20 +48,23 @@ fn play_note(
     instrument: u8,
     velocity: u8,
 ) {
-    let mut conn = CONN.as_ref().unwrap().lock().unwrap();
-
     const NOTE_ON: u8 = 0x90;
     const NOTE_OFF: u8 = 0x80;
     const PROGRAM_CHANGE: u8 = 0xC0;
 
-    conn.send(&[PROGRAM_CHANGE, instrument])
-        .expect("Failed to send PROGRAM_CHANGE message to MIDI output");
-    conn.send(&[NOTE_ON, pitch, velocity])
-        .expect("Failed to send NOTE_ON message to MIDI output");
+    {
+        let mut conn = CONN.as_ref().unwrap().lock().unwrap();
+        conn.send(&[PROGRAM_CHANGE, instrument])
+            .expect("Failed to send PROGRAM_CHANGE message to MIDI output");
+        conn.send(&[NOTE_ON, pitch, velocity])
+            .expect("Failed to send NOTE_ON message to MIDI output");
+    }
     thread::sleep(Duration::from_millis(duration as u64));
-    conn.send(&[NOTE_OFF, pitch, velocity])
-        .expect("Failed to send NOTE_OFF message to MIDI output");
-
+    {
+        let mut conn = CONN.as_ref().unwrap().lock().unwrap();
+        conn.send(&[NOTE_OFF, pitch, velocity])
+            .expect("Failed to send NOTE_OFF message to MIDI output");
+    }
 }
 
 /// Tries to handle a MIDI ecall and returns whether we could handle it
