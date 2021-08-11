@@ -18,12 +18,16 @@ jobs:
           - target: x86_64-pc-windows-gnu
             output: target/x86_64-pc-windows-gnu/release/fpgrars.exe
             finalOutput: target/x86_64-pc-windows-gnu/release/fpgrars-x86_64-pc-windows-gnu.exe
+            use_cross: true
           - target: x86_64-unknown-linux-gnu
             output: target/x86_64-unknown-linux-gnu/release/fpgrars
             finalOutput: target/x86_64-unknown-linux-gnu/release/fpgrars-x86_64-unknown-linux-gnu
+            use_cross: false
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - name: Install ALSA (for MIDI support)
+        run: sudo apt-get install libasound2-dev
       - name: Toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -33,7 +37,7 @@ jobs:
       - name: Cargo Build
         uses: actions-rs/cargo@v1
         with:
-          use-cross: true
+          use-cross: ${{ matrix.case.use_cross }}
           command: build
           args: --release --target=${{ matrix.case.target }}
       - name: Strip binary

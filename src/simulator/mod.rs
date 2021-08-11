@@ -26,6 +26,7 @@ mod into_register;
 use into_register::*;
 
 mod files;
+mod midi;
 
 mod util;
 
@@ -579,6 +580,10 @@ impl Simulator {
             &mut self.registers,
             &mut self.memory,
         ) {
+            return EcallSignal::Nothing;
+        }
+
+        if midi::handle_ecall(a7, &mut self.registers) {
             return EcallSignal::Nothing;
         }
 

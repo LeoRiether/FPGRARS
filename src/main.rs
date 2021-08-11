@@ -13,20 +13,35 @@
 //! FPGRARS doesn't care, but RARS complains.
 //!
 
+extern crate clap;
+
+mod app;
+mod parser;
 mod renderer;
 mod simulator;
-mod parser;
 
 use std::env;
 use std::error::Error;
+use std::path::Path;
 use std::thread;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let matches = app::build_app().get_matches_from(env::args_os());
+
+    if let Some(file) = matches.value_of("INPUT_FILE") {
+        if !Path::new(file).is_file() {
+            println!("\n`{}` must be a valid file.\n", file);
+            std::process::exit(1);
+        }
+    }
+
     let sim = simulator::Simulator::new();
     let mmio = sim.memory.mmio.clone();
 
-    let mut args: Vec<String> = env::args().skip(1).collect();
-    let file = args.pop().expect("Usage: ./fpgrars [OPTIONS] riscv_file.s");
+    let file = matches
+        .value_of("INPUT_FILE")
+        .expect("Failed to get <INPUT_FILE>")
+        .to_string();
 
     thread::Builder::new()
         .name("FPGRARS Simulator".into())
