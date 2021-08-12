@@ -115,15 +115,12 @@ impl MyState {
     }
 }
 
-// TODO: change the color format in pixel-canvas to ClientFormat::U8
-fn mmio_color_to_rgb(x: u8) -> Color {
-    let r = x & 0b111;
-    let g = (x >> 3) & 0b111;
-    let b = x >> 6;
+
+fn mmio_color_to_rgb(r: u8, g: u8, b: u8) -> Color {
     Color {
-        r: r * 36,
-        g: g * 36,
-        b: b * 85,
+        r: r ,
+        g: g ,
+        b: b ,
     }
 }
 
@@ -145,10 +142,25 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
         // Draw each MMIO pixel as a 2x2 square
         for (y, row) in image.chunks_mut(2 * WIDTH).enumerate() {
             for (x, pixel) in row.iter_mut().enumerate() {
+	        let bytes_per_pixel = 4;
                 let (x, y) = (x / 2, HEIGHT - 1 - y / 2);
-                let index = start + y * WIDTH + x;
+                let index = start + (y * WIDTH + x ) * bytes_per_pixel;
 
-                let col = if cfg!(debug_assertions) {
+                let red = if cfg!(debug_assertions) {
+                    *mmio
+                        .get(index+2)
+                        .expect("Out of bound access to the video memory!")
+                } else {
+                    unsafe { *mmio.get_unchecked(index+2) }
+                };
+		let green = if cfg!(debug_assertions) {
+                    *mmio
+                        .get(index+1)
+                        .expect("Out of bound access to the video memory!")
+                } else {
+                    unsafe { *mmio.get_unchecked(index+1) }
+                };
+		let blue = if cfg!(debug_assertions) {
                     *mmio
                         .get(index)
                         .expect("Out of bound access to the video memory!")
@@ -156,9 +168,7 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
                     unsafe { *mmio.get_unchecked(index) }
                 };
 
-                // if col != 0xc7 {
-                *pixel = mmio_color_to_rgb(col);
-                // }
+                *pixel = mmio_color_to_rgb(red, green, blue);
             }
         }
 
