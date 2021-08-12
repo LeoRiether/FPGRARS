@@ -6,6 +6,7 @@ edition = "2018"
 
 [features]
 show_ms = [] # show ms per frame in the window title
+8-bit-display = [] # 8-bit color format for the bitmap display
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

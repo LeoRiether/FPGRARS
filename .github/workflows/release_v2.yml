@@ -17,12 +17,19 @@ jobs:
         case:
           - target: x86_64-pc-windows-gnu
             output: target/x86_64-pc-windows-gnu/release/fpgrars.exe
-            finalOutput: target/x86_64-pc-windows-gnu/release/fpgrars-x86_64-pc-windows-gnu.exe
+            finalOutput: target/x86_64-pc-windows-gnu/release/fpgrars-x86_64-pc-windows-gnu
+            finalOutputExt: .exe
             use_cross: true
           - target: x86_64-unknown-linux-gnu
             output: target/x86_64-unknown-linux-gnu/release/fpgrars
             finalOutput: target/x86_64-unknown-linux-gnu/release/fpgrars-x86_64-unknown-linux-gnu
+            finalOutputExt: ""
             use_cross: false
+        features:
+          - list: ""
+            output-add: 24-bit-display
+          - list: 8-bit-display
+            output-add: 8-bit-display
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -39,11 +46,11 @@ jobs:
         with:
           use-cross: ${{ matrix.case.use_cross }}
           command: build
-          args: --release --target=${{ matrix.case.target }}
+          args: --release --features=${{ matrix.features.list }} --target=${{ matrix.case.target }}
       - name: Strip binary
         run: strip ${{ matrix.case.output }}
       - name: Rename output
-        run: mv ${{ matrix.case.output }} ${{ matrix.case.finalOutput }}
+        run: mv ${{ matrix.case.output }} ${{ matrix.case.finalOutput }}${{ matrix.features.output-add }}${{ matrix.case.finalOutputExt }}
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')

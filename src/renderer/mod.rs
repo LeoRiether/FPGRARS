@@ -36,16 +36,16 @@ fn remove_key_from_map(mmio: &mut [u8], key: u8) {
     mmio[KEYMAP + byte as usize] &= !(1 << bit);
 }
 
-struct MyState {
+struct InputState {
     mmio: Arc<Mutex<Vec<u8>>>,
 }
 
-impl MyState {
+impl InputState {
     fn new(mmio: Arc<Mutex<Vec<u8>>>) -> Self {
         Self { mmio }
     }
 
-    fn handle_input(_info: &CanvasInfo, state: &mut MyState, event: &Event<()>) -> bool {
+    fn handle_input(_info: &CanvasInfo, state: &mut InputState, event: &Event<()>) -> bool {
         match event {
             // Match a received character
             Event::WindowEvent {
@@ -115,20 +115,29 @@ impl MyState {
     }
 }
 
+/// Provides the color that should be drawn at position (y, x) of the display
+/// Basically a trait alias for Fn(memory, y, x) -> Color
+/// The given `memory` slice starts at the beginning of the current frame
+trait ColorProvider {
+    fn get(&self, memory: &[u8], y: usize, x: usize) -> Color;
+}
 
-fn mmio_color_to_rgb(r: u8, g: u8, b: u8) -> Color {
-    Color {
-        r: r ,
-        g: g ,
-        b: b ,
+impl<F> ColorProvider for F
+where
+    F: Fn(&[u8], usize, usize) -> Color
+{
+    fn get(&self, memory: &[u8], y: usize, x: usize) -> Color {
+        self(memory, y, x)
     }
 }
 
-pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
+/// Opens a pixel-canvas window and draws from a given memory buffer.
+/// The color provider is generally either 
+fn init_with_provider(mmio: Arc<Mutex<Vec<u8>>>, color_prov: impl ColorProvider + 'static) {
     let canvas = Canvas::new(2 * WIDTH, 2 * HEIGHT)
         .title("FPGRARS")
-        .state(MyState::new(mmio.clone()))
-        .input(MyState::handle_input);
+        .state(InputState::new(mmio.clone()))
+        .input(InputState::handle_input);
 
     #[cfg(feature = "show_ms")]
     let canvas = canvas.show_ms(true);
@@ -142,68 +151,60 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
         // Draw each MMIO pixel as a 2x2 square
         for (y, row) in image.chunks_mut(2 * WIDTH).enumerate() {
             for (x, pixel) in row.iter_mut().enumerate() {
-	        let bytes_per_pixel = 4;
-                let (x, y) = (x / 2, HEIGHT - 1 - y / 2);
-                let index = start + (y * WIDTH + x ) * bytes_per_pixel;
-
-                let red = if cfg!(debug_assertions) {
-                    *mmio
-                        .get(index+2)
-                        .expect("Out of bound access to the video memory!")
-                } else {
-                    unsafe { *mmio.get_unchecked(index+2) }
-                };
-		let green = if cfg!(debug_assertions) {
-                    *mmio
-                        .get(index+1)
-                        .expect("Out of bound access to the video memory!")
-                } else {
-                    unsafe { *mmio.get_unchecked(index+1) }
-                };
-		let blue = if cfg!(debug_assertions) {
-                    *mmio
-                        .get(index)
-                        .expect("Out of bound access to the video memory!")
-                } else {
-                    unsafe { *mmio.get_unchecked(index) }
-                };
-
-                *pixel = mmio_color_to_rgb(red, green, blue);
+                *pixel = color_prov.get(&mmio[start..], y, x);
             }
         }
-
-        // Alternative, possibly slower, implementation:
-
-        // let mut set = move |i, col| {
-        //     if cfg!(debug_assertions) {
-        //         *image
-        //             .get_mut(i)
-        //             .expect("Out of bounds access to the video memory!") = mmio_color_to_rgb(col);
-        //     } else {
-        //         unsafe {
-        //             *image.get_unchecked_mut(i) = mmio_color_to_rgb(col);
-        //         }
-        //     }
-        // };
-
-        // for i in 0..FRAME_SIZE {
-        //     let col = mmio[i + start];
-
-        //     // 0xC7 is "transparent"
-        //     if col != 0xC7 {
-        //         // Don't ask
-        //         // TODO: if this is too slow, we can try filling in line by line,
-        //         // as every other line is just a copy of the one above it
-        //         {
-        //             set((i % WIDTH) * 2 + (i / WIDTH) * WIDTH * 4, col);
-        //             set(1 + (i % WIDTH) * 2 + (i / WIDTH) * WIDTH * 4, col);
-        //             set((i % WIDTH) * 2 + (i / WIDTH) * WIDTH * 4 + 2 * WIDTH, col);
-        //             set(
-        //                 1 + (i % WIDTH) * 2 + (i / WIDTH) * WIDTH * 4 + 2 * WIDTH,
-        //                 col,
-        //             );
-        //         }
-        //     }
-        // }
     });
 }
+
+/// Init the 8-bit (BBGGGRRR) format bitmap display
+#[cfg(feature = "8-bit-display")]
+pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
+    let color_to_rgb = |x: u8| {
+        let r = x & 0b111;
+        let g = (x >> 3) & 0b111;
+        let b = x >> 6;
+        Color { r: r * 36, g: g * 36, b: b * 85 }
+    };
+
+    let color_provider = move |mmio: &[u8], y: usize, x: usize| {
+        let (x, y) = (x / 2, HEIGHT - 1 - y / 2);
+        let index = y * WIDTH + x;
+
+        let x = if cfg!(debug_assertions) {
+            *mmio.get(index).expect("Out of bound access to the video memory!")
+        } else {
+            unsafe { *mmio.get_unchecked(index) }
+        };
+
+        color_to_rgb(x)
+    };
+
+    init_with_provider(mmio, color_provider);
+}
+
+/// Init the 24-bit (R8G8B8) format bitmap display
+/// Note: this format is word-aligned, which means every color takes up
+/// 32 bits in memory, but only 24 are actually used
+#[cfg(not(feature = "8-bit-display"))]
+pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
+    let color_provider = |mmio: &[u8], y: usize, x: usize| {
+        let bytes_per_pixel = 4;
+        let (x, y) = (x / 2, HEIGHT - 1 - y / 2);
+        let index = (y * WIDTH + x) * bytes_per_pixel;
+
+        let get = |i| {
+            if cfg!(debug_assertions) {
+                *mmio.get(i).expect("Out of bound access to the video memory!")
+            } else {
+                unsafe { *mmio.get_unchecked(i) }
+            }
+        };
+
+        let (r, g, b) = (get(index+2), get(index+1), get(index));
+        Color { r, g, b }
+    };
+
+    init_with_provider(mmio, color_provider);
+}
+
