@@ -55,6 +55,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: ${{ matrix.case.finalOutput }}
+          files: ${{ matrix.case.finalOutput }}${{ matrix.features.output-add }}${{ matrix.case.finalOutputExt }} # amazing
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
