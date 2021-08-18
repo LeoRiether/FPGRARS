@@ -84,7 +84,7 @@ pub fn handle_ecall(
     let play = move || {
         play_note(
             pitch as u8,
-            if duration <= 0 { 1000 } else { duration as u32 },
+            if duration < 0 { 1000 } else { duration as u32 },
             instrument as u8,
             if (0..128).contains(&velocity) { velocity as u8 } else { 100 }
         );
