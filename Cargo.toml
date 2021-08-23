@@ -17,7 +17,7 @@ panic = "abort"
 panic = "abort"
 
 [build-dependencies]
-clap = "2.31.2"
+clap = "2.33.3"
 version_check = "0.9"
 
 [dependencies]
