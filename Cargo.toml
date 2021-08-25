@@ -37,6 +37,6 @@ byteorder = "1.3.4"
 midir = "0.7.0"
 
 [dependencies.clap]
-version = "2.31.2"
+version = "2.33.3"
 features = ["suggestions", "color", "wrap_help"]
 
