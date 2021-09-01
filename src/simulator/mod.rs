@@ -166,13 +166,14 @@ pub struct Simulator {
     started_at: time::Instant,
 
     open_files: files::FileHolder,
+    midi_player: Arc<midi::MidiPlayer>,
 
     pub memory: Memory,
     pub code: Vec<parser::Instruction>,
 }
 
 impl Simulator {
-    pub fn new() -> Self {
+    pub fn new(midi_port: Option<usize>) -> Self {
         Self {
             registers: [0; 32],
             floats: [0.0; 32],
@@ -180,6 +181,7 @@ impl Simulator {
             pc: 0,
             started_at: time::Instant::now(), // Will be set again in run()
             open_files: files::FileHolder::new(),
+            midi_player: Arc::new(midi::MidiPlayer::new(midi_port)),
             memory: Memory::new(),
             code: Vec::new(),
         }
@@ -583,7 +585,7 @@ impl Simulator {
             return EcallSignal::Nothing;
         }
 
-        if midi::handle_ecall(a7, &mut self.registers) {
+        if midi::handle_ecall(&self.midi_player, a7, &mut self.registers) {
             return EcallSignal::Nothing;
         }
 
@@ -647,10 +649,6 @@ impl Simulator {
                 let ms = duration.as_millis() as u64;
                 self.set_reg(10, ms as u32);
                 self.set_reg(11, (ms >> 32) as u32);
-            }
-
-            31 | 33 => {
-                // midi stuff, but nops for now
             }
 
             32 => {

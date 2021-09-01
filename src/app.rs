@@ -10,7 +10,7 @@ macro_rules! exit {
 
 pub struct Args {
     pub file: String,
-    pub port: usize,
+    pub port: Option<usize>,
     pub video: bool,
 }
 
@@ -42,9 +42,9 @@ pub fn get_args() -> Args {
     };
 
     let port = match matches.value_of("port").map(|x| (x, x.parse::<usize>().ok())) {
-        None => 0, // default port value
+        None => None,
         Some((x, None)) => exit!("Invalid port number `{}`", x), // parse failed
-        Some((_, Some(p))) => p,
+        Some((_, Some(p))) => Some(p),
     };
 
     let video = !matches.is_present("no-video");

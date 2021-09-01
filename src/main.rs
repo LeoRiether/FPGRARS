@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut args = app::get_args();
     let file = std::mem::replace(&mut args.file, String::default());
 
-    let sim = simulator::Simulator::new();
+    let sim = simulator::Simulator::new(args.port);
     let mmio = sim.memory.mmio.clone();
 
     let sim_thread = thread::Builder::new()
