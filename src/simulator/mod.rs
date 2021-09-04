@@ -49,12 +49,9 @@ impl Memory {
         }
     }
 
-    /// Sets N bytes in the video memory, but ignores bytes equal to 0xC7.
-    fn set_with_transparency(&mut self, i: usize, mut x: u32, n: usize) -> bool {
-        if i < VIDEO_START || i >= VIDEO_END {
-            return false;
-        }
-
+    /// Sets `n` bytes in the memory, but ignores bytes equal to 0xC7.
+    /// `i` should be inside video memory (VIDEO_START..VIDEO_END)
+    fn set_with_transparency(&mut self, i: usize, mut x: u32, n: usize) {
         let mut mmio = self.mmio.lock().unwrap();
         let i = i - MMIO_START;
 
@@ -66,10 +63,9 @@ impl Memory {
 
             x >>= 8;
         }
-
-        true
     }
 
+    /// Reads a value from the `i`-th byte of the memory
     pub fn get_with<T, F>(&self, i: usize, read: F) -> T
     where
         F: FnOnce(&[u8]) -> T,
@@ -90,7 +86,10 @@ impl Memory {
         }
     }
 
-    pub fn set_with<T, F, R>(&mut self, i: usize, x: T, write: F) -> R
+    /// Writes the value `x` to the `i`-th byte of the memory, with some writing function `write`.
+    /// Note: make sure `write` doesn't write 0xC7 (transparent) to video memory. In most cases,
+    /// you should be using `set_byte`, `set_half` or `set_word` instead.
+    fn set_with<T, F, R>(&mut self, i: usize, x: T, write: F) -> R
     where
         F: FnOnce(&mut [u8], T) -> R,
     {
@@ -112,10 +111,10 @@ impl Memory {
     }
 
     pub fn set_byte(&mut self, i: usize, x: u8) {
-        if self.set_with_transparency(i, x as u32, 1) {
-            return;
+        match (VIDEO_START..VIDEO_END).contains(&i) {
+            true => self.set_with_transparency(i, x as u32, 1),
+            false => self.set_with(i, x, |v, x| v[0] = x),
         }
-        self.set_with(i, x, |v, x| v[0] = x)
     }
 
     pub fn get_half(&self, i: usize) -> u16 {
@@ -123,10 +122,10 @@ impl Memory {
     }
 
     pub fn set_half(&mut self, i: usize, x: u16) {
-        if self.set_with_transparency(i, x as u32, 2) {
-            return;
+        match (VIDEO_START..VIDEO_END).contains(&i) {
+            true => self.set_with_transparency(i, x as u32, 2),
+            false => self.set_with(i, x, LittleEndian::write_u16),
         }
-        self.set_with(i, x, LittleEndian::write_u16)
     }
 
     pub fn get_word(&self, i: usize) -> u32 {
@@ -134,10 +133,10 @@ impl Memory {
     }
 
     pub fn set_word(&mut self, i: usize, x: u32) {
-        if self.set_with_transparency(i, x, 4) {
-            return;
+        match (VIDEO_START..VIDEO_END).contains(&i) {
+            true => self.set_with_transparency(i, x, 4),
+            false => self.set_with(i, x, LittleEndian::write_u32),
         }
-        self.set_with(i, x, LittleEndian::write_u32)
     }
 
     pub fn get_float(&self, i: usize) -> f32 {
@@ -145,7 +144,20 @@ impl Memory {
     }
 
     pub fn set_float(&mut self, i: usize, x: f32) {
-        self.set_with(i, x, LittleEndian::write_f32)
+        self.set_word(i, x.to_bits());
+    }
+
+    /// Writes the contents of the iterator into memory[i..] and returns
+    /// the number of bytes written
+    pub fn set_iterator<I>(&mut self, i: usize, it: I) -> usize
+        where I: IntoIterator<Item = u8>
+    {
+        let mut bytes = 0;
+        for b in it {
+            self.set_byte(i + bytes, b);
+            bytes += 1;
+        }
+        bytes
     }
 }
 
@@ -161,7 +173,7 @@ enum EcallSignal {
 pub struct Simulator {
     registers: [u32; 32],
     floats: [f32; 32],
-    status: Vec<u32>, // I'm not sure myself how many status register I'll use
+    status: Vec<u32>, // I'm not sure myself how many status registers I'll use
     pc: usize,
     started_at: time::Instant,
 
