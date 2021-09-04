@@ -178,7 +178,7 @@ pub struct Simulator {
     started_at: time::Instant,
 
     open_files: files::FileHolder,
-    midi_player: Arc<midi::MidiPlayer>,
+    midi_player: midi::MidiPlayer,
 
     pub memory: Memory,
     pub code: Vec<parser::Instruction>,
@@ -193,7 +193,7 @@ impl Simulator {
             pc: 0,
             started_at: time::Instant::now(), // Will be set again in run()
             open_files: files::FileHolder::new(),
-            midi_player: Arc::new(midi::MidiPlayer::new(midi_port)),
+            midi_player: midi::MidiPlayer::new(midi_port),
             memory: Memory::new(),
             code: Vec::new(),
         }
@@ -597,7 +597,7 @@ impl Simulator {
             return EcallSignal::Nothing;
         }
 
-        if midi::handle_ecall(&self.midi_player, a7, &mut self.registers) {
+        if self.midi_player.handle_ecall(a7, &mut self.registers) {
             return EcallSignal::Nothing;
         }
 
