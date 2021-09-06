@@ -10,7 +10,7 @@ env:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.case.os }}
     strategy:
       matrix:
         # https://doc.rust-lang.org/nightly/rustc/platform-support.html
@@ -20,11 +20,19 @@ jobs:
             finalOutput: target/x86_64-pc-windows-gnu/release/fpgrars-x86_64-pc-windows-gnu
             finalOutputExt: .exe
             use_cross: true
+            os: ubuntu-latest
           - target: x86_64-unknown-linux-gnu
             output: target/x86_64-unknown-linux-gnu/release/fpgrars
             finalOutput: target/x86_64-unknown-linux-gnu/release/fpgrars-x86_64-unknown-linux-gnu
             finalOutputExt: ""
             use_cross: false
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            output: target/x86_64-apple-darwin/release/fpgrars
+            finalOutput: target/x86_64-apple-darwin/release/fpgrars-x86_64-apple-darwin
+            finalOutputExt: ""
+            use_cross: false
+            os: macos-latest
         features:
           - list: ""
             output-add: --24-bit-display
@@ -34,6 +42,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Install ALSA (for MIDI support)
+        if: matrix.case.os != 'macos-latest'
         run: sudo apt-get install libasound2-dev
       - name: Toolchain
         uses: actions-rs/toolchain@v1
