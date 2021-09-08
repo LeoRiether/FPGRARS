@@ -610,6 +610,10 @@ impl Simulator {
                 // print int
                 print!("{}", self.get_reg::<i32>(10));
             }
+            2 => {
+                // print float
+                print!("{}", self.floats[10]);
+            }
             4 => {
                 // print string
                 let start = self.get_reg::<u32>(10) as usize; // a0
@@ -625,8 +629,10 @@ impl Simulator {
                 self.set_reg(10, buf.trim().parse::<i32>().unwrap());
             }
             6 => {
-                // print float
-                print!("{}", self.floats[10]);
+                // read float
+                let mut buf = String::new();
+                std::io::stdin().read_line(&mut buf).unwrap();
+                self.floats[10] = buf.trim().parse::<f32>().unwrap();
             }
 
             9 => {
