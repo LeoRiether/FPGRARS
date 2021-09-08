@@ -17,7 +17,7 @@ Print integer | 1  | a0 = integer to print | |
 Print float | 2 | fa0 = float to print | |
 Print string | 4 | a0 = address of the string | |
 Read int | 5 | | a0 = the read integer |
-Read float | 6 | a0 = the read float | |
+Read float | 6 | fa0 = the read float | |
 Sbrk | 9 | a0 = bytes to allocate (>= 0) | a0 = address of the allocated chunk
 Exit | 10 | | |
 Stop execution | 110 | |
