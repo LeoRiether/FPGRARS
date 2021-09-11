@@ -38,7 +38,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 /// From https://graphics.stanford.edu/~seander/bithacks.html#ZeroInWord
 #[inline]
-fn has_zero_byte(v: u32) -> bool { (((v) - 0x01010101u32) & !(v) & 0x80808080u32) != 0 }
+fn has_zero_byte(v: u32) -> bool { (((v as u64).wrapping_sub(0x01010101u64)) & !(v as u64) & 0x80808080u64) != 0 }
 
 #[inline]
 fn has_transparent_byte(v: u32) -> bool { has_zero_byte(v ^ TRANSPARENT_WORD) }
@@ -805,4 +805,21 @@ impl Simulator {
 
         EcallSignal::Nothing
     }
+}
+
+// as if this file wasn't big enough already
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_has_zero_byte() {
+        assert!(has_zero_byte(0xff00ff00));
+        assert!(!has_zero_byte(0x10203040));
+        assert!(has_zero_byte(0x0011ff22));
+        assert!(!has_zero_byte(0x12345678));
+        assert!(has_zero_byte(0x12005678));
+        assert!(has_zero_byte(0x11223300));
+    }
+    
 }
