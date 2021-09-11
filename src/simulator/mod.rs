@@ -168,8 +168,8 @@ impl Memory {
     {
         // We'll write to these three sections separately
         let before_video = start..VIDEO_START.min(start+len);
-        let in_video = VIDEO_START..VIDEO_END.min(start+len);
-        let after_video = VIDEO_END..start+len;
+        let in_video = VIDEO_START.max(start)..VIDEO_END.min(start+len);
+        let after_video = VIDEO_END.max(start)..start+len;
 
         let mut bytes_read = 0;
 

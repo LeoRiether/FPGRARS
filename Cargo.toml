@@ -1,6 +1,6 @@
 [package]
 name = "fpgrars"
-version = "1.11.0"
+version = "1.12.1"
 authors = ["Leonardo Riether <leonardoalves8217@gmail.com>"]
 edition = "2018"
 
