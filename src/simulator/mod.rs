@@ -37,8 +37,9 @@ mod util;
 use byteorder::{ByteOrder, LittleEndian};
 
 /// From https://graphics.stanford.edu/~seander/bithacks.html#ZeroInWord
+/// I have no idea whether these u32 should be u32s or u64s because UL means nothing
 #[inline]
-fn has_zero_byte(v: u32) -> bool { (((v as u64).wrapping_sub(0x01010101u64)) & !(v as u64) & 0x80808080u64) != 0 }
+fn has_zero_byte(v: u32) -> bool { (((v).wrapping_sub(0x01010101u32)) & !(v) & 0x80808080u32) != 0 }
 
 #[inline]
 fn has_transparent_byte(v: u32) -> bool { has_zero_byte(v ^ TRANSPARENT_WORD) }
