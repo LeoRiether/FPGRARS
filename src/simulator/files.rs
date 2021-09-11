@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::{Read, Seek, SeekFrom, Write, BufReader};
+use std::io::{Seek, SeekFrom, Write};
 
 /// Maximum number of simultaneous open files
 const MAX_DESCRIPTORS: i32 = 1 << 30;
@@ -99,11 +99,8 @@ fn read(
 ) -> i32 {
     holder
         .get_mut(fd)
-        .map(|file| {
-            let bytes = BufReader::new(file.take(len as u64)) // The BufReader should read exactly `len`
-                .bytes()                                      // bytes from file. If it reads more, some
-                .filter_map(|r| r.ok()); // Ignore Errs       // data will be skipped in the next `read()`
-            memory.set_iterator(buffer_start as usize, bytes)
+        .and_then(|file| {
+            memory.set_reader(file, buffer_start as usize, len)
         })
         .map(|x| x as i32)
         .unwrap_or(-1)
