@@ -1,7 +1,8 @@
 #############################################
 ##                                         ##
 ##  Colors the screen if a key is pressed  ##
-##  - (modified) RARS-compatible           ##
+##  Uses KDMMIO_KEYDOWN, which isn't       ##
+##  compatible with RARS                   ##
 ##                                         ##
 #############################################
 
@@ -70,8 +71,8 @@ print.exit:
     ret
 
 is_key_down:
-	li t0 0xff200000
+	li t0 0xff210000
 	lb a0 0(t0)
-	lb t0 4(t0) # Clear KDMMIO_Data
+	lw t0 4(t0) # Clear KDMMIO_Data bit
 	ret
 	

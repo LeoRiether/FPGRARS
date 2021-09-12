@@ -13,9 +13,17 @@ pub const FRAME_0: usize = 0;
 pub const FRAME_1: usize = 0x10_0000;
 
 /// Control bit for the Keyboard (Display?) MMIO.
-/// `mmio[KDMMIO_CONTROL]` == 1 iff the key indicated by `mmio[KDMMIO_DATA]` is currently down
-const KDMMIO_CONTROL: usize = 0x20_0000;
-const KDMMIO_DATA: usize = 0x20_0004;
+/// `mmio[KDMMIO_CONTROL] == 1` means that a new key has been put in `mmio[KDMMIO_DATA]`, like a
+/// keydown event. The control bit will be cleared right after you read a byte/half_word/word from
+/// `mmio[KDMMIO_DATA]`. `KDMMIO_KEYDOWN` is easier to use, but not supported by other simulators.
+pub const KDMMIO_CONTROL: usize = 0x20_0000;
+pub const KDMMIO_DATA: usize = 0x20_0004;
+
+/// `mmio[KDMMIO_KEYDOWN] == 1` means that some key is currently down/pressed. Not supported by
+/// other simulators, but switching from `0x21` to `0x20` should be easy enough.
+/// `mmio[KDMMIO_DATADOWN]` is a duplicate of `mmio[KDMMIO_DATA]`
+pub const KDMMIO_KEYDOWN: usize = 0x21_0000;
+pub const KDMMIO_DATADOWN: usize = 0x21_0004;
 
 const KEYBUFFER: usize = 0x20_0100;
 const KEYBUFFER_SIZE: usize = 8;
@@ -61,8 +69,11 @@ impl InputState {
 
                 let mut mmio = state.mmio.lock().unwrap();
 
-                mmio[KDMMIO_CONTROL] = 1; // key is pressed
+                mmio[KDMMIO_CONTROL] = 1;
                 mmio[KDMMIO_DATA] = chr as u8;
+
+                mmio[KDMMIO_KEYDOWN] = 1;
+                mmio[KDMMIO_DATADOWN] = chr as u8;
 
                 true
             }
@@ -107,7 +118,7 @@ impl InputState {
             } => {
                 let mut mmio = state.mmio.lock().unwrap();
 
-                mmio[KDMMIO_CONTROL] = 0; // key isn't pressed
+                mmio[KDMMIO_KEYDOWN] = 0;
 
                 push_key_to_buffer(&mut mmio, 0xF0);
                 push_key_to_buffer(&mut mmio, *key as u8);
