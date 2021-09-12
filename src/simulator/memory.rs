@@ -3,14 +3,12 @@ use std::io::Read;
 use std::sync::{Arc, Mutex};
 
 pub const DATA_SIZE: usize = 0x0040_0000; // TODO: this, but I think it's about this much
-pub const MMIO_SIZE: usize = 0x0021_0000;
+pub const MMIO_SIZE: usize = 0x0022_0000;
 pub const MMIO_START: usize = 0xff00_0000;
-pub const KBMMIO_CONTROL: usize = 0xff20_0000;
-pub const KBMMIO_DATA: usize = 0xff20_0004;
 
 pub const HEAP_START: usize = 0x1004_0000;
 
-use crate::renderer::{FRAME_0, FRAME_1, HEIGHT, WIDTH};
+use crate::renderer::{FRAME_0, FRAME_1, HEIGHT, WIDTH, KDMMIO_CONTROL, KDMMIO_DATA};
 pub const VIDEO_START: usize = MMIO_START + FRAME_0;
 pub const VIDEO_END: usize = MMIO_START + FRAME_1 + WIDTH * HEIGHT;
 
@@ -74,8 +72,8 @@ impl Memory {
         if i >= MMIO_START {
             // MMIO
             let mut mmio = self.mmio.lock().unwrap();
-            if i == KBMMIO_DATA {
-                mmio[KBMMIO_CONTROL - MMIO_START] = 0;
+            if i == KDMMIO_DATA + MMIO_START {
+                mmio[KDMMIO_CONTROL] = 0;
             }
             read(&mmio[i - MMIO_START..])
         } else if i >= HEAP_START {
