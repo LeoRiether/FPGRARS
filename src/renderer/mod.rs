@@ -11,7 +11,12 @@ pub const HEIGHT: usize = 240;
 pub const FRAME_SELECT: usize = 0x20_0604;
 pub const FRAME_0: usize = 0;
 pub const FRAME_1: usize = 0x10_0000;
-const KEYBOARD: usize = 0x20_0000;
+
+/// Control bit for the Keyboard (Display?) MMIO.
+/// `mmio[KDMMIO_CONTROL]` == 1 iff the key indicated by `mmio[KDMMIO_DATA]` is currently down
+const KDMMIO_CONTROL: usize = 0x20_0000;
+const KDMMIO_DATA: usize = 0x20_0004;
+
 const KEYBUFFER: usize = 0x20_0100;
 const KEYBUFFER_SIZE: usize = 8;
 const KEYMAP: usize = 0x20_0520;
@@ -56,8 +61,8 @@ impl InputState {
 
                 let mut mmio = state.mmio.lock().unwrap();
 
-                mmio[KEYBOARD] = 1;
-                mmio[KEYBOARD + 4] = chr as u8;
+                mmio[KDMMIO_CONTROL] = 1; // key is pressed
+                mmio[KDMMIO_DATA] = chr as u8;
 
                 true
             }
@@ -101,6 +106,8 @@ impl InputState {
                 ..
             } => {
                 let mut mmio = state.mmio.lock().unwrap();
+
+                mmio[KDMMIO_CONTROL] = 0; // key isn't pressed
 
                 push_key_to_buffer(&mut mmio, 0xF0);
                 push_key_to_buffer(&mut mmio, *key as u8);
