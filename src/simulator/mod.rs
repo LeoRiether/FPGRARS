@@ -209,7 +209,7 @@ impl Memory {
                 }
                 while i+1 <= b {
                     // copy a byte
-                    if has_transparent_byte(buf[i] as u32) {
+                    if !has_transparent_byte(buf[i] as u32) {
                         mmio[pos + i - MMIO_START] = buf[i];
                     }
                     i += 1;
