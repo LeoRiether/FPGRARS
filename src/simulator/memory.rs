@@ -211,3 +211,18 @@ impl Memory {
         Some(bytes_read)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_has_zero_byte() {
+        assert!(has_zero_byte(0xff00ff00));
+        assert!(!has_zero_byte(0x10203040));
+        assert!(has_zero_byte(0x0011ff22));
+        assert!(!has_zero_byte(0x12345678));
+        assert!(has_zero_byte(0x12005678));
+        assert!(has_zero_byte(0x11223300));
+    }
+}
