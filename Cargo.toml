@@ -24,8 +24,8 @@ version_check = "0.9"
 lazy_static = "1.4.0"
 rand = "0.7.3"
 
-pixel-canvas = "0.2.1"
-glium = "0.26.0"
+pixel-canvas = "0.2.2"
+glium = "0.28.0"
 
 nom = "5.1.2"
 
