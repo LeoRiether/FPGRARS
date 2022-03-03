@@ -21,8 +21,10 @@ mod midi;
 
 mod util;
 
-/// Returned by the [ecall](struct.Simulator.html#method.ecall) procedure
-enum EcallSignal {
+/// [ecall](struct.Simulator.html#method.ecall) and [step](struct.Simulator.html#method.step)
+/// use this to indicate to the function that called them of whether they should end the
+/// simulation (Exit), continue to the next step (Continue), or just continue normally (Nothing)
+pub enum StepSignal {
     Nothing,
     Exit,
     Continue,
@@ -110,6 +112,15 @@ impl Simulator {
     }
 
     pub fn run(&mut self) {
+        self.init();
+        loop {
+            if let StepSignal::Exit = self.step() {
+                return;
+            }
+        }
+    }
+
+    pub fn step(&mut self) -> StepSignal {
         use parser::FloatInstruction as F;
         use parser::Instruction::*;
 
@@ -119,330 +130,327 @@ impl Simulator {
             ($cond:expr, $pc:expr, $label:expr) => {
                 if $cond {
                     $pc = $label;
-                    continue;
+                    return StepSignal::Nothing;
                 }
             };
         }
 
-        self.init();
-
-        loop {
-            match self.code[self.pc / 4] {
-                // Type R
-                Add(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<i32>(rs1) + self.get_reg::<i32>(rs2))
-                }
-                Sub(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<i32>(rs1) - self.get_reg::<i32>(rs2))
-                }
-                Sll(rd, rs1, rs2) => self.set_reg(
-                    rd,
-                    self.get_reg::<u32>(rs1) << (self.get_reg::<i32>(rs2) & 0x1f),
-                ),
-                Slt(rd, rs1, rs2) => self.set_reg(
-                    rd,
-                    to_1(self.get_reg::<i32>(rs1) < self.get_reg::<i32>(rs2)),
-                ),
-                Sltu(rd, rs1, rs2) => self.set_reg(
-                    rd,
-                    to_1(self.get_reg::<u32>(rs1) < self.get_reg::<u32>(rs2)),
-                ),
-                Xor(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) ^ self.get_reg::<u32>(rs2))
-                }
-                Srl(rd, rs1, rs2) => self.set_reg(
-                    rd,
-                    self.get_reg::<u32>(rs1) >> (self.get_reg::<i32>(rs2) & 0x1f),
-                ),
-                Sra(rd, rs1, rs2) => self.set_reg(
-                    rd,
-                    self.get_reg::<i32>(rs1) >> (self.get_reg::<i32>(rs2) & 0x1f),
-                ),
-                Or(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) | self.get_reg::<u32>(rs2))
-                }
-                And(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) & self.get_reg::<u32>(rs2))
-                }
-                Mul(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<i32>(rs1) * self.get_reg::<i32>(rs2))
-                }
-                Div(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<i32>(rs1) / self.get_reg::<i32>(rs2))
-                }
-                Divu(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) / self.get_reg::<u32>(rs2))
-                }
-                Rem(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<i32>(rs1) % self.get_reg::<i32>(rs2))
-                }
-                Remu(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) % self.get_reg::<u32>(rs2))
-                }
-
-                // Type I
-                Ecall => {
-                    use EcallSignal::*;
-                    match self.ecall() {
-                        Exit => {
-                            return;
-                        }
-                        Continue => {
-                            continue;
-                        }
-                        Nothing => {}
-                    }
-                }
-                Addi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) + (imm as i32)),
-                Slli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) << (imm & 0x1f)),
-                Slti(rd, rs1, imm) => {
-                    self.set_reg(rd, to_1(self.get_reg::<i32>(rs1) < (imm as i32)))
-                }
-                Sltiu(rd, rs1, imm) => self.set_reg(rd, to_1(self.get_reg::<u32>(rs1) < imm)),
-                Xori(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) ^ imm),
-                Srli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) >> (imm & 0x1f)),
-                Srai(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) >> (imm & 0x1f)),
-                Ori(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) | imm),
-                Andi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) & imm),
-
-                // Type I, loads from memory
-                Lb(rd, imm, rs1) => self.set_reg(
-                    rd,
-                    self.memory
-                        .get_byte((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
-                        as i8 as u32,
-                ),
-                Lh(rd, imm, rs1) => self.set_reg(
-                    rd,
-                    self.memory
-                        .get_half((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
-                        as i16 as u32,
-                ),
-                Lw(rd, imm, rs1) => self.set_reg(
-                    rd,
-                    self.memory
-                        .get_word((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
-                        as u32,
-                ),
-                Lbu(rd, imm, rs1) => self.set_reg(
-                    rd,
-                    self.memory
-                        .get_byte((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
-                        as u8 as u32,
-                ),
-                Lhu(rd, imm, rs1) => self.set_reg(
-                    rd,
-                    self.memory
-                        .get_half((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
-                        as u16 as u32,
-                ),
-                Float(F::Lw(rd, imm, rs1)) => {
-                    let rd = rd as usize;
-                    let x = self
-                        .memory
-                        .get_float(self.get_reg::<u32>(rs1).wrapping_add(imm) as usize);
-                    self.floats[rd] = x;
-                }
-
-                // Type S
-                Sb(rs2, imm, rs1) => self.memory.set_byte(
-                    (self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize,
-                    self.get_reg::<u8>(rs2),
-                ),
-                Sh(rs2, imm, rs1) => self.memory.set_half(
-                    (self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize,
-                    self.get_reg::<u16>(rs2),
-                ),
-                Sw(rs2, imm, rs1) => self.memory.set_word(
-                    (self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize,
-                    self.get_reg::<u32>(rs2),
-                ),
-                Float(F::Sw(rs2, imm, rs1)) => {
-                    let x = self.floats[rs2 as usize];
-                    self.memory
-                        .set_float(self.get_reg::<u32>(rs1).wrapping_add(imm) as usize, x);
-                }
-
-                // Type SB + jumps
-                Beq(rs1, rs2, label) => branch!(
-                    self.get_reg::<i32>(rs1) == self.get_reg::<i32>(rs2),
-                    self.pc,
-                    label
-                ),
-                Bne(rs1, rs2, label) => branch!(
-                    self.get_reg::<i32>(rs1) != self.get_reg::<i32>(rs2),
-                    self.pc,
-                    label
-                ),
-                Blt(rs1, rs2, label) => branch!(
-                    self.get_reg::<i32>(rs1) < self.get_reg::<i32>(rs2),
-                    self.pc,
-                    label
-                ),
-                Bge(rs1, rs2, label) => branch!(
-                    self.get_reg::<i32>(rs1) >= self.get_reg::<i32>(rs2),
-                    self.pc,
-                    label
-                ),
-                Bltu(rs1, rs2, label) => branch!(
-                    self.get_reg::<u32>(rs1) < self.get_reg::<u32>(rs2),
-                    self.pc,
-                    label
-                ),
-                Bgeu(rs1, rs2, label) => branch!(
-                    self.get_reg::<u32>(rs1) >= self.get_reg::<u32>(rs2),
-                    self.pc,
-                    label
-                ),
-                Jalr(rd, rs1, imm) => {
-                    // This produces a weird result for `jalr s0 s0 0`. s0 is set to pc+4 before the jump occurs
-                    // so it works as a nop. Maybe this is correct, maybe it's not, but I'll copy the behavior seen in
-                    // RARS to be consistent.
-                    self.set_reg(rd, (self.pc + 4) as u32);
-                    self.pc = (self.get_reg::<i32>(rs1) + (imm as i32)) as usize & !1;
-                    continue;
-                }
-                Jal(rd, label) => {
-                    self.set_reg(rd, (self.pc + 4) as u32);
-                    self.pc = label;
-                    continue;
-                }
-
-                // CSR
-                CsrRw(rd, fcsr, rs1) => {
-                    self.set_reg(rd, self.get_status(fcsr));
-                    self.status[fcsr as usize] = self.get_reg::<u32>(rs1);
-                }
-                CsrRwi(rd, fcsr, imm) => {
-                    self.set_reg(rd, self.get_status(fcsr));
-                    self.status[fcsr as usize] = imm;
-                }
-                CsrRs(rd, fcsr, rs1) => {
-                    self.set_reg(rd, self.get_status(fcsr));
-                    self.status[fcsr as usize] |= self.get_reg::<u32>(rs1);
-                }
-                CsrRsi(rd, fcsr, imm) => {
-                    self.set_reg(rd, self.get_status(fcsr));
-                    self.status[fcsr as usize] |= imm;
-                }
-                CsrRc(rd, fcsr, rs1) => {
-                    self.set_reg(rd, self.get_status(fcsr));
-                    self.status[fcsr as usize] &= !self.get_reg::<u32>(rs1);
-                }
-                CsrRci(rd, fcsr, imm) => {
-                    self.set_reg(rd, self.get_status(fcsr));
-                    self.status[fcsr as usize] &= !imm;
-                }
-
-                // Floating point
-                Float(F::Add(rd, rs1, rs2)) => {
-                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
-                    self.floats[rd] = self.floats[rs1] + self.floats[rs2];
-                }
-                Float(F::Sub(rd, rs1, rs2)) => {
-                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
-                    self.floats[rd] = self.floats[rs1] - self.floats[rs2];
-                }
-                Float(F::Mul(rd, rs1, rs2)) => {
-                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
-                    self.floats[rd] = self.floats[rs1] * self.floats[rs2];
-                }
-                Float(F::Div(rd, rs1, rs2)) => {
-                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
-                    self.floats[rd] = self.floats[rs1] / self.floats[rs2];
-                }
-                Float(F::Equ(rd, rs1, rs2)) => {
-                    let (rs1, rs2) = (rs1 as usize, rs2 as usize);
-                    self.set_reg(rd, to_1(self.floats[rs1] == self.floats[rs2]));
-                }
-                Float(F::Le(rd, rs1, rs2)) => {
-                    let (rs1, rs2) = (rs1 as usize, rs2 as usize);
-                    self.set_reg(rd, to_1(self.floats[rs1] <= self.floats[rs2]));
-                }
-                Float(F::Lt(rd, rs1, rs2)) => {
-                    let (rs1, rs2) = (rs1 as usize, rs2 as usize);
-                    self.set_reg(rd, to_1(self.floats[rs1] < self.floats[rs2]));
-                }
-                Float(F::Max(rd, rs1, rs2)) => {
-                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
-                    self.floats[rd] = self.floats[rs1].max(self.floats[rs2]);
-                }
-                Float(F::Min(rd, rs1, rs2)) => {
-                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
-                    self.floats[rd] = self.floats[rs1].min(self.floats[rs2]);
-                }
-                Float(F::SgnjS(rd, rs1, rs2)) => {
-                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
-                    self.floats[rd] = self.floats[rs1].copysign(self.floats[rs2]);
-                }
-                Float(F::SgnjNS(rd, rs1, rs2)) => {
-                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
-                    self.floats[rd] = self.floats[rs1].copysign(-self.floats[rs2]);
-                }
-                Float(F::SgnjXS(rd, rs1, rs2)) => {
-                    let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
-                    let (a, b) = (self.floats[rs1], self.floats[rs2]);
-
-                    // I'm pretty sure this is correct (for most architectures anyway)
-                    self.floats[rd] = f32::from_bits(a.to_bits() ^ (b.to_bits() & (1 << 31)));
-                }
-
-                // I didn't even know this existed before this project
-                Float(F::Class(rd, rs1)) => {
-                    let rs1 = rs1 as usize;
-                    self.set_reg(rd, util::class_mask(self.floats[rs1]));
-                }
-
-                Float(F::CvtSW(rd, rs1)) => {
-                    let rd = rd as usize;
-                    self.floats[rd] = self.get_reg::<i32>(rs1) as f32;
-                }
-                Float(F::CvtSWu(rd, rs1)) => {
-                    let rd = rd as usize;
-                    self.floats[rd] = self.get_reg::<u32>(rs1) as f32;
-                }
-                Float(F::CvtWS(rd, rs1)) => {
-                    let rs1 = rs1 as usize;
-                    self.set_reg(rd, self.floats[rs1] as i32);
-                }
-                Float(F::CvtWuS(rd, rs1)) => {
-                    let rs1 = rs1 as usize;
-                    self.set_reg(rd, self.floats[rs1] as u32);
-                }
-
-                Float(F::MvSX(rd, rs1)) => {
-                    let rd = rd as usize;
-                    self.floats[rd] = f32::from_bits(self.get_reg::<u32>(rs1));
-                }
-                Float(F::MvXS(rd, rs1)) => {
-                    let rs1 = rs1 as usize;
-                    self.set_reg(rd, self.floats[rs1].to_bits());
-                }
-
-                Float(F::Sqrt(rd, rs1)) => {
-                    let (rd, rs1) = (rd as usize, rs1 as usize);
-                    self.floats[rd] = self.floats[rs1].sqrt();
-                }
-
-                // Pseudoinstructions
-                Li(rd, imm) => self.set_reg(rd, imm),
-                Mv(rd, rs1) => self.registers[rd as usize] = self.registers[rs1 as usize],
-                Ret => {
-                    self.pc = self.registers[1] as usize;
-                    continue;
-                }
-                URet => {
-                    use crate::parser::register_names::UEPC_INDEX;
-                    self.pc = self.status[UEPC_INDEX as usize] as usize;
-                    continue;
-                }
+        match self.code[self.pc / 4] {
+            // Type R
+            Add(rd, rs1, rs2) => {
+                self.set_reg(rd, self.get_reg::<i32>(rs1) + self.get_reg::<i32>(rs2))
+            }
+            Sub(rd, rs1, rs2) => {
+                self.set_reg(rd, self.get_reg::<i32>(rs1) - self.get_reg::<i32>(rs2))
+            }
+            Sll(rd, rs1, rs2) => self.set_reg(
+                rd,
+                self.get_reg::<u32>(rs1) << (self.get_reg::<i32>(rs2) & 0x1f),
+            ),
+            Slt(rd, rs1, rs2) => self.set_reg(
+                rd,
+                to_1(self.get_reg::<i32>(rs1) < self.get_reg::<i32>(rs2)),
+            ),
+            Sltu(rd, rs1, rs2) => self.set_reg(
+                rd,
+                to_1(self.get_reg::<u32>(rs1) < self.get_reg::<u32>(rs2)),
+            ),
+            Xor(rd, rs1, rs2) => {
+                self.set_reg(rd, self.get_reg::<u32>(rs1) ^ self.get_reg::<u32>(rs2))
+            }
+            Srl(rd, rs1, rs2) => self.set_reg(
+                rd,
+                self.get_reg::<u32>(rs1) >> (self.get_reg::<i32>(rs2) & 0x1f),
+            ),
+            Sra(rd, rs1, rs2) => self.set_reg(
+                rd,
+                self.get_reg::<i32>(rs1) >> (self.get_reg::<i32>(rs2) & 0x1f),
+            ),
+            Or(rd, rs1, rs2) => {
+                self.set_reg(rd, self.get_reg::<u32>(rs1) | self.get_reg::<u32>(rs2))
+            }
+            And(rd, rs1, rs2) => {
+                self.set_reg(rd, self.get_reg::<u32>(rs1) & self.get_reg::<u32>(rs2))
+            }
+            Mul(rd, rs1, rs2) => {
+                self.set_reg(rd, self.get_reg::<i32>(rs1) * self.get_reg::<i32>(rs2))
+            }
+            Div(rd, rs1, rs2) => {
+                self.set_reg(rd, self.get_reg::<i32>(rs1) / self.get_reg::<i32>(rs2))
+            }
+            Divu(rd, rs1, rs2) => {
+                self.set_reg(rd, self.get_reg::<u32>(rs1) / self.get_reg::<u32>(rs2))
+            }
+            Rem(rd, rs1, rs2) => {
+                self.set_reg(rd, self.get_reg::<i32>(rs1) % self.get_reg::<i32>(rs2))
+            }
+            Remu(rd, rs1, rs2) => {
+                self.set_reg(rd, self.get_reg::<u32>(rs1) % self.get_reg::<u32>(rs2))
             }
 
-            self.pc += 4;
+            // Type I
+            Ecall => {
+                use StepSignal::*;
+                match self.ecall() {
+                    Exit => {
+                        return Exit;
+                    }
+                    Continue => {
+                        return Continue;
+                    }
+                    Nothing => {}
+                }
+            }
+            Addi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) + (imm as i32)),
+            Slli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) << (imm & 0x1f)),
+            Slti(rd, rs1, imm) => {
+                self.set_reg(rd, to_1(self.get_reg::<i32>(rs1) < (imm as i32)))
+            }
+            Sltiu(rd, rs1, imm) => self.set_reg(rd, to_1(self.get_reg::<u32>(rs1) < imm)),
+            Xori(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) ^ imm),
+            Srli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) >> (imm & 0x1f)),
+            Srai(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) >> (imm & 0x1f)),
+            Ori(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) | imm),
+            Andi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) & imm),
+
+            // Type I, loads from memory
+            Lb(rd, imm, rs1) => self.set_reg(
+                rd,
+                self.memory
+                    .get_byte((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
+                    as i8 as u32,
+            ),
+            Lh(rd, imm, rs1) => self.set_reg(
+                rd,
+                self.memory
+                    .get_half((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
+                    as i16 as u32,
+            ),
+            Lw(rd, imm, rs1) => self.set_reg(
+                rd,
+                self.memory
+                    .get_word((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
+                    as u32,
+            ),
+            Lbu(rd, imm, rs1) => self.set_reg(
+                rd,
+                self.memory
+                    .get_byte((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
+                    as u8 as u32,
+            ),
+            Lhu(rd, imm, rs1) => self.set_reg(
+                rd,
+                self.memory
+                    .get_half((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
+                    as u16 as u32,
+            ),
+            Float(F::Lw(rd, imm, rs1)) => {
+                let rd = rd as usize;
+                let x = self
+                    .memory
+                    .get_float(self.get_reg::<u32>(rs1).wrapping_add(imm) as usize);
+                self.floats[rd] = x;
+            }
+
+            // Type S
+            Sb(rs2, imm, rs1) => self.memory.set_byte(
+                (self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize,
+                self.get_reg::<u8>(rs2),
+            ),
+            Sh(rs2, imm, rs1) => self.memory.set_half(
+                (self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize,
+                self.get_reg::<u16>(rs2),
+            ),
+            Sw(rs2, imm, rs1) => self.memory.set_word(
+                (self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize,
+                self.get_reg::<u32>(rs2),
+            ),
+            Float(F::Sw(rs2, imm, rs1)) => {
+                let x = self.floats[rs2 as usize];
+                self.memory
+                    .set_float(self.get_reg::<u32>(rs1).wrapping_add(imm) as usize, x);
+            }
+
+            // Type SB + jumps
+            Beq(rs1, rs2, label) => branch!(
+                self.get_reg::<i32>(rs1) == self.get_reg::<i32>(rs2),
+                self.pc,
+                label
+            ),
+            Bne(rs1, rs2, label) => branch!(
+                self.get_reg::<i32>(rs1) != self.get_reg::<i32>(rs2),
+                self.pc,
+                label
+            ),
+            Blt(rs1, rs2, label) => branch!(
+                self.get_reg::<i32>(rs1) < self.get_reg::<i32>(rs2),
+                self.pc,
+                label
+            ),
+            Bge(rs1, rs2, label) => branch!(
+                self.get_reg::<i32>(rs1) >= self.get_reg::<i32>(rs2),
+                self.pc,
+                label
+            ),
+            Bltu(rs1, rs2, label) => branch!(
+                self.get_reg::<u32>(rs1) < self.get_reg::<u32>(rs2),
+                self.pc,
+                label
+            ),
+            Bgeu(rs1, rs2, label) => branch!(
+                self.get_reg::<u32>(rs1) >= self.get_reg::<u32>(rs2),
+                self.pc,
+                label
+            ),
+            Jalr(rd, rs1, imm) => {
+                // This produces a weird result for `jalr s0 s0 0`. s0 is set to pc+4 before the jump occurs
+                // so it works as a nop. Maybe this is correct, maybe it's not, but I'll copy the behavior seen in
+                // RARS to be consistent.
+                self.set_reg(rd, (self.pc + 4) as u32);
+                self.pc = (self.get_reg::<i32>(rs1) + (imm as i32)) as usize & !1;
+                return StepSignal::Continue;
+            }
+            Jal(rd, label) => {
+                self.set_reg(rd, (self.pc + 4) as u32);
+                self.pc = label;
+                return StepSignal::Continue;
+            }
+
+            // CSR
+            CsrRw(rd, fcsr, rs1) => {
+                self.set_reg(rd, self.get_status(fcsr));
+                self.status[fcsr as usize] = self.get_reg::<u32>(rs1);
+            }
+            CsrRwi(rd, fcsr, imm) => {
+                self.set_reg(rd, self.get_status(fcsr));
+                self.status[fcsr as usize] = imm;
+            }
+            CsrRs(rd, fcsr, rs1) => {
+                self.set_reg(rd, self.get_status(fcsr));
+                self.status[fcsr as usize] |= self.get_reg::<u32>(rs1);
+            }
+            CsrRsi(rd, fcsr, imm) => {
+                self.set_reg(rd, self.get_status(fcsr));
+                self.status[fcsr as usize] |= imm;
+            }
+            CsrRc(rd, fcsr, rs1) => {
+                self.set_reg(rd, self.get_status(fcsr));
+                self.status[fcsr as usize] &= !self.get_reg::<u32>(rs1);
+            }
+            CsrRci(rd, fcsr, imm) => {
+                self.set_reg(rd, self.get_status(fcsr));
+                self.status[fcsr as usize] &= !imm;
+            }
+
+            // Floating point
+            Float(F::Add(rd, rs1, rs2)) => {
+                let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                self.floats[rd] = self.floats[rs1] + self.floats[rs2];
+            }
+            Float(F::Sub(rd, rs1, rs2)) => {
+                let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                self.floats[rd] = self.floats[rs1] - self.floats[rs2];
+            }
+            Float(F::Mul(rd, rs1, rs2)) => {
+                let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                self.floats[rd] = self.floats[rs1] * self.floats[rs2];
+            }
+            Float(F::Div(rd, rs1, rs2)) => {
+                let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                self.floats[rd] = self.floats[rs1] / self.floats[rs2];
+            }
+            Float(F::Equ(rd, rs1, rs2)) => {
+                let (rs1, rs2) = (rs1 as usize, rs2 as usize);
+                self.set_reg(rd, to_1(self.floats[rs1] == self.floats[rs2]));
+            }
+            Float(F::Le(rd, rs1, rs2)) => {
+                let (rs1, rs2) = (rs1 as usize, rs2 as usize);
+                self.set_reg(rd, to_1(self.floats[rs1] <= self.floats[rs2]));
+            }
+            Float(F::Lt(rd, rs1, rs2)) => {
+                let (rs1, rs2) = (rs1 as usize, rs2 as usize);
+                self.set_reg(rd, to_1(self.floats[rs1] < self.floats[rs2]));
+            }
+            Float(F::Max(rd, rs1, rs2)) => {
+                let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                self.floats[rd] = self.floats[rs1].max(self.floats[rs2]);
+            }
+            Float(F::Min(rd, rs1, rs2)) => {
+                let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                self.floats[rd] = self.floats[rs1].min(self.floats[rs2]);
+            }
+            Float(F::SgnjS(rd, rs1, rs2)) => {
+                let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                self.floats[rd] = self.floats[rs1].copysign(self.floats[rs2]);
+            }
+            Float(F::SgnjNS(rd, rs1, rs2)) => {
+                let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                self.floats[rd] = self.floats[rs1].copysign(-self.floats[rs2]);
+            }
+            Float(F::SgnjXS(rd, rs1, rs2)) => {
+                let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
+                let (a, b) = (self.floats[rs1], self.floats[rs2]);
+
+                // I'm pretty sure this is correct (for most architectures anyway)
+                self.floats[rd] = f32::from_bits(a.to_bits() ^ (b.to_bits() & (1 << 31)));
+            }
+
+            // I didn't even know this existed before this project
+            Float(F::Class(rd, rs1)) => {
+                let rs1 = rs1 as usize;
+                self.set_reg(rd, util::class_mask(self.floats[rs1]));
+            }
+
+            Float(F::CvtSW(rd, rs1)) => {
+                let rd = rd as usize;
+                self.floats[rd] = self.get_reg::<i32>(rs1) as f32;
+            }
+            Float(F::CvtSWu(rd, rs1)) => {
+                let rd = rd as usize;
+                self.floats[rd] = self.get_reg::<u32>(rs1) as f32;
+            }
+            Float(F::CvtWS(rd, rs1)) => {
+                let rs1 = rs1 as usize;
+                self.set_reg(rd, self.floats[rs1] as i32);
+            }
+            Float(F::CvtWuS(rd, rs1)) => {
+                let rs1 = rs1 as usize;
+                self.set_reg(rd, self.floats[rs1] as u32);
+            }
+
+            Float(F::MvSX(rd, rs1)) => {
+                let rd = rd as usize;
+                self.floats[rd] = f32::from_bits(self.get_reg::<u32>(rs1));
+            }
+            Float(F::MvXS(rd, rs1)) => {
+                let rs1 = rs1 as usize;
+                self.set_reg(rd, self.floats[rs1].to_bits());
+            }
+
+            Float(F::Sqrt(rd, rs1)) => {
+                let (rd, rs1) = (rd as usize, rs1 as usize);
+                self.floats[rd] = self.floats[rs1].sqrt();
+            }
+
+            // Pseudoinstructions
+            Li(rd, imm) => self.set_reg(rd, imm),
+            Mv(rd, rs1) => self.registers[rd as usize] = self.registers[rs1 as usize],
+            Ret => {
+                self.pc = self.registers[1] as usize;
+                return StepSignal::Continue;
+            }
+            URet => {
+                use crate::parser::register_names::UEPC_INDEX;
+                self.pc = self.status[UEPC_INDEX as usize] as usize;
+                return StepSignal::Continue;
+            }
         }
+
+        self.pc += 4;
+        StepSignal::Nothing
     }
 
-    fn ecall(&mut self) -> EcallSignal {
+    fn ecall(&mut self) -> StepSignal {
         use crate::parser::register_names::*;
         use rand::{thread_rng, Rng};
 
@@ -454,15 +462,15 @@ impl Simulator {
             &mut self.registers,
             &mut self.memory,
         ) {
-            return EcallSignal::Nothing;
+            return StepSignal::Nothing;
         }
 
         if self.midi_player.handle_ecall(a7, &mut self.registers) {
-            return EcallSignal::Nothing;
+            return StepSignal::Nothing;
         }
 
         match a7 {
-            10 => return EcallSignal::Exit,
+            10 => return StepSignal::Exit,
             110 => loop {
                 std::thread::sleep(time::Duration::from_millis(500));
             },
@@ -588,13 +596,13 @@ impl Simulator {
                 self.status[UCAUSE_INDEX as usize] = 8; // ecall exception
                 self.status[UEPC_INDEX as usize] = self.pc as u32; // set uret location
                 self.pc = self.status[UTVEC_INDEX as usize] as usize; // jump to utvec
-                return EcallSignal::Continue;
+                return StepSignal::Continue;
             }
 
             x => unimplemented!("Ecall {} is not implemented", x),
         }
 
-        EcallSignal::Nothing
+        StepSignal::Nothing
     }
 }
 
