@@ -113,14 +113,26 @@ impl Simulator {
         use parser::FloatInstruction as F;
         use parser::Instruction::*;
 
-        let to_1 = |b| if b { 1 } else { 0 };
+        let from_bool = |b| if b { 1 } else { 0 };
 
         macro_rules! branch {
-            ($cond:expr, $pc:expr, $label:expr) => {
+            (if $cond:expr => $label:expr) => {
                 if $cond {
-                    $pc = $label;
+                    self.pc = $label;
                     continue;
                 }
+            };
+        }
+
+        macro_rules! get {
+            ($reg:ident $type:ty) => {
+                self.get_reg::<$type>($reg)
+            };
+        }
+
+        macro_rules! set {
+            ($rd:ident = $val:expr) => {
+                self.set_reg($rd, $val)
             };
         }
 
@@ -129,56 +141,21 @@ impl Simulator {
         loop {
             match self.code[self.pc / 4] {
                 // Type R
-                Add(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<i32>(rs1) + self.get_reg::<i32>(rs2))
-                }
-                Sub(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<i32>(rs1) - self.get_reg::<i32>(rs2))
-                }
-                Sll(rd, rs1, rs2) => self.set_reg(
-                    rd,
-                    self.get_reg::<u32>(rs1) << (self.get_reg::<i32>(rs2) & 0x1f),
-                ),
-                Slt(rd, rs1, rs2) => self.set_reg(
-                    rd,
-                    to_1(self.get_reg::<i32>(rs1) < self.get_reg::<i32>(rs2)),
-                ),
-                Sltu(rd, rs1, rs2) => self.set_reg(
-                    rd,
-                    to_1(self.get_reg::<u32>(rs1) < self.get_reg::<u32>(rs2)),
-                ),
-                Xor(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) ^ self.get_reg::<u32>(rs2))
-                }
-                Srl(rd, rs1, rs2) => self.set_reg(
-                    rd,
-                    self.get_reg::<u32>(rs1) >> (self.get_reg::<i32>(rs2) & 0x1f),
-                ),
-                Sra(rd, rs1, rs2) => self.set_reg(
-                    rd,
-                    self.get_reg::<i32>(rs1) >> (self.get_reg::<i32>(rs2) & 0x1f),
-                ),
-                Or(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) | self.get_reg::<u32>(rs2))
-                }
-                And(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) & self.get_reg::<u32>(rs2))
-                }
-                Mul(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<i32>(rs1) * self.get_reg::<i32>(rs2))
-                }
-                Div(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<i32>(rs1) / self.get_reg::<i32>(rs2))
-                }
-                Divu(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) / self.get_reg::<u32>(rs2))
-                }
-                Rem(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<i32>(rs1) % self.get_reg::<i32>(rs2))
-                }
-                Remu(rd, rs1, rs2) => {
-                    self.set_reg(rd, self.get_reg::<u32>(rs1) % self.get_reg::<u32>(rs2))
-                }
+                Add(rd, rs1, rs2) => set! { rd = get!(rs1 i32) + get!(rs2 i32) },
+                Sub(rd, rs1, rs2) => set! { rd = get!(rs1 i32) - get!(rs2 i32) },
+                Sll(rd, rs1, rs2) => set! { rd = get!(rs1 u32) << (get!(rs2 i32) & 0x1f) },
+                Slt(rd, rs1, rs2) => set! { rd = from_bool(get!(rs1 i32) < get!(rs2 i32)) },
+                Sltu(rd, rs1, rs2) => set! { rd = from_bool(get!(rs1 u32) < get!(rs2 u32)) },
+                Xor(rd, rs1, rs2) => set! { rd = get!(rs1 u32) ^ get!(rs2 u32) },
+                Srl(rd, rs1, rs2) => set! { rd = get!(rs1 u32) >> (get!(rs2 i32) & 0x1f) },
+                Sra(rd, rs1, rs2) => set! { rd = get!(rs1 i32) >> (get!(rs2 i32) & 0x1f) },
+                Or(rd, rs1, rs2) => set! { rd = get!(rs1 u32) | get!(rs2 u32) },
+                And(rd, rs1, rs2) => set! { rd = get!(rs1 u32) & get!(rs2 u32) },
+                Mul(rd, rs1, rs2) => set! { rd = get!(rs1 i32) * get!(rs2 i32) },
+                Div(rd, rs1, rs2) => set! { rd = get!(rs1 i32) / get!(rs2 i32) },
+                Divu(rd, rs1, rs2) => set! { rd = get!(rs1 u32) / get!(rs2 u32) },
+                Rem(rd, rs1, rs2) => set! { rd = get!(rs1 i32) % get!(rs2 i32) },
+                Remu(rd, rs1, rs2) => set! { rd = get!(rs1 u32) % get!(rs2 u32) },
 
                 // Type I
                 Ecall => {
@@ -193,17 +170,15 @@ impl Simulator {
                         Nothing => {}
                     }
                 }
-                Addi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) + (imm as i32)),
-                Slli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) << (imm & 0x1f)),
-                Slti(rd, rs1, imm) => {
-                    self.set_reg(rd, to_1(self.get_reg::<i32>(rs1) < (imm as i32)))
-                }
-                Sltiu(rd, rs1, imm) => self.set_reg(rd, to_1(self.get_reg::<u32>(rs1) < imm)),
-                Xori(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) ^ imm),
-                Srli(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) >> (imm & 0x1f)),
-                Srai(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<i32>(rs1) >> (imm & 0x1f)),
-                Ori(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) | imm),
-                Andi(rd, rs1, imm) => self.set_reg(rd, self.get_reg::<u32>(rs1) & imm),
+                Addi(rd, rs1, imm) => set! { rd = get!(rs1 i32) + (imm as i32) },
+                Slli(rd, rs1, imm) => set! { rd = get!(rs1 u32) << (imm & 0x1f) },
+                Slti(rd, rs1, imm) => set! { rd = from_bool(get!(rs1 i32) < (imm as i32)) },
+                Sltiu(rd, rs1, imm) => set! { rd = from_bool(get!(rs1 u32) < imm) },
+                Xori(rd, rs1, imm) => set! { rd = get!(rs1 u32) ^ imm },
+                Srli(rd, rs1, imm) => set! { rd = get!(rs1 u32) >> (imm & 0x1f) },
+                Srai(rd, rs1, imm) => set! { rd = get!(rs1 i32) >> (imm & 0x1f) },
+                Ori(rd, rs1, imm) => set! { rd = get!(rs1 u32) | imm },
+                Andi(rd, rs1, imm) => set! { rd = get!(rs1 u32) & imm },
 
                 // Type I, loads from memory
                 Lb(rd, imm, rs1) => self.set_reg(
@@ -221,20 +196,19 @@ impl Simulator {
                 Lw(rd, imm, rs1) => self.set_reg(
                     rd,
                     self.memory
-                        .get_word((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
-                        as u32,
+                        .get_word((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize),
                 ),
                 Lbu(rd, imm, rs1) => self.set_reg(
                     rd,
                     self.memory
                         .get_byte((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
-                        as u8 as u32,
+                        as u32,
                 ),
                 Lhu(rd, imm, rs1) => self.set_reg(
                     rd,
                     self.memory
                         .get_half((self.get_reg::<u32>(rs1).wrapping_add(imm)) as usize)
-                        as u16 as u32,
+                        as u32,
                 ),
                 Float(F::Lw(rd, imm, rs1)) => {
                     let rd = rd as usize;
@@ -265,72 +239,60 @@ impl Simulator {
 
                 // Type SB + jumps
                 Beq(rs1, rs2, label) => branch!(
-                    self.get_reg::<i32>(rs1) == self.get_reg::<i32>(rs2),
-                    self.pc,
-                    label
+                    if get!(rs1 i32) == get!(rs2 i32) => label
                 ),
                 Bne(rs1, rs2, label) => branch!(
-                    self.get_reg::<i32>(rs1) != self.get_reg::<i32>(rs2),
-                    self.pc,
-                    label
+                    if get!(rs1 i32) != get!(rs2 i32) => label
                 ),
                 Blt(rs1, rs2, label) => branch!(
-                    self.get_reg::<i32>(rs1) < self.get_reg::<i32>(rs2),
-                    self.pc,
-                    label
+                    if get!(rs1 i32) < get!(rs2 i32) => label
                 ),
                 Bge(rs1, rs2, label) => branch!(
-                    self.get_reg::<i32>(rs1) >= self.get_reg::<i32>(rs2),
-                    self.pc,
-                    label
+                    if get!(rs1 i32) >= get!(rs2 i32) => label
                 ),
                 Bltu(rs1, rs2, label) => branch!(
-                    self.get_reg::<u32>(rs1) < self.get_reg::<u32>(rs2),
-                    self.pc,
-                    label
+                    if get!(rs1 u32) < get!(rs2 u32) => label
                 ),
                 Bgeu(rs1, rs2, label) => branch!(
-                    self.get_reg::<u32>(rs1) >= self.get_reg::<u32>(rs2),
-                    self.pc,
-                    label
+                    if get!(rs1 u32) >= get!(rs2 u32) => label
                 ),
                 Jalr(rd, rs1, imm) => {
                     // This produces a weird result for `jalr s0 s0 0`. s0 is set to pc+4 before the jump occurs
                     // so it works as a nop. Maybe this is correct, maybe it's not, but I'll copy the behavior seen in
                     // RARS to be consistent.
-                    self.set_reg(rd, (self.pc + 4) as u32);
-                    self.pc = (self.get_reg::<i32>(rs1) + (imm as i32)) as usize & !1;
+                    set! { rd = (self.pc + 4) as u32 };
+                    self.pc = (get!(rs1 i32) + (imm as i32)) as usize & !1;
                     continue;
                 }
                 Jal(rd, label) => {
-                    self.set_reg(rd, (self.pc + 4) as u32);
+                    set! { rd = (self.pc + 4) as u32 };
                     self.pc = label;
                     continue;
                 }
 
                 // CSR
                 CsrRw(rd, fcsr, rs1) => {
-                    self.set_reg(rd, self.get_status(fcsr));
+                    set! { rd = self.get_status(fcsr) };
                     self.status[fcsr as usize] = self.get_reg::<u32>(rs1);
                 }
                 CsrRwi(rd, fcsr, imm) => {
-                    self.set_reg(rd, self.get_status(fcsr));
+                    set! { rd = self.get_status(fcsr) };
                     self.status[fcsr as usize] = imm;
                 }
                 CsrRs(rd, fcsr, rs1) => {
-                    self.set_reg(rd, self.get_status(fcsr));
+                    set! { rd = self.get_status(fcsr) };
                     self.status[fcsr as usize] |= self.get_reg::<u32>(rs1);
                 }
                 CsrRsi(rd, fcsr, imm) => {
-                    self.set_reg(rd, self.get_status(fcsr));
+                    set! { rd = self.get_status(fcsr) };
                     self.status[fcsr as usize] |= imm;
                 }
                 CsrRc(rd, fcsr, rs1) => {
-                    self.set_reg(rd, self.get_status(fcsr));
+                    set! { rd = self.get_status(fcsr) };
                     self.status[fcsr as usize] &= !self.get_reg::<u32>(rs1);
                 }
                 CsrRci(rd, fcsr, imm) => {
-                    self.set_reg(rd, self.get_status(fcsr));
+                    set! { rd = self.get_status(fcsr) };
                     self.status[fcsr as usize] &= !imm;
                 }
 
@@ -353,15 +315,15 @@ impl Simulator {
                 }
                 Float(F::Equ(rd, rs1, rs2)) => {
                     let (rs1, rs2) = (rs1 as usize, rs2 as usize);
-                    self.set_reg(rd, to_1(self.floats[rs1] == self.floats[rs2]));
+                    self.set_reg(rd, from_bool(self.floats[rs1] == self.floats[rs2]));
                 }
                 Float(F::Le(rd, rs1, rs2)) => {
                     let (rs1, rs2) = (rs1 as usize, rs2 as usize);
-                    self.set_reg(rd, to_1(self.floats[rs1] <= self.floats[rs2]));
+                    self.set_reg(rd, from_bool(self.floats[rs1] <= self.floats[rs2]));
                 }
                 Float(F::Lt(rd, rs1, rs2)) => {
                     let (rs1, rs2) = (rs1 as usize, rs2 as usize);
-                    self.set_reg(rd, to_1(self.floats[rs1] < self.floats[rs2]));
+                    self.set_reg(rd, from_bool(self.floats[rs1] < self.floats[rs2]));
                 }
                 Float(F::Max(rd, rs1, rs2)) => {
                     let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
@@ -597,4 +559,3 @@ impl Simulator {
         EcallSignal::Nothing
     }
 }
-
