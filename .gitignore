@@ -1,6 +1,8 @@
-/target
+target/
+site/
+.directory
+
 perf.data
 perf.data.old
 flamegraph.svg
 index.wiki
-.directory
