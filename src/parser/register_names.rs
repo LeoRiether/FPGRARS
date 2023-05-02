@@ -13,7 +13,7 @@ pub type RegMap = FnvHashMap<String, u8>;
 pub type FullRegMap = (RegMap, RegMap, RegMap);
 
 fn insert_names(map: &mut RegMap, names: &[&'static str]) {
-    for (i, name) in names.into_iter().enumerate() {
+    for (i, name) in names.iter().enumerate() {
         map.insert(name.to_string(), i as u8);
     }
 }

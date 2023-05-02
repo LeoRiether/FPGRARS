@@ -8,8 +8,7 @@
 .data
 
 .text
-    # Allocates the array in the stack
-    # 10^4 integers, even if this was executed natively it wouldn't be so fast
+    # Allocates the array in the stack with 8000 integers
     # [sp .. s0)
     mv s0 sp
     li t0 8000
@@ -28,16 +27,34 @@
     li a7 1
     ecall
 
+    # Save time
+    csrr s7 time
+
     # Sort
     mv a0 sp
     mv a1 s0
     jal sort
+
+    # Save time 
+    csrr t0 time
+    sub s7 t0 s7 # s7 == time elapsed
 
     # Print whether it's sorted or not again (should print 1)
     mv a0 sp
     mv a1 s0
     jal check_sorted
     li a7 1
+    ecall
+
+    # Print time elapsed
+    li a0 '\n'
+    li a7 11
+    ecall
+    mv a0 s7
+    li a7 1 
+    ecall
+    li a0 '\n'
+    li a7 11
     ecall
 
 exit:
