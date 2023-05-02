@@ -1,0 +1,11 @@
+site_name: FPGRARS
+site_url: https://leoriether.github.io/fpgrars/
+extra_css: [style/extra.css]
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: custom
+    accent: custom
+plugins:
+  - search
