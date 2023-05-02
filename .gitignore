@@ -1,1 +1,6 @@
 /target
+perf.data
+perf.data.old
+flamegraph.svg
+index.wiki
+.directory
