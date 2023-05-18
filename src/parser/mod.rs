@@ -24,7 +24,7 @@ mod text;
 /// In a separate enum because maybe someday I'll have a cargo feature to disable
 /// floating point instructions.
 /// Everything here is single precision, no doubles allowed.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum FloatInstruction {
     /// rd, rs1, rs2
     Add(u8, u8, u8),
@@ -55,7 +55,7 @@ pub enum FloatInstruction {
 }
 
 /// Giant enum that represents a single RISC-V instruction and its arguments
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Instruction {
     // Type R
     /// rd, rs1, rs2

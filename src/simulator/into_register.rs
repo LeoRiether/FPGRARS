@@ -37,6 +37,8 @@ macro_rules! impl_from_reg {
     };
 }
 
+impl_from_reg!(u64);
+impl_from_reg!(i64);
 impl_from_reg!(u32);
 impl_from_reg!(i32);
 impl_from_reg!(u16);

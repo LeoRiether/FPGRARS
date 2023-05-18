@@ -17,13 +17,14 @@ mod app;
 mod parser;
 mod renderer;
 mod simulator;
+mod codegen;
 
 use std::error::Error;
 use std::thread;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = app::get_args();
-    let file = std::mem::replace(&mut args.file, String::default());
+    let file = std::mem::take(&mut args.file);
 
     let sim = simulator::Simulator::new(args.port);
     let mmio = sim.memory.mmio.clone();
