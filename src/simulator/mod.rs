@@ -266,6 +266,16 @@ impl Simulator {
                     }
                 }
 
+                OPCODE_TYPE_I_JALR => {
+                    let (rd, rs1, imm) = (instr.rd() as u8, instr.rs1() as u8, instr.imm_i());
+                    // This produces a weird result for `jalr s0 s0 0`. s0 is set to pc+4 before the jump occurs
+                    // so it works as a nop. Maybe this is correct, maybe it's not, but I'll copy the behavior seen in
+                    // RARS to be consistent.
+                    set! { rd = (self.pc + 4) as u32 };
+                    self.pc = (get!(rs1 i32) + imm) as usize & !1;
+                    continue;
+                }
+
                 OPCODE_TYPE_S => {
                     let (rs1, rs2) = (instr.rs1() as u8, instr.rs2() as u8);
                     let imm = instr.imm_s();
@@ -376,15 +386,9 @@ impl Simulator {
                     // Type B
                     Beq(..) | Bne(..) | Blt(..) | Bge(..) | Bltu(..) | Bgeu(..) => covered!(),
 
-                    // Type I -- Jumps
-                    Jalr(rd, rs1, imm) => {
-                        // This produces a weird result for `jalr s0 s0 0`. s0 is set to pc+4 before the jump occurs
-                        // so it works as a nop. Maybe this is correct, maybe it's not, but I'll copy the behavior seen in
-                        // RARS to be consistent.
-                        set! { rd = (self.pc + 4) as u32 };
-                        self.pc = (get!(rs1 i32) + (imm as i32)) as usize & !1;
-                        continue;
-                    }
+                    // Type I -- JALR
+                    Jalr(..) => covered!(),
+
                     Jal(rd, label) => {
                         set! { rd = (self.pc + 4) as u32 };
                         self.pc = label;

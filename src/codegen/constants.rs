@@ -72,7 +72,7 @@ define! { slli,   F3: 0b001, F7: 0b0000000 }
 define! { srli,   F3: 0b101, F7: 0b0000000 }
 define! { srai,   F3: 0b101, F7: 0b0100000 }
 
-// Type I -- Branch
+// Type I -- Jalr
 define! { jalr,   F3: 0b000 }
 
 // Type I -- Misc Mem

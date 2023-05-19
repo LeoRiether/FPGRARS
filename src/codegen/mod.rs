@@ -58,6 +58,9 @@ macro_rules! opcode_shorthand {
     (I_LOAD) => {
         OPCODE_TYPE_I_LOAD
     };
+    (I_JALR) => {
+        OPCODE_TYPE_I_JALR
+    };
     (I_SYS) => {
         OPCODE_TYPE_I_SYSTEM
     };
@@ -190,7 +193,9 @@ impl Instruction {
             Bgeu(rs1, rs2, label) => {
                 compile! { B; funct3: bgeu::F3; rs1: rs1; rs2: rs2; imm_b: (4*label as isize - pc as isize) / 4; }
             }
-            Jalr(rd, rs1, imm) => Instruction(0),
+            Jalr(rd, rs1, imm) => {
+                compile! { I_JALR; funct3: jalr::F3; rd: rd; rs1: rs1; imm_i: imm; }
+            }
             Jal(rd, label) => Instruction(0),
             CsrRw(rd, fcsr, rs1) => Instruction(0),
             CsrRs(rd, fcsr, rs1) => Instruction(0),
