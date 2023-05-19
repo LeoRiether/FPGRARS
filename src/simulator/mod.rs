@@ -83,8 +83,8 @@ impl Simulator {
         }
     }
 
-    fn get_status(&self, i: u8) -> u32 {
-        if i == parser::register_names::TIME_INDEX {
+    fn get_status(&self, i: u32) -> u32 {
+        if i == parser::register_names::TIME_INDEX as u32 {
             self.started_at.elapsed().as_millis() as u32
         } else {
             self.status[i as usize]
@@ -228,16 +228,44 @@ impl Simulator {
                     }
                 }
 
+                OPCODE_TYPE_I_SYSTEM if funct10 == ecall::F10 && instr.rs2() == 0 => {
+                    use EcallSignal::*;
+                    match self.ecall() {
+                        Exit => return,
+                        Continue => continue,
+                        Nothing => {}
+                    }
+                }
+
                 OPCODE_TYPE_I_SYSTEM => {
-                    let rs2 = instr.rs2();
-                    match funct10 {
-                        ecall::F10 if rs2 == 0 => {
-                            use EcallSignal::*;
-                            match self.ecall() {
-                                Exit => return,
-                                Continue => continue,
-                                Nothing => {}
-                            }
+                    // TODO: rs1 can be an immediate in CsrRwi, CsrRci and CsrRsi. Is it
+                    // sign-extended?
+                    let (rd, fcsr, rs1) =
+                        (instr.rd() as u8, instr.imm_i() as u32, instr.rs1() as u8);
+                    match funct3 {
+                        csrrw::F3 => {
+                            set! { rd = self.get_status(fcsr) };
+                            self.status[fcsr as usize] = self.get_reg::<u32>(rs1);
+                        }
+                        csrrs::F3 => {
+                            set! { rd = self.get_status(fcsr) };
+                            self.status[fcsr as usize] |= self.get_reg::<u32>(rs1);
+                        }
+                        csrrc::F3 => {
+                            set! { rd = self.get_status(fcsr) };
+                            self.status[fcsr as usize] &= !self.get_reg::<u32>(rs1);
+                        }
+                        csrrwi::F3 => {
+                            set! { rd = self.get_status(fcsr) };
+                            self.status[fcsr as usize] = rs1 as u32;
+                        }
+                        csrrsi::F3 => {
+                            set! { rd = self.get_status(fcsr) };
+                            self.status[fcsr as usize] |= rs1 as u32;
+                        }
+                        csrrci::F3 => {
+                            set! { rd = self.get_status(fcsr) };
+                            self.status[fcsr as usize] &= !(rs1 as u32);
                         }
                         _ => panic!("Unknown TypeI::System instruction: {:x}", instr.0),
                     }
@@ -399,29 +427,8 @@ impl Simulator {
                     Jal(..) => covered!(),
 
                     // CSR
-                    CsrRw(rd, fcsr, rs1) => {
-                        set! { rd = self.get_status(fcsr) };
-                        self.status[fcsr as usize] = self.get_reg::<u32>(rs1);
-                    }
-                    CsrRwi(rd, fcsr, imm) => {
-                        set! { rd = self.get_status(fcsr) };
-                        self.status[fcsr as usize] = imm;
-                    }
-                    CsrRs(rd, fcsr, rs1) => {
-                        set! { rd = self.get_status(fcsr) };
-                        self.status[fcsr as usize] |= self.get_reg::<u32>(rs1);
-                    }
-                    CsrRsi(rd, fcsr, imm) => {
-                        set! { rd = self.get_status(fcsr) };
-                        self.status[fcsr as usize] |= imm;
-                    }
-                    CsrRc(rd, fcsr, rs1) => {
-                        set! { rd = self.get_status(fcsr) };
-                        self.status[fcsr as usize] &= !self.get_reg::<u32>(rs1);
-                    }
-                    CsrRci(rd, fcsr, imm) => {
-                        set! { rd = self.get_status(fcsr) };
-                        self.status[fcsr as usize] &= !imm;
+                    CsrRw(..) | CsrRwi(..) | CsrRs(..) | CsrRsi(..) | CsrRc(..) | CsrRci(..) => {
+                        covered!()
                     }
 
                     // Floating point
@@ -516,7 +523,6 @@ impl Simulator {
 
                     // Pseudoinstructions
                     Li(rd, imm) => self.set_reg(rd, imm),
-                    Mv(rd, rs1) => self.registers[rd as usize] = self.registers[rs1 as usize],
                     URet => {
                         use crate::parser::register_names::UEPC_INDEX;
                         self.pc = self.status[UEPC_INDEX as usize] as usize;

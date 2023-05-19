@@ -168,7 +168,7 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
         "remu" => type_r!(Remu),
         "neg" => args_mv(s, &regs).map(|(rd, rs1)| Sub(rd, 0, rs1).into())?,
         "not" => args_mv(s, &regs).map(|(rd, rs1)| Xori(rd, rs1, (-1i32) as u32).into())?,
-        "mv" => args_mv(s, &regs).map(|(rd, rs1)| Mv(rd, rs1).into())?,
+        "mv" => args_mv(s, &regs).map(|(rd, rs1)| Addi(rd, rs1, 0).into())?,
         "snez" => args_mv(s, &regs).map(|(rd, rs1)| Sltu(rd, 0, rs1).into())?,
         "sltz" => args_mv(s, &regs).map(|(rd, rs1)| Slt(rd, rs1, 0).into())?,
         "sgtz" => args_mv(s, &regs).map(|(rd, rs1)| Slt(rd, 0, rs1).into())?,
@@ -248,7 +248,7 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
         "li" => args_li(s, &regs).map(|(rd, imm)| Li(rd, imm).into())?,
         "lui" => args_li(s, &regs).map(|(rd, imm)| Li(rd, imm << 12).into())?,
 
-        "nop" => Mv(0, 0).into(),
+        "nop" => Addi(0, 0, 0).into(),
 
         "fadd.s" => type_r!(float F::Add),
         "fsub.s" => type_r!(float F::Sub),

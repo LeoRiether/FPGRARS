@@ -204,15 +204,26 @@ impl Instruction {
                 compile! { I_JALR; funct3: jalr::F3; rd: rd; rs1: rs1; imm_i: imm; }
             }
             Jal(rd, label) => compile! { J; rd: rd; imm_j: (label as isize - pc as isize); },
-            CsrRw(rd, fcsr, rs1) => Instruction(0),
-            CsrRs(rd, fcsr, rs1) => Instruction(0),
-            CsrRc(rd, fcsr, rs1) => Instruction(0),
-            CsrRwi(rd, fcsr, imm) => Instruction(0),
-            CsrRsi(rd, fcsr, imm) => Instruction(0),
-            CsrRci(rd, fcsr, imm) => Instruction(0),
+            CsrRw(rd, fcsr, rs1) => {
+                compile! { I_SYS; funct3: csrrw::F3; rd: rd; rs1: rs1; imm_i: fcsr; }
+            }
+            CsrRs(rd, fcsr, rs1) => {
+                compile! { I_SYS; funct3: csrrs::F3; rd: rd; rs1: rs1; imm_i: fcsr; }
+            }
+            CsrRc(rd, fcsr, rs1) => {
+                compile! { I_SYS; funct3: csrrc::F3; rd: rd; rs1: rs1; imm_i: fcsr; }
+            }
+            CsrRwi(rd, fcsr, imm) => {
+                compile! { I_SYS; funct3: csrrwi::F3; rd: rd; rs1: imm; imm_i: fcsr; }
+            }
+            CsrRsi(rd, fcsr, imm) => {
+                compile! { I_SYS; funct3: csrrsi::F3; rd: rd; rs1: imm; imm_i: fcsr; }
+            }
+            CsrRci(rd, fcsr, imm) => {
+                compile! { I_SYS; funct3: csrrci::F3; rd: rd; rs1: imm; imm_i: fcsr; }
+            }
             Float(_) => Instruction(0),
             Li(_, _) => Instruction(0),
-            Mv(_, _) => Instruction(0),
             URet => Instruction(0),
         }
     }

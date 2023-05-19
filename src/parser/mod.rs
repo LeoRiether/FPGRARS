@@ -129,8 +129,6 @@ pub enum Instruction {
     // Some pseudoinstructions
     /// rd, imm
     Li(u8, u32),
-    /// rd, rs1
-    Mv(u8, u8),
 
     URet,
 }
