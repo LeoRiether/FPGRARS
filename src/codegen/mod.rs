@@ -222,9 +222,9 @@ impl Instruction {
             CsrRci(rd, fcsr, imm) => {
                 compile! { I_SYS; funct3: csrrci::F3; rd: rd; rs1: imm; imm_i: fcsr; }
             }
+            URet => compile! { I_SYS; funct3: uret::F3; funct7: uret::F7; rs2: uret::RS2; },
             Float(_) => Instruction(0),
             Li(_, _) => Instruction(0),
-            URet => Instruction(0),
         }
     }
 }
@@ -238,8 +238,16 @@ mod tests {
     #[test]
     fn test_jal() {
         assert_eq!(
-            Instruction::from_parsed(ParserInstr::Jal(5, 3), 0),
+            Instruction::from_parsed(ParserInstr::Jal(5, 12), 0),
             Instruction(0x00c002ef)
+        );
+    }
+
+    #[test]
+    fn test_uret() {
+        assert_eq!(
+            Instruction::from_parsed(ParserInstr::URet, 0),
+            Instruction(0x00200073)
         );
     }
 }

@@ -1,4 +1,3 @@
-
 macro_rules! define_inner {
     () => {};
     (F7: $value:expr $(, $($tts:tt)*)?) => {
@@ -88,17 +87,17 @@ define! { csrrc,  F3: 0b011, F7: 0b0000000 }
 define! { csrrwi, F3: 0b101, F7: 0b0000000 }
 define! { csrrsi, F3: 0b110, F7: 0b0000000 }
 define! { csrrci, F3: 0b111, F7: 0b0000000 }
+define! { uret, F3: 0b000, F7: 0b0000000, RS2: 0b00010 }
 
-// Type S 
+// Type S
 define! { sb, F3: 0b000 }
 define! { sh, F3: 0b001 }
 define! { sw, F3: 0b010 }
 
-// Type B 
+// Type B
 define! { beq,  F3: 0b000 }
 define! { bne,  F3: 0b001 }
 define! { blt,  F3: 0b100 }
 define! { bge,  F3: 0b101 }
 define! { bltu, F3: 0b110 }
 define! { bgeu, F3: 0b111 }
-

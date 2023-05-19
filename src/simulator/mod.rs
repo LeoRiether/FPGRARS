@@ -228,6 +228,7 @@ impl Simulator {
                     }
                 }
 
+                // Ecall
                 OPCODE_TYPE_I_SYSTEM if funct10 == ecall::F10 && instr.rs2() == 0 => {
                     use EcallSignal::*;
                     match self.ecall() {
@@ -235,6 +236,13 @@ impl Simulator {
                         Continue => continue,
                         Nothing => {}
                     }
+                }
+
+                // URet
+                OPCODE_TYPE_I_SYSTEM if funct10 == uret::F10 && instr.rs2() == uret::RS2 => {
+                    use crate::parser::register_names::UEPC_INDEX;
+                    self.pc = self.status[UEPC_INDEX as usize] as usize;
+                    continue;
                 }
 
                 OPCODE_TYPE_I_SYSTEM => {
@@ -523,11 +531,7 @@ impl Simulator {
 
                     // Pseudoinstructions
                     Li(rd, imm) => self.set_reg(rd, imm),
-                    URet => {
-                        use crate::parser::register_names::UEPC_INDEX;
-                        self.pc = self.status[UEPC_INDEX as usize] as usize;
-                        continue;
-                    }
+                    URet => covered!(),
                 },
             };
 
