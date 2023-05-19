@@ -128,15 +128,6 @@ impl Simulator {
 
         let from_bool = |b| if b { 1 } else { 0 };
 
-        macro_rules! branch {
-            (if $cond:expr => $label:expr) => {
-                if $cond {
-                    self.pc = $label;
-                    continue;
-                }
-            };
-        }
-
         macro_rules! get {
             ($reg:ident $type:ty) => {
                 self.get_reg::<$type>($reg)
@@ -155,15 +146,16 @@ impl Simulator {
         let old_code = std::mem::take(&mut self.code);
         let machine_code: Vec<codegen::Instruction> = old_code
             .iter()
-            .map(|instruction| instruction.clone().into())
+            .zip((0..).step_by(4))
+            .map(|(instruction, pc)| codegen::Instruction::from_parsed(instruction.clone(), pc * 4))
             .collect();
 
-        println!("Decoded instructions:");
-        for x in &machine_code {
-            if x.0 != 0 {
-                println!("{:x}", x.0);
-            }
-        }
+        // println!("Decoded instructions:");
+        // for x in &machine_code {
+        //     if x.0 != 0 {
+        //         println!("{:x}", x.0);
+        //     }
+        // }
         ////////////////////////////////////////////////////////////////////////////////
 
         loop {
@@ -174,14 +166,9 @@ impl Simulator {
                 )
             });
 
-            let rd = instr.rd() as u8;
-            let rs1 = instr.rs1() as u8;
-            let rs2 = instr.rs2() as u8;
             let funct3 = instr.funct3();
             let funct7 = instr.funct7();
             let funct10 = instr.funct10();
-            let imm_i = instr.imm_i();
-            let imm_s = instr.imm_s();
 
             macro_rules! covered {
                 () => {
@@ -193,102 +180,164 @@ impl Simulator {
             }
 
             match instr.opcode() {
-                OPCODE_TYPE_R => match funct10 {
-                    add::F10 => set! { rd = get!(rs1 i32) + get!(rs2 i32) },
-                    sub::F10 => set! { rd = get!(rs1 i32) - get!(rs2 i32) },
-                    sll::F10 => set! { rd = get!(rs1 u32) << (get!(rs2 i32) & 0x1f) },
-                    slt::F10 => set! { rd = from_bool(get!(rs1 i32) < get!(rs2 i32)) },
-                    sltu::F10 => set! { rd = from_bool(get!(rs1 u32) < get!(rs2 u32)) },
-                    xor::F10 => set! { rd = get!(rs1 u32) ^ get!(rs2 u32) },
-                    srl::F10 => set! { rd = get!(rs1 u32) >> (get!(rs2 u32) & 0x1f) },
-                    sra::F10 => set! { rd = get!(rs1 i32) >> (get!(rs2 u32) & 0x1f) },
-                    or::F10 => set! { rd = get!(rs1 u32) | get!(rs2 u32) },
-                    and::F10 => set! { rd = get!(rs1 u32) & get!(rs2 u32) },
-                    mul::F10 => set! { rd = get!(rs1 i32) * get!(rs2 i32) },
-                    // mulh::F10 => set! { rd = (get!(rs1 i64) * get!(rs2 i64)) as i32 },
-                    // mulhsu::F10 => set! { rd = (get!(rs1 i64) * get!(rs2 u64)) as i32 },
-                    // mulhu::F10 => set! { rd = (get!(rs1 u64) * get!(rs2 u64)) as i32 },
-                    div::F10 => set! { rd = get!(rs1 i32) / get!(rs2 i32) },
-                    divu::F10 => set! { rd = get!(rs1 u32) / get!(rs2 u32) },
-                    rem::F10 => set! { rd = get!(rs1 i32) % get!(rs2 i32) },
-                    remu::F10 => set! { rd = get!(rs1 u32) % get!(rs2 u32) },
-                    _ => panic!("Unknown TypeR instruction: {:x}", instr.0),
-                },
+                OPCODE_TYPE_R => {
+                    let (rd, rs1, rs2) = (instr.rd() as u8, instr.rs1() as u8, instr.rs2() as u8);
+                    match funct10 {
+                        add::F10 => set! { rd = get!(rs1 i32) + get!(rs2 i32) },
+                        sub::F10 => set! { rd = get!(rs1 i32) - get!(rs2 i32) },
+                        sll::F10 => set! { rd = get!(rs1 u32) << (get!(rs2 i32) & 0x1f) },
+                        slt::F10 => set! { rd = from_bool(get!(rs1 i32) < get!(rs2 i32)) },
+                        sltu::F10 => set! { rd = from_bool(get!(rs1 u32) < get!(rs2 u32)) },
+                        xor::F10 => set! { rd = get!(rs1 u32) ^ get!(rs2 u32) },
+                        srl::F10 => set! { rd = get!(rs1 u32) >> (get!(rs2 u32) & 0x1f) },
+                        sra::F10 => set! { rd = get!(rs1 i32) >> (get!(rs2 u32) & 0x1f) },
+                        or::F10 => set! { rd = get!(rs1 u32) | get!(rs2 u32) },
+                        and::F10 => set! { rd = get!(rs1 u32) & get!(rs2 u32) },
+                        mul::F10 => set! { rd = get!(rs1 i32) * get!(rs2 i32) },
+                        // mulh::F10 => set! { rd = (get!(rs1 i64) * get!(rs2 i64)) as i32 },
+                        // mulhsu::F10 => set! { rd = (get!(rs1 i64) * get!(rs2 u64)) as i32 },
+                        // mulhu::F10 => set! { rd = (get!(rs1 u64) * get!(rs2 u64)) as i32 },
+                        div::F10 => set! { rd = get!(rs1 i32) / get!(rs2 i32) },
+                        divu::F10 => set! { rd = get!(rs1 u32) / get!(rs2 u32) },
+                        rem::F10 => set! { rd = get!(rs1 i32) % get!(rs2 i32) },
+                        remu::F10 => set! { rd = get!(rs1 u32) % get!(rs2 u32) },
+                        _ => panic!("Unknown TypeR instruction: {:x}", instr.0),
+                    }
+                }
 
-                OPCODE_TYPE_I_IMM => match funct3 {
-                    addi::F3 => set! { rd = get!(rs1 i32) + instr.imm_i() },
-                    slti::F3 => set! { rd = from_bool(get!(rs1 i32) < imm_i) },
-                    // TODO: implement this correctly
-                    // sltiu::F3 => set! { rd = from_bool(get!(rs1 u32) < imm_i) },
-                    xori::F3 => set! { rd = get!(rs1 u32) ^ imm_i as u32 },
-                    ori::F3 => set! { rd = get!(rs1 u32) | imm_i as u32 },
-                    andi::F3 => set! { rd = get!(rs1 u32) & imm_i as u32 },
-                    // TODO: figure out why slli has a funct7
-                    slli::F3 => set! { rd = get!(rs1 u32) << (imm_i & 0x1f) },
-                    srli::F3 => match funct7 {
-                        srli::F7 => set! { rd = get!(rs1 u32) >> (instr.imm_i() & 0x1f) },
-                        srai::F7 => set! { rd = get!(rs1 i32) >> (instr.imm_i() & 0x1f) },
+                OPCODE_TYPE_I_IMM => {
+                    let (rd, rs1) = (instr.rd() as u8, instr.rs1() as u8);
+                    let imm = instr.imm_i();
+                    match funct3 {
+                        addi::F3 => set! { rd = get!(rs1 i32) + imm },
+                        slti::F3 => set! { rd = from_bool(get!(rs1 i32) < imm) },
+                        // TODO: implement this correctly
+                        // sltiu::F3 => set! { rd = from_bool(get!(rs1 u32) < imm) },
+                        xori::F3 => set! { rd = get!(rs1 u32) ^ imm as u32 },
+                        ori::F3 => set! { rd = get!(rs1 u32) | imm as u32 },
+                        andi::F3 => set! { rd = get!(rs1 u32) & imm as u32 },
+                        // TODO: figure out why slli has a funct7
+                        slli::F3 => set! { rd = get!(rs1 u32) << (imm & 0x1f) },
+                        srli::F3 => match funct7 {
+                            srli::F7 => set! { rd = get!(rs1 u32) >> (imm & 0x1f) },
+                            srai::F7 => set! { rd = get!(rs1 i32) >> (imm & 0x1f) },
+                            _ => panic!("Unknown TypeI instruction: {:x}", instr.0),
+                        },
                         _ => panic!("Unknown TypeI instruction: {:x}", instr.0),
-                    },
-                    _ => panic!("Unknown TypeI instruction: {:x}", instr.0),
-                },
+                    }
+                }
 
-                OPCODE_TYPE_I_SYSTEM => match funct10 {
-                    ecall::F10 if rs2 == 0 => {
-                        use EcallSignal::*;
-                        match self.ecall() {
-                            Exit => return,
-                            Continue => continue,
-                            Nothing => {}
+                OPCODE_TYPE_I_SYSTEM => {
+                    let rs2 = instr.rs2();
+                    match funct10 {
+                        ecall::F10 if rs2 == 0 => {
+                            use EcallSignal::*;
+                            match self.ecall() {
+                                Exit => return,
+                                Continue => continue,
+                                Nothing => {}
+                            }
                         }
+                        _ => panic!("Unknown TypeI::System instruction: {:x}", instr.0),
                     }
-                    _ => panic!("Unknown TypeI::System instruction: {:x}", instr.0),
-                },
+                }
 
-                OPCODE_TYPE_I_LOAD => match funct3 {
-                    lb::F3 => {
-                        set! { rd = self.memory.get_byte(get!(rs1 u32).wrapping_add(imm_i as u32) as usize) as i32 }
+                OPCODE_TYPE_I_LOAD => {
+                    let (rd, rs1) = (instr.rd() as u8, instr.rs1() as u8);
+                    let imm = instr.imm_i();
+                    match funct3 {
+                        lb::F3 => {
+                            set! { rd = self.memory.get_byte(get!(rs1 u32).wrapping_add(imm as u32) as usize) as i32 }
+                        }
+                        lh::F3 => {
+                            set! { rd = self.memory.get_half(get!(rs1 u32).wrapping_add(imm as u32) as usize) as i32 }
+                        }
+                        lw::F3 => {
+                            set! { rd = self.memory.get_word(get!(rs1 u32).wrapping_add(imm as u32) as usize) }
+                        }
+                        lbu::F3 => {
+                            set! { rd = self.memory.get_byte(get!(rs1 u32).wrapping_add(imm as u32) as usize) as u32 }
+                        }
+                        lhu::F3 => {
+                            set! { rd = self.memory.get_half(get!(rs1 u32).wrapping_add(imm as u32) as usize) as u32 }
+                        }
+                        _ => panic!("Unknown TypeI::Load instruction: {:x}", instr.0),
                     }
-                    lh::F3 => {
-                        set! { rd = self.memory.get_half(get!(rs1 u32).wrapping_add(imm_i as u32) as usize) as i32 }
-                    }
-                    lw::F3 => {
-                        set! { rd = self.memory.get_word(get!(rs1 u32).wrapping_add(imm_i as u32) as usize) }
-                    }
-                    lbu::F3 => {
-                        set! { rd = self.memory.get_byte(get!(rs1 u32).wrapping_add(imm_i as u32) as usize) as u32 }
-                    }
-                    lhu::F3 => {
-                        set! { rd = self.memory.get_half(get!(rs1 u32).wrapping_add(imm_i as u32) as usize) as u32 }
-                    }
-                    _ => panic!("Unknown TypeI::Load instruction: {:x}", instr.0),
-                },
+                }
 
-                OPCODE_TYPE_S => match funct3 {
-                    sb::F3 => {
-                        self.memory.set_byte(
-                            get!(rs1 u32).wrapping_add(imm_s as u32) as usize,
-                            get!(rs2 u8),
-                        );
+                OPCODE_TYPE_S => {
+                    let (rs1, rs2) = (instr.rs1() as u8, instr.rs2() as u8);
+                    let imm = instr.imm_s();
+                    match funct3 {
+                        sb::F3 => {
+                            self.memory.set_byte(
+                                get!(rs1 u32).wrapping_add(imm as u32) as usize,
+                                get!(rs2 u8),
+                            );
+                        }
+                        sh::F3 => {
+                            self.memory.set_half(
+                                get!(rs1 u32).wrapping_add(imm as u32) as usize,
+                                get!(rs2 u16),
+                            );
+                        }
+                        sw::F3 => {
+                            self.memory.set_word(
+                                get!(rs1 u32).wrapping_add(imm as u32) as usize,
+                                get!(rs2 u32),
+                            );
+                        }
+                        _ => panic!(
+                            "Unknown TypeS instruction: {:?} (machine code {:x})",
+                            old_code[self.pc / 4],
+                            instr.0
+                        ),
                     }
-                    sh::F3 => {
-                        self.memory.set_half(
-                            get!(rs1 u32).wrapping_add(imm_s as u32) as usize,
-                            get!(rs2 u16),
-                        );
+                }
+
+                OPCODE_TYPE_B => {
+                    let (rs1, rs2) = (instr.rs1() as u8, instr.rs2() as u8);
+                    let imm = (instr.imm_b() as u32) << 1;
+                    match funct3 {
+                        beq::F3 => {
+                            if get!(rs1 u32) == get!(rs2 u32) {
+                                self.pc = (self.pc as u32).wrapping_add(imm) as usize;
+                                continue;
+                            }
+                        }
+                        bne::F3 => {
+                            if get!(rs1 u32) != get!(rs2 u32) {
+                                self.pc = (self.pc as u32).wrapping_add(imm) as usize;
+                                continue;
+                            }
+                        }
+                        blt::F3 => {
+                            if get!(rs1 i32) < get!(rs2 i32) {
+                                self.pc = (self.pc as u32).wrapping_add(imm) as usize;
+                                continue;
+                            }
+                        }
+                        bge::F3 => {
+                            if get!(rs1 i32) >= get!(rs2 i32) {
+                                self.pc = (self.pc as u32).wrapping_add(imm) as usize;
+                                continue;
+                            }
+                        }
+                        bltu::F3 => {
+                            if get!(rs1 u32) < get!(rs2 u32) {
+                                self.pc = (self.pc as u32).wrapping_add(imm) as usize;
+                                continue;
+                            }
+                        }
+                        bgeu::F3 => {
+                            if get!(rs1 u32) >= get!(rs2 u32) {
+                                self.pc = (self.pc as u32).wrapping_add(imm) as usize;
+                                continue;
+                            }
+                        }
+                        _ => panic!("Unknown TypeB instruction: {:x}", instr.0),
                     }
-                    sw::F3 => {
-                        self.memory.set_word(
-                            get!(rs1 u32).wrapping_add(imm_s as u32) as usize,
-                            get!(rs2 u32),
-                        );
-                    }
-                    _ => panic!(
-                        "Unknown TypeS instruction: {:?} (machine code {:x})",
-                        old_code[self.pc / 4],
-                        instr.0
-                    ),
-                },
+                }
 
                 _ => match old_code[self.pc / 4] {
                     // Type R
@@ -323,25 +372,10 @@ impl Simulator {
                             .set_float(self.get_reg::<u32>(rs1).wrapping_add(imm) as usize, x);
                     }
 
-                    // Type SB + jumps
-                    Beq(rs1, rs2, label) => branch!(
-                        if get!(rs1 i32) == get!(rs2 i32) => label
-                    ),
-                    Bne(rs1, rs2, label) => branch!(
-                        if get!(rs1 i32) != get!(rs2 i32) => label
-                    ),
-                    Blt(rs1, rs2, label) => branch!(
-                        if get!(rs1 i32) < get!(rs2 i32) => label
-                    ),
-                    Bge(rs1, rs2, label) => branch!(
-                        if get!(rs1 i32) >= get!(rs2 i32) => label
-                    ),
-                    Bltu(rs1, rs2, label) => branch!(
-                        if get!(rs1 u32) < get!(rs2 u32) => label
-                    ),
-                    Bgeu(rs1, rs2, label) => branch!(
-                        if get!(rs1 u32) >= get!(rs2 u32) => label
-                    ),
+                    // Type B
+                    Beq(..) | Bne(..) | Blt(..) | Bge(..) | Bltu(..) | Bgeu(..) => covered!(),
+
+                    // Type I -- Jumps
                     Jalr(rd, rs1, imm) => {
                         // This produces a weird result for `jalr s0 s0 0`. s0 is set to pc+4 before the jump occurs
                         // so it works as a nop. Maybe this is correct, maybe it's not, but I'll copy the behavior seen in

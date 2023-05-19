@@ -1,3 +1,4 @@
+pub mod bitops;
 pub mod constants;
 pub mod instruction;
 
@@ -41,6 +42,10 @@ macro_rules! compile_inner {
         $i.set_imm_s($val as i32);
         compile_inner!($i, $($props)*);
     };
+    ($i:ident, imm_b: $val:expr; $($props:tt)*) => {
+        $i.set_imm_b($val as i32);
+        compile_inner!($i, $($props)*);
+    };
 }
 
 macro_rules! opcode_shorthand {
@@ -59,6 +64,9 @@ macro_rules! opcode_shorthand {
     (S) => {
         OPCODE_TYPE_S
     };
+    (B) => {
+        OPCODE_TYPE_B
+    };
 }
 
 macro_rules! compile {
@@ -74,8 +82,8 @@ macro_rules! compile {
     };
 }
 
-impl From<parser::Instruction> for Instruction {
-    fn from(instruction: parser::Instruction) -> Self {
+impl Instruction {
+    pub fn from_parsed(instruction: parser::Instruction, pc: usize) -> Self {
         use parser::Instruction::*;
 
         // TODO: disallow unused variables when this is done
@@ -164,12 +172,24 @@ impl From<parser::Instruction> for Instruction {
             Sb(rs2, imm, rs1) => compile! { S; funct3: sb::F3; rs1: rs1; rs2: rs2; imm_s: imm; },
             Sh(rs2, imm, rs1) => compile! { S; funct3: sh::F3; rs1: rs1; rs2: rs2; imm_s: imm; },
             Sw(rs2, imm, rs1) => compile! { S; funct3: sw::F3; rs1: rs1; rs2: rs2; imm_s: imm; },
-            Beq(rs1, rs2, label) => Instruction(0),
-            Bne(rs1, rs2, label) => Instruction(0),
-            Blt(rs1, rs2, label) => Instruction(0),
-            Bge(rs1, rs2, label) => Instruction(0),
-            Bltu(rs1, rs2, label) => Instruction(0),
-            Bgeu(rs1, rs2, label) => Instruction(0),
+            Beq(rs1, rs2, label) => {
+                compile! { B; funct3: beq::F3; rs1: rs1; rs2: rs2; imm_b: label as isize - pc as isize; }
+            }
+            Bne(rs1, rs2, label) => {
+                compile! { B; funct3: bne::F3; rs1: rs1; rs2: rs2; imm_b: label as isize - pc as isize; }
+            }
+            Blt(rs1, rs2, label) => {
+                compile! { B; funct3: blt::F3; rs1: rs1; rs2: rs2; imm_b: label as isize - pc as isize; }
+            }
+            Bge(rs1, rs2, label) => {
+                compile! { B; funct3: bge::F3; rs1: rs1; rs2: rs2; imm_b: label as isize - pc as isize; }
+            }
+            Bltu(rs1, rs2, label) => {
+                compile! { B; funct3: bltu::F3; rs1: rs1; rs2: rs2; imm_b: label as isize - pc as isize; }
+            }
+            Bgeu(rs1, rs2, label) => {
+                compile! { B; funct3: bgeu::F3; rs1: rs1; rs2: rs2; imm_b: label as isize - pc as isize; }
+            }
             Jalr(rd, rs1, imm) => Instruction(0),
             Jal(rd, label) => Instruction(0),
             CsrRw(rd, fcsr, rs1) => Instruction(0),

@@ -32,6 +32,7 @@ pub const OPCODE_TYPE_I_MISC_MEM: u32 = 0b0001111;
 pub const OPCODE_TYPE_I_SYSTEM: u32 = 0b1110011;
 pub const OPCODE_TYPE_S: u32 = 0b0100011;
 pub const OPCODE_TYPE_U: u32 = 0b0110111;
+pub const OPCODE_TYPE_B: u32 = 0b1100011;
 
 // Type R
 define! { add,    F3: 0b000, F7: 0b0000000 }
@@ -91,3 +92,12 @@ define! { csrrci, F3: 0b111, F7: 0b0000000 }
 define! { sb, F3: 0b000 }
 define! { sh, F3: 0b001 }
 define! { sw, F3: 0b010 }
+
+// Type B 
+define! { beq,  F3: 0b000 }
+define! { bne,  F3: 0b001 }
+define! { blt,  F3: 0b100 }
+define! { bge,  F3: 0b101 }
+define! { bltu, F3: 0b110 }
+define! { bgeu, F3: 0b111 }
+
