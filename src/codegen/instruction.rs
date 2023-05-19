@@ -1,8 +1,8 @@
-use bitfield::bitfield;
 use super::bitops::{mask, BitOps};
+use bitfield::bitfield;
 
 bitfield! {
-    #[derive(Default, Clone, Copy)]
+    #[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct Instruction(u32);
     impl Debug;
 
@@ -61,9 +61,9 @@ impl Instruction {
 
     pub fn imm_b(self) -> i32 {
         let imm = (self.0.mask(31..32) >> 19)
-            | (self.0.mask(7..8) << 4)
             | (self.0.mask(25..31) >> 20)
-            | (self.0.mask(8..12) >> 7);
+            | (self.0.mask(8..12) >> 7)
+            | (self.0.mask(7..8) << 4);
         if self.0 & (1 << 31) == 0 {
             imm as i32
         } else {
@@ -88,6 +88,37 @@ impl Instruction {
 
         // set self[31] = imm[12]
         self.0 |= (imm & (0x1 << 12)) << 19;
+    }
+
+    pub fn imm_j(self) -> i32 {
+        let imm = (self.0.mask(31..32) >> 11)
+            | (self.0.mask(21..31) >> 20)
+            | (self.0.mask(20..21) >> 9)
+            | self.0.mask(12..20);
+        if self.0 & (1 << 31) == 0 {
+            imm as i32
+        } else {
+            (imm | mask(12..32)) as i32
+        }
+    }
+
+    pub fn set_imm_j(&mut self, imm: i32) {
+        let imm = imm as u32;
+
+        // clear
+        self.0 &= !mask(12..32);
+
+        // set self[31] = imm[20]
+        self.0 |= (imm & mask(20..21)) << 11;
+
+        // set self[21:30] = imm[1:10]
+        self.0 |= (imm & mask(1..11)) << 20;
+
+        // set self[20] = imm[11]
+        self.0 |= (imm & mask(11..12)) << 9;
+
+        // set self[12:19] = imm[12:19]
+        self.0 |= imm & mask(12..20);
     }
 }
 
@@ -136,5 +167,24 @@ mod tests {
             i.set_imm_b(imm);
             assert_eq!(i.imm_b(), imm);
         }
+    }
+
+    #[test]
+    fn test_imm_j() {
+        assert_eq!(Instruction(0x052000ef).imm_j(), 82);
+        assert_eq!(Instruction(0xffdff2ef).imm_j(), -4);
+        assert_eq!(Instruction(0x0000046f).imm_j(), 0);
+
+        for b in 1..20 {
+            let imm = 1 << b;
+            let mut i = Instruction(0x12345678);
+            i.set_imm_j(imm);
+            assert_eq!(i.imm_j(), imm);
+        }
+
+        let imm = 1 << 20;
+        let mut i = Instruction(0x12345678);
+        i.set_imm_j(imm);
+        assert_eq!(i.imm_j(), imm | mask(12..32) as i32);
     }
 }

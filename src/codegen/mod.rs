@@ -46,6 +46,10 @@ macro_rules! compile_inner {
         $i.set_imm_b($val as i32);
         compile_inner!($i, $($props)*);
     };
+    ($i:ident, imm_j: $val:expr; $($props:tt)*) => {
+        $i.set_imm_j($val as i32);
+        compile_inner!($i, $($props)*);
+    };
 }
 
 macro_rules! opcode_shorthand {
@@ -69,6 +73,9 @@ macro_rules! opcode_shorthand {
     };
     (B) => {
         OPCODE_TYPE_B
+    };
+    (J) => {
+        OPCODE_TYPE_J
     };
 }
 
@@ -176,27 +183,27 @@ impl Instruction {
             Sh(rs2, imm, rs1) => compile! { S; funct3: sh::F3; rs1: rs1; rs2: rs2; imm_s: imm; },
             Sw(rs2, imm, rs1) => compile! { S; funct3: sw::F3; rs1: rs1; rs2: rs2; imm_s: imm; },
             Beq(rs1, rs2, label) => {
-                compile! { B; funct3: beq::F3; rs1: rs1; rs2: rs2; imm_b: (4*label as isize - pc as isize) / 4; }
+                compile! { B; funct3: beq::F3; rs1: rs1; rs2: rs2; imm_b: (label as isize - pc as isize); }
             }
             Bne(rs1, rs2, label) => {
-                compile! { B; funct3: bne::F3; rs1: rs1; rs2: rs2; imm_b: (4*label as isize - pc as isize) / 4; }
+                compile! { B; funct3: bne::F3; rs1: rs1; rs2: rs2; imm_b: (label as isize - pc as isize); }
             }
             Blt(rs1, rs2, label) => {
-                compile! { B; funct3: blt::F3; rs1: rs1; rs2: rs2; imm_b: (4*label as isize - pc as isize) / 4; }
+                compile! { B; funct3: blt::F3; rs1: rs1; rs2: rs2; imm_b: (label as isize - pc as isize); }
             }
             Bge(rs1, rs2, label) => {
-                compile! { B; funct3: bge::F3; rs1: rs1; rs2: rs2; imm_b: (4*label as isize - pc as isize) / 4; }
+                compile! { B; funct3: bge::F3; rs1: rs1; rs2: rs2; imm_b: (label as isize - pc as isize); }
             }
             Bltu(rs1, rs2, label) => {
-                compile! { B; funct3: bltu::F3; rs1: rs1; rs2: rs2; imm_b: (4*label as isize - pc as isize) / 4; }
+                compile! { B; funct3: bltu::F3; rs1: rs1; rs2: rs2; imm_b: (label as isize - pc as isize); }
             }
             Bgeu(rs1, rs2, label) => {
-                compile! { B; funct3: bgeu::F3; rs1: rs1; rs2: rs2; imm_b: (4*label as isize - pc as isize) / 4; }
+                compile! { B; funct3: bgeu::F3; rs1: rs1; rs2: rs2; imm_b: (label as isize - pc as isize); }
             }
             Jalr(rd, rs1, imm) => {
                 compile! { I_JALR; funct3: jalr::F3; rd: rd; rs1: rs1; imm_i: imm; }
             }
-            Jal(rd, label) => Instruction(0),
+            Jal(rd, label) => compile! { J; rd: rd; imm_j: (label as isize - pc as isize); },
             CsrRw(rd, fcsr, rs1) => Instruction(0),
             CsrRs(rd, fcsr, rs1) => Instruction(0),
             CsrRc(rd, fcsr, rs1) => Instruction(0),
@@ -206,8 +213,22 @@ impl Instruction {
             Float(_) => Instruction(0),
             Li(_, _) => Instruction(0),
             Mv(_, _) => Instruction(0),
-            Ret => Instruction(0),
             URet => Instruction(0),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::parser::Instruction as ParserInstr;
+
+    #[test]
+    fn test_jal() {
+        assert_eq!(
+            Instruction::from_parsed(ParserInstr::Jal(5, 3), 0),
+            Instruction(0x00c002ef)
+        );
     }
 }

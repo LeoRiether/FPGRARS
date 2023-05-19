@@ -147,7 +147,7 @@ impl Simulator {
         let machine_code: Vec<codegen::Instruction> = old_code
             .iter()
             .zip((0..).step_by(4))
-            .map(|(instruction, pc)| codegen::Instruction::from_parsed(instruction.clone(), pc * 4))
+            .map(|(instruction, pc)| codegen::Instruction::from_parsed(instruction.clone(), pc))
             .collect();
 
         println!("Decoded instructions:");
@@ -350,6 +350,13 @@ impl Simulator {
                     }
                 }
 
+                OPCODE_TYPE_J => {
+                    let (rd, imm) = (instr.rd() as u8, instr.imm_j());
+                    set! { rd = (self.pc + 4) as u32 };
+                    self.pc = (self.pc as i32 + imm) as usize;
+                    continue;
+                }
+
                 _ => match old_code[self.pc / 4] {
                     // Type R
                     Add(..) | Sub(..) | Sll(..) | Slt(..) | Sltu(..) | Xor(..) | Srl(..)
@@ -389,11 +396,7 @@ impl Simulator {
                     // Type I -- JALR
                     Jalr(..) => covered!(),
 
-                    Jal(rd, label) => {
-                        set! { rd = (self.pc + 4) as u32 };
-                        self.pc = label;
-                        continue;
-                    }
+                    Jal(..) => covered!(),
 
                     // CSR
                     CsrRw(rd, fcsr, rs1) => {

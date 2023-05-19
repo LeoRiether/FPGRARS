@@ -33,6 +33,7 @@ pub const OPCODE_TYPE_I_SYSTEM: u32 = 0b1110011;
 pub const OPCODE_TYPE_S: u32 = 0b0100011;
 pub const OPCODE_TYPE_U: u32 = 0b0110111;
 pub const OPCODE_TYPE_B: u32 = 0b1100011;
+pub const OPCODE_TYPE_J: u32 = 0b1101111;
 
 // Type R
 define! { add,    F3: 0b000, F7: 0b0000000 }
