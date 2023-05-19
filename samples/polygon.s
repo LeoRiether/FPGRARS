@@ -142,7 +142,10 @@ vertices.exit:
 	addi sp sp 28
 
 	la a0 V
-	ret
+
+    addi ra ra 4
+    jalr x0 ra -4
+	# ret
 
 # a0 = int* V
 # a1 = cor

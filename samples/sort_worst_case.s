@@ -8,20 +8,21 @@
 .data
 
 .text
-    # Allocates the array in the stack with 8000 integers
+    # Allocates the array in the stack with t0 integers
     # [sp .. s0)
     mv s0 sp
-    li t0 8000
+    li t0 10000
+    slli t0 t0 2 # t0 = t0 * 4
     sub sp sp t0
     mv s1 sp
 
     # Fill with the worst case (array sorted in reverse)
-    mv a0 sp
+    mv a0 s1
     mv a1 s0
     jal fill
 
     # Print whether it's sorted or not (should print 0)
-    mv a0 sp
+    mv a0 s1
     mv a1 s0
     jal check_sorted
     li a7 1
@@ -31,7 +32,7 @@
     csrr s7 time
 
     # Sort
-    mv a0 sp
+    mv a0 s1
     mv a1 s0
     jal sort
 
@@ -40,7 +41,7 @@
     sub s7 t0 s7 # s7 == time elapsed
 
     # Print whether it's sorted or not again (should print 1)
-    mv a0 sp
+    mv a0 s1
     mv a1 s0
     jal check_sorted
     li a7 1
@@ -76,7 +77,7 @@ sort.loop:
     bge s0 s1 sort.exit
 
     mv a0 s0
-    mv a1 s1
+    addi a1 s1 -4
     jal fix
 
     addi s1 s1 -4
@@ -90,13 +91,13 @@ sort.exit:
     ret
 
 # Moves the last element of the array to the front until it gets to the right position
-# fix(int* last, int* first)
+# fix(int* first, int* last)
 fix:
     bge a0 a1 fexit
 
     lw t0 0(a1)
     lw t1 -4(a1)
-    bge t0 t1 fix_no_swap
+    bge t0 t1 fix_no_swap # could be bge to t1 fexit actually
 
     # swap
     sw t1 0(a1)

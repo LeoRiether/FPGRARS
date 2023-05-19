@@ -150,14 +150,14 @@ impl Simulator {
             .map(|(instruction, pc)| codegen::Instruction::from_parsed(instruction.clone(), pc))
             .collect();
 
-        println!("Decoded instructions:");
-        for x in &machine_code {
-            if x.0 != 0 {
-                println!("{:x}", x.0);
-            }
-        }
+        // println!("Decoded instructions:");
+        // for x in &machine_code {
+        //     if x.0 != 0 {
+        //         println!("{:x}", x.0);
+        //     }
+        // }
 
-        ////////////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////////
 
         loop {
             let instr = machine_code.get(self.pc / 4).unwrap_or_else(|| {
