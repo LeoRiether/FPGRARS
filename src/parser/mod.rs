@@ -132,7 +132,6 @@ pub enum Instruction {
     /// rd, rs1
     Mv(u8, u8),
 
-    Ret,
     URet,
 }
 

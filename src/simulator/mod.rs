@@ -150,12 +150,13 @@ impl Simulator {
             .map(|(instruction, pc)| codegen::Instruction::from_parsed(instruction.clone(), pc * 4))
             .collect();
 
-        // println!("Decoded instructions:");
-        // for x in &machine_code {
-        //     if x.0 != 0 {
-        //         println!("{:x}", x.0);
-        //     }
-        // }
+        println!("Decoded instructions:");
+        for x in &machine_code {
+            if x.0 != 0 {
+                println!("{:x}", x.0);
+            }
+        }
+
         ////////////////////////////////////////////////////////////////////////////////
 
         loop {
@@ -297,7 +298,7 @@ impl Simulator {
 
                 OPCODE_TYPE_B => {
                     let (rs1, rs2) = (instr.rs1() as u8, instr.rs2() as u8);
-                    let imm = (instr.imm_b() as u32) << 1;
+                    let imm = instr.imm_b() as u32;
                     match funct3 {
                         beq::F3 => {
                             if get!(rs1 u32) == get!(rs2 u32) {
@@ -509,10 +510,6 @@ impl Simulator {
                     // Pseudoinstructions
                     Li(rd, imm) => self.set_reg(rd, imm),
                     Mv(rd, rs1) => self.registers[rd as usize] = self.registers[rs1 as usize],
-                    Ret => {
-                        self.pc = self.registers[1] as usize;
-                        continue;
-                    }
                     URet => {
                         use crate::parser::register_names::UEPC_INDEX;
                         self.pc = self.status[UEPC_INDEX as usize] as usize;

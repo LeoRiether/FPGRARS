@@ -238,7 +238,7 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
         "jal" => parse_jal(s, &regs)?,
         "call" => one_arg(s).map(|(_i, label)| pre::Jal(1, label.to_owned()))?,
         "j" | "tail" | "b" => one_arg(s).map(|(_i, label)| pre::Jal(0, label.to_owned()))?,
-        "ret" => Ret.into(),
+        "ret" => Jalr(0, 1, 0).into(),
 
         "ecall" => Ecall.into(),
 

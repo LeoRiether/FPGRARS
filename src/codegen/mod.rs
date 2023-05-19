@@ -173,22 +173,22 @@ impl Instruction {
             Sh(rs2, imm, rs1) => compile! { S; funct3: sh::F3; rs1: rs1; rs2: rs2; imm_s: imm; },
             Sw(rs2, imm, rs1) => compile! { S; funct3: sw::F3; rs1: rs1; rs2: rs2; imm_s: imm; },
             Beq(rs1, rs2, label) => {
-                compile! { B; funct3: beq::F3; rs1: rs1; rs2: rs2; imm_b: label as isize - pc as isize; }
+                compile! { B; funct3: beq::F3; rs1: rs1; rs2: rs2; imm_b: (4*label as isize - pc as isize) / 4; }
             }
             Bne(rs1, rs2, label) => {
-                compile! { B; funct3: bne::F3; rs1: rs1; rs2: rs2; imm_b: label as isize - pc as isize; }
+                compile! { B; funct3: bne::F3; rs1: rs1; rs2: rs2; imm_b: (4*label as isize - pc as isize) / 4; }
             }
             Blt(rs1, rs2, label) => {
-                compile! { B; funct3: blt::F3; rs1: rs1; rs2: rs2; imm_b: label as isize - pc as isize; }
+                compile! { B; funct3: blt::F3; rs1: rs1; rs2: rs2; imm_b: (4*label as isize - pc as isize) / 4; }
             }
             Bge(rs1, rs2, label) => {
-                compile! { B; funct3: bge::F3; rs1: rs1; rs2: rs2; imm_b: label as isize - pc as isize; }
+                compile! { B; funct3: bge::F3; rs1: rs1; rs2: rs2; imm_b: (4*label as isize - pc as isize) / 4; }
             }
             Bltu(rs1, rs2, label) => {
-                compile! { B; funct3: bltu::F3; rs1: rs1; rs2: rs2; imm_b: label as isize - pc as isize; }
+                compile! { B; funct3: bltu::F3; rs1: rs1; rs2: rs2; imm_b: (4*label as isize - pc as isize) / 4; }
             }
             Bgeu(rs1, rs2, label) => {
-                compile! { B; funct3: bgeu::F3; rs1: rs1; rs2: rs2; imm_b: label as isize - pc as isize; }
+                compile! { B; funct3: bgeu::F3; rs1: rs1; rs2: rs2; imm_b: (4*label as isize - pc as isize) / 4; }
             }
             Jalr(rd, rs1, imm) => Instruction(0),
             Jal(rd, label) => Instruction(0),

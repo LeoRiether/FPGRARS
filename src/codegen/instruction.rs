@@ -127,6 +127,7 @@ mod tests {
     fn test_imm_b() {
         assert_eq!(Instruction(0x1e105663).imm_b(), 492);
         assert_eq!(Instruction(0xfe208ee3).imm_b(), -4);
+        assert_eq!(Instruction(0xfe0008e3).imm_b(), -16);
         assert_eq!(Instruction(0x015a7063).imm_b(), 0);
 
         let tests = [0, -4, 122, -122, 0x7e, 0b11111111110];
