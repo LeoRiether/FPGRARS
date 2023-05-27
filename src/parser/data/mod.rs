@@ -9,20 +9,15 @@ use byteorder::{ByteOrder, LittleEndian};
 use std::borrow::{Borrow, Cow};
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub(super) enum Type {
+    #[default]
     Word,
     Byte,
     Half,
     Align,
     Asciz,
     Float,
-}
-
-impl Default for Type {
-    fn default() -> Type {
-        Type::Word
-    }
 }
 
 impl FromStr for Type {
@@ -65,7 +60,7 @@ fn store_integer(x: u32, data: &mut Vec<u8>, dtype: Type) {
         Word => {
             let pos = data.len();
             data.resize(pos + 4, 0);
-            LittleEndian::write_u32(&mut data[pos..], x as u32);
+            LittleEndian::write_u32(&mut data[pos..], x);
         }
         Align => {
             data.resize(data.len() + x as usize, 0);
@@ -142,7 +137,7 @@ fn one_token(dtype: Type) -> impl Fn(&str) -> nom::IResult<&str, Cow<str>> {
         use Type::*;
         match dtype {
             Word | Byte | Half | Align | Float => {
-                let (i, parsed) = take_till1(|c| is_separator(c))(s)?;
+                let (i, parsed) = take_till1(is_separator)(s)?;
                 Ok((i, Cow::from(parsed)))
             }
             Asciz => {

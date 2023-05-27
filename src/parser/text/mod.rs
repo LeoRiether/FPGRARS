@@ -166,12 +166,12 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
         "divu" => type_r!(Divu),
         "rem" => type_r!(Rem),
         "remu" => type_r!(Remu),
-        "neg" => args_mv(s, &regs).map(|(rd, rs1)| Sub(rd, 0, rs1).into())?,
-        "not" => args_mv(s, &regs).map(|(rd, rs1)| Xori(rd, rs1, (-1i32) as u32).into())?,
-        "mv" => args_mv(s, &regs).map(|(rd, rs1)| Mv(rd, rs1).into())?,
-        "snez" => args_mv(s, &regs).map(|(rd, rs1)| Sltu(rd, 0, rs1).into())?,
-        "sltz" => args_mv(s, &regs).map(|(rd, rs1)| Slt(rd, rs1, 0).into())?,
-        "sgtz" => args_mv(s, &regs).map(|(rd, rs1)| Slt(rd, 0, rs1).into())?,
+        "neg" => args_mv(s, regs).map(|(rd, rs1)| Sub(rd, 0, rs1).into())?,
+        "not" => args_mv(s, regs).map(|(rd, rs1)| Xori(rd, rs1, (-1i32) as u32).into())?,
+        "mv" => args_mv(s, regs).map(|(rd, rs1)| Mv(rd, rs1).into())?,
+        "snez" => args_mv(s, regs).map(|(rd, rs1)| Sltu(rd, 0, rs1).into())?,
+        "sltz" => args_mv(s, regs).map(|(rd, rs1)| Slt(rd, rs1, 0).into())?,
+        "sgtz" => args_mv(s, regs).map(|(rd, rs1)| Slt(rd, 0, rs1).into())?,
 
         // Type I
         "addi" => type_i!(Addi),
@@ -184,8 +184,8 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
         "ori" => type_i!(Ori),
         "andi" => type_i!(Andi),
         "jalr" => type_i!(Jalr),
-        "jr" => one_reg(&regs)(s).map(|(_i, rs1)| Jalr(0, rs1, 0).into())?,
-        "seqz" => args_mv(s, &regs).map(|(rd, rs1)| Sltiu(rd, rs1, 1).into())?,
+        "jr" => one_reg(regs)(s).map(|(_i, rs1)| Jalr(0, rs1, 0).into())?,
+        "seqz" => args_mv(s, regs).map(|(rd, rs1)| Sltiu(rd, rs1, 1).into())?,
 
         // Type I, loads from memory
         "lb" => type_s!(Lb),
@@ -232,10 +232,10 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
         "csrrsi" => csr_imm!(CsrRsi),
         "csrrwi" => csr_imm!(CsrRwi),
         "csrrci" => csr_imm!(CsrRci),
-        "csrr" => args_csr_small(s, &regs, &status).map(|(rd, fcsr)| CsrRs(rd, fcsr, 0).into())?,
+        "csrr" => args_csr_small(s, regs, status).map(|(rd, fcsr)| CsrRs(rd, fcsr, 0).into())?,
 
         // Jumps
-        "jal" => parse_jal(s, &regs)?,
+        "jal" => parse_jal(s, regs)?,
         "call" => one_arg(s).map(|(_i, label)| pre::Jal(1, label.to_owned()))?,
         "j" | "tail" | "b" => one_arg(s).map(|(_i, label)| pre::Jal(0, label.to_owned()))?,
         "ret" => Ret.into(),
@@ -243,10 +243,10 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
         "ecall" => Ecall.into(),
 
         // not quite a `jal`, but the same arguments
-        "la" => args_jal(s, &regs).map(|(rd, label)| pre::La(rd, label.to_owned()))?,
+        "la" => args_jal(s, regs).map(|(rd, label)| pre::La(rd, label))?,
 
-        "li" => args_li(s, &regs).map(|(rd, imm)| Li(rd, imm).into())?,
-        "lui" => args_li(s, &regs).map(|(rd, imm)| Li(rd, imm << 12).into())?,
+        "li" => args_li(s, regs).map(|(rd, imm)| Li(rd, imm).into())?,
+        "lui" => args_li(s, regs).map(|(rd, imm)| Li(rd, imm << 12).into())?,
 
         "nop" => Mv(0, 0).into(),
 
@@ -262,22 +262,22 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
         "fsgnj.s" => type_r!(float F::SgnjS),
         "fsgnjn.s" => type_r!(float F::SgnjNS),
         "fsgnjx.s" => type_r!(float F::SgnjXS),
-        "fclass.s" => float_two_regs!(F::Class, &regs, &floats),
-        "fcvt.s.w" => float_two_regs!(F::CvtSW, &floats, &regs),
-        "fcvt.s.wu" => float_two_regs!(F::CvtSWu, &floats, &regs),
-        "fcvt.w.s" => float_two_regs!(F::CvtWS, &regs, &floats),
-        "fcvt.wu.s" => float_two_regs!(F::CvtWuS, &regs, &floats),
-        "fmv.s.x" => float_two_regs!(F::MvSX, &floats, &regs),
-        "fmv.x.s" => float_two_regs!(F::MvXS, &regs, &floats),
-        "fsqrt.s" => float_two_regs!(F::Sqrt, &floats, &floats),
+        "fclass.s" => float_two_regs!(F::Class, regs, floats),
+        "fcvt.s.w" => float_two_regs!(F::CvtSW, floats, regs),
+        "fcvt.s.wu" => float_two_regs!(F::CvtSWu, floats, regs),
+        "fcvt.w.s" => float_two_regs!(F::CvtWS, regs, floats),
+        "fcvt.wu.s" => float_two_regs!(F::CvtWuS, regs, floats),
+        "fmv.s.x" => float_two_regs!(F::MvSX, floats, regs),
+        "fmv.x.s" => float_two_regs!(F::MvXS, regs, floats),
+        "fsqrt.s" => float_two_regs!(F::Sqrt, floats, floats),
         "fabs.s" => {
-            float_two_regs(s, &floats, &floats).map(|(rd, rs1)| F::SgnjXS(rd, rs1, rs1).into())?
+            float_two_regs(s, floats, floats).map(|(rd, rs1)| F::SgnjXS(rd, rs1, rs1).into())?
         }
         "fmv.s" => {
-            float_two_regs(s, &floats, &floats).map(|(rd, rs1)| F::SgnjS(rd, rs1, rs1).into())?
+            float_two_regs(s, floats, floats).map(|(rd, rs1)| F::SgnjS(rd, rs1, rs1).into())?
         }
         "fneg.s" => {
-            float_two_regs(s, &floats, &floats).map(|(rd, rs1)| F::SgnjNS(rd, rs1, rs1).into())?
+            float_two_regs(s, floats, floats).map(|(rd, rs1)| F::SgnjNS(rd, rs1, rs1).into())?
         }
         "flw" => type_s!(float F::Lw),
         "fsw" => type_s!(float F::Sw),
@@ -291,10 +291,10 @@ pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabe
 }
 
 /// Parses either `jal rd label` or `jal label`. In the last case, we set `rd = ra`
-fn parse_jal<'a>(s: &'a str, regs: &RegMap) -> Result<PreLabelInstruction, Error> {
+fn parse_jal(s: &str, regs: &RegMap) -> Result<PreLabelInstruction, Error> {
     use PreLabelInstruction as pre;
     args_jal(s, regs)
-        .map(|(rd, label)| pre::Jal(rd, label.to_owned()))
+        .map(|(rd, label)| pre::Jal(rd, label))
         .or_else(|_| one_arg(s).map(|(_i, label)| pre::Jal(1, label.to_owned())))
         .map_err(|e| e.into())
 }
@@ -332,11 +332,11 @@ mod tests {
         );
         assert_eq!(
             parse_instruction("j label", &FULLREG).map_err(|_| ()),
-            Ok(pre::Jal(0, "label".to_owned()).into())
+            Ok(pre::Jal(0, "label".to_owned()))
         );
         assert_eq!(
             parse_instruction("bgtz x1 somewhere", &FULLREG).map_err(|_| ()),
-            Ok(pre::Blt(0, 1, "somewhere".to_owned()).into())
+            Ok(pre::Blt(0, 1, "somewhere".to_owned()))
         );
     }
 }

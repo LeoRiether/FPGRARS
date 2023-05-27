@@ -318,7 +318,7 @@ fn unlabel_instruction(
 
 /// Replaces all positions in the `.data` that had labels with their
 /// actual values
-fn unlabel_data(data_labels: Vec<data::Label>, data: &mut Vec<u8>, labels: &Trie<String, usize>) -> Result<(), Error> {
+fn unlabel_data(data_labels: Vec<data::Label>, data: &mut [u8], labels: &Trie<String, usize>) -> Result<(), Error> {
     for dl in data_labels {
         let data::Label{ pos, dtype, label } = dl;
 

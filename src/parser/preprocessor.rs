@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use std::mem;
+
 use std::path::PathBuf;
 
 use super::combinators::*;
@@ -48,7 +48,7 @@ impl<'a> Iterator for Includer<'a> {
 
         let line = strip_unneeded(&line).unwrap();
 
-        if let Ok((_, file)) = include_directive(&line) {
+        if let Ok((_, file)) = include_directive(line) {
             // Get the current path and push the filename
             let mut path = self.paths.last().unwrap().clone();
             path.push(file);
@@ -106,7 +106,7 @@ impl MacroLine {
         let mut res = Self::default();
 
         fn ignore_char(t: &str) -> &str {
-            if t.len() >= 1 {
+            if !t.is_empty() {
                 &t[1..]
             } else {
                 t
@@ -117,7 +117,7 @@ impl MacroLine {
         s = ignore_char(s); // ignore the %
         res.raw.push(prefix.into());
 
-        while s.len() > 0 {
+        while !s.is_empty() {
             let (rest, arg) = take_arg(s);
             let (rest, raw) = take_raw(rest);
             s = ignore_char(rest);
@@ -139,11 +139,11 @@ impl MacroLine {
         let mut ans = String::new();
 
         for (r, &p) in self.raw.iter().zip(self.args.iter()) {
-            ans.extend(r.chars());
-            ans.extend(args[p].chars());
+            ans.push_str(r);
+            ans.push_str(&args[p]);
         }
 
-        ans.extend(self.raw.last().unwrap().chars());
+        ans.push_str(self.raw.last().unwrap());
         ans
     }
 }
@@ -179,7 +179,7 @@ impl MacroBuilder {
         Ok(())
     }
 
-    fn to_macro(self) -> Macro {
+    fn into_macro(self) -> Macro {
         // We reverse the lines so we can get them in stack order later
         Macro {
             lines: self.lines.into_iter().rev().collect(),
@@ -232,8 +232,8 @@ impl<I: Iterator<Item = String>> MacroParser<I> {
             match self.items.next() {
                 Some(line) if end_macro(&line) => {
                     let arg_count = builder.arg_names.len();
-                    let name = mem::replace(&mut builder.name, String::new());
-                    return Ok(((name, arg_count), builder.to_macro()));
+                    let name = std::mem::take(&mut builder.name);
+                    return Ok(((name, arg_count), builder.into_macro()));
                 }
                 None => return Err(Error::UnendedMacro(builder.name)),
 
@@ -262,7 +262,7 @@ impl<I: Iterator<Item = String>> MacroParser<I> {
     /// in an inneficient manner and replaces stuff it shouldn't. Will do for now.
     fn replace_eqvs(&self, s: String) -> String {
         // There can't be any eqvs
-        if self.eqvs.len() == 0 {
+        if self.eqvs.is_empty() {
             return s;
         }
 
@@ -272,10 +272,10 @@ impl<I: Iterator<Item = String>> MacroParser<I> {
         let mut found_eqv = false;
 
         let mut push_buf = |buf: &mut String, ans: &mut String| {
-            if buf.len() > 0 {
+            if !buf.is_empty() {
                 let eqv_to = self.eqvs.get(buf);
                 found_eqv = found_eqv || eqv_to.is_some();
-                ans.push_str(eqv_to.unwrap_or(&buf));
+                ans.push_str(eqv_to.unwrap_or(buf));
                 buf.clear();
             }
         };
@@ -360,7 +360,7 @@ mod tests {
         builder.push_line("li %arg1 10").unwrap();
         builder.push_line("%arg2").unwrap();
 
-        let m = builder.to_macro();
+        let m = builder.into_macro();
 
         // notice the lines are in stack order
         assert_eq!(

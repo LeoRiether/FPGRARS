@@ -58,14 +58,14 @@ impl FileHolder {
 /// Open a file and return its descriptor
 fn open(filepath: &str, flags: u32, holder: &mut FileHolder) -> i32 {
     let file_opt = match flags {
-        0 => fs::File::open(&filepath).ok(),
-        1 => fs::File::create(&filepath).ok(),
-        9 => fs::OpenOptions::new().append(true).open(&filepath).ok(),
+        0 => fs::File::open(filepath).ok(),
+        1 => fs::File::create(filepath).ok(),
+        9 => fs::OpenOptions::new().append(true).open(filepath).ok(),
         _ => None,
     };
 
-    let descriptor = file_opt.map(|f| holder.add(f)).unwrap_or(-1);
-    descriptor
+    
+    file_opt.map(|f| holder.add(f)).unwrap_or(-1)
 }
 
 /// Close a file

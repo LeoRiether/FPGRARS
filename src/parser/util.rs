@@ -92,7 +92,7 @@ impl Iterator for LossyLines {
         }
 
         let line = String::from_utf8_lossy(&self.buf);
-        let line = line.trim_end_matches("\r\n").trim_end_matches("\n");
+        let line = line.trim_end_matches("\r\n").trim_end_matches('\n');
         Some(line.to_owned())
     }
 }

@@ -86,7 +86,7 @@ impl MidiPlayer {
 
         match midi_out.connect(port, "FPGRARS_MIDI_conn") {
             Ok(conn) => Ok(conn),
-            Err(_) => return Err(ConnectionError::CouldntConnect),
+            Err(_) => Err(ConnectionError::CouldntConnect),
         }
     }
 
