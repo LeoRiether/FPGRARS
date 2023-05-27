@@ -13,7 +13,7 @@
 //! FPGRARS doesn't care, but RARS complains.
 //!
 
-mod app;
+mod args;
 mod parser;
 mod renderer;
 mod simulator;
@@ -22,7 +22,7 @@ use std::error::Error;
 use std::thread;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut args = app::get_args();
+    let mut args = args::get_args();
     let file = std::mem::take(&mut args.file);
 
     let sim = simulator::Simulator::new(args.port);
@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             std::process::exit(0);
         })?;
 
-    if args.video {
+    if !args.no_video {
         renderer::init(mmio);
     }
 

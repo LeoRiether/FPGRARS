@@ -518,11 +518,11 @@ impl Simulator {
             42 => {
                 // rand int in [0, a1)
                 let upper = self.get_reg::<u32>(11);
-                self.set_reg(10, thread_rng().gen_range::<u32, _, _>(0, upper));
+                self.set_reg(10, thread_rng().gen_range(0..upper));
             }
             43 => {
                 // rand float in [0, 1)
-                self.floats[10] = thread_rng().gen_range(0f32, 1f32);
+                self.floats[10] = thread_rng().gen_range(0f32..1f32);
             }
 
             48 | 148 => {
