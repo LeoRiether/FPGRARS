@@ -1,6 +1,7 @@
 use byteorder::{ByteOrder, LittleEndian};
 use std::io::Read;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use parking_lot::Mutex;
 
 pub const DATA_SIZE: usize = 0x0040_0000; // TODO: this, but I think it's about this much
 pub const MMIO_SIZE: usize = 0x0022_0000;
@@ -56,7 +57,7 @@ impl Memory {
     /// Returns whether we actually set the bytes or not.
     fn set_with_transparency(&mut self, i: usize, x: u32, n: usize) -> bool {
         if has_transparent_byte(x) && (VIDEO_START..VIDEO_END).contains(&i) {
-            let mut mmio = self.mmio.lock().unwrap();
+            let mut mmio = self.mmio.lock();
             copy_with_transparency(&mut mmio[i - MMIO_START..], x, n);
             true
         } else {
@@ -71,7 +72,7 @@ impl Memory {
     {
         if i >= MMIO_START {
             // MMIO
-            let mut mmio = self.mmio.lock().unwrap();
+            let mut mmio = self.mmio.lock();
             if i == KDMMIO_DATA + MMIO_START {
                 mmio[KDMMIO_CONTROL] = 0;
             }
@@ -94,7 +95,7 @@ impl Memory {
     {
         if i >= MMIO_START {
             // MMIO
-            let mut mmio = self.mmio.lock().unwrap();
+            let mut mmio = self.mmio.lock();
             write(&mut mmio[i - MMIO_START..], x)
         } else if i >= HEAP_START {
             // Heap/dynamic memory
@@ -162,7 +163,7 @@ impl Memory {
 
         // Slow path: we need to check for transparent bytes and skip them
         if !in_video.is_empty() {
-            let mut mmio = self.mmio.lock().unwrap();
+            let mut mmio = self.mmio.lock();
 
             const MAX_LEN: usize = WIDTH * HEIGHT + 128; // most of the time `len` will be smaller
             let mut buf = vec![0; MAX_LEN.min(len)];

@@ -4,7 +4,8 @@ use pixel_canvas::{
     input::{Event, WindowEvent},
     Canvas, Color,
 };
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use parking_lot::Mutex;
 
 pub const WIDTH: usize = 320;
 pub const HEIGHT: usize = 240;
@@ -67,7 +68,7 @@ impl InputState {
             } => {
                 let chr = if *chr == '\r' { '\n' } else { *chr };
 
-                let mut mmio = state.mmio.lock().unwrap();
+                let mut mmio = state.mmio.lock();
 
                 mmio[KDMMIO_CONTROL] = 1;
                 mmio[KDMMIO_DATA] = chr as u8;
@@ -93,7 +94,7 @@ impl InputState {
                     },
                 ..
             } => {
-                let mut mmio = state.mmio.lock().unwrap();
+                let mut mmio = state.mmio.lock();
 
                 push_key_to_buffer(&mut mmio, *key as u8);
                 push_key_to_map(&mut mmio, *key as u8);
@@ -116,7 +117,7 @@ impl InputState {
                     },
                 ..
             } => {
-                let mut mmio = state.mmio.lock().unwrap();
+                let mut mmio = state.mmio.lock();
 
                 mmio[KDMMIO_KEYDOWN] = 0;
 
@@ -161,7 +162,7 @@ fn init_with_provider(mmio: Arc<Mutex<Vec<u8>>>, color_prov: impl ColorProvider 
     let canvas = canvas.show_ms(true);
 
     canvas.render(move |_state, image| {
-        let mmio = mmio.lock().unwrap();
+        let mmio = mmio.lock();
 
         let frame = mmio[FRAME_SELECT];
         let start = if frame == 0 { FRAME_0 } else { FRAME_1 };

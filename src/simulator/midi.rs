@@ -5,7 +5,8 @@
 use midir::{MidiOutput, MidiOutputConnection};
 use std::error::Error;
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use parking_lot::Mutex;
 use std::thread;
 use std::time::Duration;
 
@@ -110,7 +111,7 @@ impl MidiPlayer {
 
         let ch;
         {
-            let mut d = self.0.as_ref().unwrap().lock().unwrap();
+            let mut d = self.0.as_ref().unwrap().lock();
             ch = get_channel(&mut d, instrument);
 
             d.conn.send(&[PROGRAM_CHANGE | ch, instrument])
@@ -120,7 +121,7 @@ impl MidiPlayer {
         }
         thread::sleep(Duration::from_millis(duration as u64));
         {
-            let mut d = self.0.as_ref().unwrap().lock().unwrap();
+            let mut d = self.0.as_ref().unwrap().lock();
             d.conn.send(&[NOTE_OFF | ch, pitch, velocity])
                 .expect("Failed to send NOTE_OFF message to MIDI output");
         }

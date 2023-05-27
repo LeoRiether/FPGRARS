@@ -530,7 +530,7 @@ impl Simulator {
                 let color = self.get_reg::<u8>(10); // a0
                 let frame_select = self.get_reg::<u32>(11); // a1
 
-                let mut mmio = self.memory.mmio.lock().unwrap();
+                let mut mmio = self.memory.mmio.lock();
                 let frame = if frame_select == 0 { FRAME_0 } else { FRAME_1 };
                 for x in &mut mmio[frame..frame + WIDTH * HEIGHT] {
                     *x = color;
