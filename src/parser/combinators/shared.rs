@@ -2,14 +2,14 @@ use nom::{
     self,
     branch::alt,
     bytes::complete::{escaped_transform, is_not, take_till, take_till1},
-    character::complete::{char as the_char},
+    character::complete::char as the_char,
     combinator::{map, value},
-    sequence::{delimited},
+    sequence::delimited,
     IResult,
 };
 
 pub type NomErr<'a> = nom::Err<(&'a str, nom::error::ErrorKind)>;
-pub use super::super::util::Error;
+pub use crate::parser::error::ParserError as Error;
 
 pub fn is_separator(c: char) -> bool {
     c == ',' || c.is_whitespace()

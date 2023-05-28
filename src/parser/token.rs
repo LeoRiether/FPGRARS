@@ -7,7 +7,6 @@ pub enum Data {
     Directive(String),
     Char(char),
     Integer(i32),
-    Float(f32),
     StringLiteral(String),
     CharLiteral(char),
     MacroArg(String),

@@ -1,7 +1,7 @@
 use super::{
     combinators::*,
     register_names::{FullRegMap, RegMap},
-    util::Error,
+    error::ParserError as Error,
     FloatInstruction, Instruction, PreLabelInstruction,
 };
 

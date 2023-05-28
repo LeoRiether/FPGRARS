@@ -501,6 +501,7 @@ dependencies = [
  "pixel-canvas",
  "radix_trie",
  "rand",
+ "thiserror",
  "version_check",
 ]
 

@@ -14,6 +14,7 @@
 //!
 
 mod args;
+mod instruction;
 mod parser;
 mod renderer;
 mod simulator;

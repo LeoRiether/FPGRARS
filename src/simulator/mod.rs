@@ -41,7 +41,7 @@ pub struct Simulator {
     midi_player: midi::MidiPlayer,
 
     pub memory: Memory,
-    pub code: Vec<parser::Instruction>,
+    pub code: Vec<crate::instruction::Instruction>,
 }
 
 impl Simulator {
@@ -78,7 +78,7 @@ impl Simulator {
         }
     }
 
-    pub fn load_from_file(mut self, path: String) -> Result<Self, parser::Error> {
+    pub fn load_from_file(mut self, path: String) -> Result<Self, parser::error::Error> {
         // TODO: some of this logic is duplicated from the Includer, try to dedup?
         let pathbuf = std::path::PathBuf::from(&path);
         let error = format!("Can't open file: <{:?}>", pathbuf.to_str());
@@ -110,8 +110,8 @@ impl Simulator {
     }
 
     pub fn run(&mut self) {
-        use parser::FloatInstruction as F;
-        use parser::Instruction::*;
+        use crate::instruction::FloatInstruction as F;
+        use crate::instruction::Instruction::*;
 
         let from_bool = |b| if b { 1 } else { 0 };
 

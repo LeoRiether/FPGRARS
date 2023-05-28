@@ -1,4 +1,4 @@
-use super::{combinators::*, util::Error};
+use super::{combinators::*, error::ParserError as Error};
 
 use nom::{
     bytes::complete::take_till1, character::complete::char as the_char, multi::separated_list,

@@ -7,7 +7,7 @@ pub const USTATUS_INDEX: u8 = 3;
 pub const UTVEC_INDEX: u8 = 4;
 pub const UCAUSE_INDEX: u8 = 5;
 
-use super::util::Error;
+use super::error::ParserError as Error;
 
 pub type RegMap = HashMap<String, u8>;
 pub type FullRegMap = (RegMap, RegMap, RegMap);
