@@ -3,10 +3,10 @@
 //!
 
 use midir::{MidiOutput, MidiOutputConnection};
+use parking_lot::Mutex;
 use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
-use parking_lot::Mutex;
 use std::thread;
 use std::time::Duration;
 
@@ -92,12 +92,10 @@ impl MidiPlayer {
 
     pub fn new(port: Option<usize>) -> Self {
         match Self::get_connection(port) {
-            Ok(c) => {
-                Self(Some(Arc::new(Mutex::new(MidiPlayerData{
-                    conn: c,
-                    channels: [0; 128]
-                }))))
-            }
+            Ok(c) => Self(Some(Arc::new(Mutex::new(MidiPlayerData {
+                conn: c,
+                channels: [0; 128],
+            })))),
             Err(e) => {
                 eprintln!("Warning: {}", e);
                 Self(None)
@@ -107,22 +105,27 @@ impl MidiPlayer {
 
     /// Plays a blocking MIDI note (unless there's no connection)
     fn play_note(&self, pitch: u8, duration: u32, instrument: u8, velocity: u8) {
-        if self.0.is_none() { return; }
+        if self.0.is_none() {
+            return;
+        }
 
         let ch;
         {
             let mut d = self.0.as_ref().unwrap().lock();
             ch = get_channel(&mut d, instrument);
 
-            d.conn.send(&[PROGRAM_CHANGE | ch, instrument])
+            d.conn
+                .send(&[PROGRAM_CHANGE | ch, instrument])
                 .expect("Failed to send PROGRAM_CHANGE message to MIDI output");
-            d.conn.send(&[NOTE_ON | ch, pitch, velocity])
+            d.conn
+                .send(&[NOTE_ON | ch, pitch, velocity])
                 .expect("Failed to send NOTE_ON message to MIDI output");
         }
         thread::sleep(Duration::from_millis(duration as u64));
         {
             let mut d = self.0.as_ref().unwrap().lock();
-            d.conn.send(&[NOTE_OFF | ch, pitch, velocity])
+            d.conn
+                .send(&[NOTE_OFF | ch, pitch, velocity])
                 .expect("Failed to send NOTE_OFF message to MIDI output");
         }
     }
@@ -144,7 +147,11 @@ impl MidiPlayer {
                 pitch as u8,
                 if duration < 0 { 1000 } else { duration as u32 },
                 instrument as u8,
-                if (0..128).contains(&velocity) { velocity as u8 } else { 100 },
+                if (0..128).contains(&velocity) {
+                    velocity as u8
+                } else {
+                    100
+                },
             );
         };
 
@@ -164,6 +171,8 @@ impl MidiPlayer {
 fn get_channel(d: &mut MidiPlayerData, instrument: u8) -> u8 {
     let ch = &mut d.channels[instrument as usize];
     *ch = (*ch + 1) & 0xF; // channels 0x0 through 0xF are used
-    if *ch == 9 { *ch = 10; } // ch 9 is only for percussion...
+    if *ch == 9 {
+        *ch = 10;
+    } // ch 9 is only for percussion...
     *ch
 }

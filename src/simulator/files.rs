@@ -64,7 +64,6 @@ fn open(filepath: &str, flags: u32, holder: &mut FileHolder) -> i32 {
         _ => None,
     };
 
-    
     file_opt.map(|f| holder.add(f)).unwrap_or(-1)
 }
 
@@ -99,9 +98,7 @@ fn read(
 ) -> i32 {
     holder
         .get_mut(fd)
-        .and_then(|file| {
-            memory.set_reader(file, buffer_start as usize, len)
-        })
+        .and_then(|file| memory.set_reader(file, buffer_start as usize, len))
         .map(|x| x as i32)
         .unwrap_or(-1)
 }

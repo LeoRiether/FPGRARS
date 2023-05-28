@@ -1,11 +1,11 @@
 use glium::glutin;
+use parking_lot::Mutex;
 use pixel_canvas::{
     canvas::CanvasInfo,
     input::{Event, WindowEvent},
     Canvas, Color,
 };
 use std::sync::Arc;
-use parking_lot::Mutex;
 
 pub const WIDTH: usize = 320;
 pub const HEIGHT: usize = 240;
@@ -143,7 +143,7 @@ trait ColorProvider {
 
 impl<F> ColorProvider for F
 where
-    F: Fn(&[u8], usize, usize) -> Color
+    F: Fn(&[u8], usize, usize) -> Color,
 {
     fn get(&self, memory: &[u8], y: usize, x: usize) -> Color {
         self(memory, y, x)
@@ -151,7 +151,7 @@ where
 }
 
 /// Opens a pixel-canvas window and draws from a given memory buffer.
-/// The color provider is generally either 
+/// The color provider is generally either
 fn init_with_provider(mmio: Arc<Mutex<Vec<u8>>>, color_prov: impl ColorProvider + 'static) {
     let canvas = Canvas::new(2 * WIDTH, 2 * HEIGHT)
         .title("FPGRARS")
@@ -183,7 +183,11 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
         let r = x & 0b111;
         let g = (x >> 3) & 0b111;
         let b = x >> 6;
-        Color { r: r * 36, g: g * 36, b: b * 85 }
+        Color {
+            r: r * 36,
+            g: g * 36,
+            b: b * 85,
+        }
     };
 
     let color_provider = move |mmio: &[u8], y: usize, x: usize| {
@@ -191,7 +195,9 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
         let index = y * WIDTH + x;
 
         let x = if cfg!(debug_assertions) {
-            *mmio.get(index).expect("Out of bound access to the video memory!")
+            *mmio
+                .get(index)
+                .expect("Out of bound access to the video memory!")
         } else {
             unsafe { *mmio.get_unchecked(index) }
         };
@@ -214,16 +220,17 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
 
         let get = |i| {
             if cfg!(debug_assertions) {
-                *mmio.get(i).expect("Out of bound access to the video memory!")
+                *mmio
+                    .get(i)
+                    .expect("Out of bound access to the video memory!")
             } else {
                 unsafe { *mmio.get_unchecked(i) }
             }
         };
 
-        let (r, g, b) = (get(index+2), get(index+1), get(index));
+        let (r, g, b) = (get(index + 2), get(index + 1), get(index));
         Color { r, g, b }
     };
 
     init_with_provider(mmio, color_provider);
 }
-

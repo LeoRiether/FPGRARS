@@ -14,6 +14,23 @@ pub enum Data {
     MacroArg(String),
 }
 
+impl Data {
+    pub fn extract_u32(&self) -> Option<u32> {
+        match self {
+            Data::Integer(i) => Some(*i as u32),
+            Data::CharLiteral(c) => Some(*c as u32),
+            _ => None,
+        }
+    }
+
+    pub fn extract_f32(&self) -> Option<u32> {
+        match self {
+            Data::Float(f) => Some(*f as u32),
+            _ => None,
+        }
+    }
+}
+
 impl fmt::Display for Data {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -65,7 +82,7 @@ impl Context {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 /// Token given by the lexer
 pub struct Token {
     pub data: Data,

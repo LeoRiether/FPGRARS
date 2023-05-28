@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use hashbrown::HashMap;
 
 use crate::parser::error::Contextualize;
@@ -32,11 +34,36 @@ struct Macro {
 /// Generally constructed by calling the [`Preprocess::preprocess`] method.
 pub struct Preprocessor<TI: Iterator<Item = Token>> {
     tokens: TI,
+    buffer: VecDeque<Token>,
+    macros: HashMap<String, Macro>,
 }
 
 impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
     pub fn new(tokens: TI) -> Self {
-        Self { tokens }
+        Self {
+            tokens,
+            buffer: VecDeque::new(),
+            macros: HashMap::new(),
+        }
+    }
+
+    fn is_registered_macro(&self, name: &str) -> bool {
+        self.macros.contains_key(name)
+    }
+
+    /// When a macro has been invoked in the assembly code, `expand_macro` expands the invocation,
+    /// putting the body of the macro into `self.buffer`.
+    fn expand_macro(&mut self, name: &str, args: &[Token]) {
+        let m = self.macros.get(name).unwrap();
+        let expanded_body = m.body.iter().map(|token| match token.data {
+            token::Data::MacroArg(ref arg) => {
+                let index = m.args[arg];
+                args[index].clone()
+            }
+            _ => token.clone(),
+        });
+
+        self.buffer.extend(expanded_body);
     }
 
     fn consume_include(&mut self, include_ctx: token::Context) -> Result<(), Error> {
@@ -66,7 +93,7 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
 
     /// Read a macro until the .end_macro directive
     fn consume_macro(&mut self, macro_ctx: token::Context) -> Result<(), Error> {
-        use super::token::Data::{Char, Directive, Identifier};
+        use super::token::Data::{Char, Directive, Identifier, MacroArg};
 
         // Read macro name
         let name = match self.tokens.next() {
@@ -76,7 +103,11 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
             }) => d,
 
             None => return Err(PreprocessorError::ExpectedMacroName(None).with_context(macro_ctx)),
-            Some(other) => return Err(PreprocessorError::ExpectedMacroName(Some(other.data)).with_context(other.ctx)),
+            Some(other) => {
+                return Err(
+                    PreprocessorError::ExpectedMacroName(Some(other.data)).with_context(other.ctx)
+                )
+            }
         };
 
         let mut r#macro = Macro {
@@ -101,15 +132,33 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
             match peek.take().or_else(|| self.tokens.next()) {
                 Some(Token {
                     data: Directive(d), ..
-                }) if d == "endmacro" || d == "end_macro" => break Ok(()),
+                }) if d == "endmacro" || d == "end_macro" => break,
 
-                Some(other_token) => {
-                    r#macro.body.push(other_token);
+                Some(token) => {
+                    // Make sure the argument being used was defined
+                    if let MacroArg(arg) = &token.data {
+                        if !r#macro.args.contains_key(arg) {
+                            return Err(PreprocessorError::UndefinedMacroArg {
+                                macro_name: r#macro.name.clone(),
+                                arg: arg.clone(),
+                            }
+                            .with_context(token.ctx));
+                        }
+                    }
+
+                    r#macro.body.push(token);
                 }
 
-                None => return Err(PreprocessorError::UnterminatedMacro(r#macro.name).with_context(macro_ctx)),
+                None => {
+                    return Err(
+                        PreprocessorError::UnterminatedMacro(r#macro.name).with_context(macro_ctx)
+                    )
+                }
             }
         }
+
+        self.macros.insert(r#macro.name.clone(), r#macro);
+        Ok(())
     }
 
     /// Read macro arguments until the closing parenthesis.
@@ -145,7 +194,7 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
                         }
                         .with_context(ctx));
                     }
-                    
+
                     entry.or_insert(index);
                 }
 
@@ -163,6 +212,10 @@ impl<TI: Iterator<Item = Token>> Iterator for Preprocessor<TI> {
     type Item = Result<Token, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if let Some(token) = self.buffer.pop_front() {
+            return Some(Ok(token));
+        }
+
         let token = self.tokens.next()?;
         use super::token::Data::*;
 
@@ -179,7 +232,64 @@ impl<TI: Iterator<Item = Token>> Iterator for Preprocessor<TI> {
                 }
                 self.next()
             }
+            Identifier(id) if self.is_registered_macro(&id) => {
+                // TODO: get_macro_args
+                // let args = self.get_macro_args();
+                self.expand_macro(&id, &[]);
+                self.next()
+            }
             _ => Some(Ok(token)),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::lexer::Lexer;
+
+    #[test]
+    fn test_macros() {
+        use crate::parser::token::Data::*;
+        let testcases = &[
+            (
+                r#".macro INC(%rd, %rs1)
+                    addi %rd, %rs1, 1
+                .end_macro"#,
+                "INC",
+                &[
+                    Identifier("addi".into()),
+                    MacroArg("rd".into()),
+                    MacroArg("rs1".into()),
+                    Integer(1),
+                ],
+            ),
+            (
+                r#".macro NOP
+                    addi x0, zero, 0
+                .end_macro"#,
+                "NOP",
+                &[
+                    Identifier("addi".into()),
+                    Identifier("x0".into()),
+                    Identifier("zero".into()),
+                    Integer(0),
+                ],
+            ),
+        ];
+
+        for (input, macro_name, expected_macro) in testcases {
+            let tokens = Lexer::from_content(String::from(*input), "macro.s");
+            let mut preprocessor = Preprocessor::new(tokens);
+            for token in preprocessor.by_ref() {
+                assert!(token.is_ok());
+            }
+
+            assert!(preprocessor.is_registered_macro(macro_name));
+            let m = preprocessor.macros.get(*macro_name).unwrap();
+            let m: Vec<_> = m.body.iter().map(|t| t.data.clone()).collect();
+
+            assert_eq!(m, *expected_macro);
         }
     }
 }

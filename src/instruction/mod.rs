@@ -1,4 +1,3 @@
-
 /// Floating point instructions.
 /// In a separate enum because maybe someday I'll have a cargo feature to disable
 /// floating point instructions.
@@ -116,4 +115,3 @@ pub enum Instruction {
     Ret,
     URet,
 }
-

@@ -134,4 +134,3 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
         data: ctx.data,
     })
 }
-

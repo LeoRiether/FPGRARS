@@ -4,13 +4,12 @@ use std::fs;
 
 use super::token::{Context, Data, Token};
 
-// TODO: what about $, @, etc?
 macro_rules! allowed_identifier {
     () => {
-        'a'..='z' | 'A'..='Z' | '_' | '0'..='9'
+        'a'..='z' | 'A'..='Z' | '_' | '0'..='9' | '.' | '$' | '@'
     };
     (start) => {
-        'a'..='z' | 'A'..='Z' | '_'
+        'a'..='z' | 'A'..='Z' | '_' | '$' | '@'
     };
 }
 
@@ -113,7 +112,6 @@ impl Lexer {
         Token::new(Data::CharLiteral(c))
     }
 
-    // TODO: float support
     fn next_number(&mut self) -> Token {
         let cursor = self.cursor;
         let mut i = 0;
@@ -393,6 +391,27 @@ DE1(t0, LABEL)
         assert_eq!(
             tokens,
             &[Directive("float".into()), Float(123.456), Float(-3.1415)]
+        );
+    }
+
+    #[test]
+    fn test_identifier() {
+        let lexer = Lexer::from_content(
+            String::from("abc ABC main.loop main$loop main@loop @global"),
+            "identifiers.s",
+        );
+        let tokens = lexer.map(|t| t.data).collect::<Vec<_>>();
+        use crate::parser::token::Data::*;
+        assert_eq!(
+            tokens,
+            &[
+                Identifier("abc".into()),
+                Identifier("ABC".into()),
+                Identifier("main.loop".into()),
+                Identifier("main$loop".into()),
+                Identifier("main@loop".into()),
+                Identifier("@global".into()),
+            ]
         );
     }
 }
