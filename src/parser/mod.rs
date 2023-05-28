@@ -13,12 +13,11 @@ mod text;
 pub mod token;
 mod util;
 
-use crate::instruction::{FloatInstruction, Instruction, PreLabelInstruction};
+use crate::{instruction::{FloatInstruction, Instruction, PreLabelInstruction}, parser::register_names::RegNames};
 use byteorder::{ByteOrder, LittleEndian};
 use error::{Error, ParserError};
 use hashbrown::HashMap;
 pub use preprocessor::*;
-use register_names::{self as reg_names, FullRegMap};
 pub use util::*;
 
 /// Represents a successful parser result. This is the same format the simulator
@@ -55,7 +54,7 @@ impl<I: Iterator<Item = Result<String, ParserError>>> RISCVParser for I {
     fn parse_riscv(self, data_segment_size: usize) -> ParseResult {
         use combinators::*;
 
-        let regmaps: FullRegMap = (reg_names::regs(), reg_names::floats(), reg_names::status());
+        let regmaps = RegNames::default();
         let mut labels = HashMap::<String, usize>::new();
 
         let mut directive = Directive::Text;

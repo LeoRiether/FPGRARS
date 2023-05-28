@@ -10,7 +10,22 @@ pub const UCAUSE_INDEX: u8 = 5;
 use super::error::ParserError as Error;
 
 pub type RegMap = HashMap<String, u8>;
-pub type FullRegMap = (RegMap, RegMap, RegMap);
+
+pub struct RegNames {
+    pub regs: RegMap,
+    pub floats: RegMap,
+    pub status: RegMap,
+}
+
+impl Default for RegNames {
+    fn default() -> Self {
+        Self {
+            regs: regs(),
+            floats: floats(),
+            status: status(),
+        }
+    }
+}
 
 fn insert_names(map: &mut RegMap, names: &[&'static str]) {
     for (i, name) in names.iter().enumerate() {
@@ -19,7 +34,7 @@ fn insert_names(map: &mut RegMap, names: &[&'static str]) {
 }
 
 pub fn regs() -> RegMap {
-    let mut map = RegMap::with_capacity_and_hasher(64, Default::default());
+    let mut map = RegMap::with_capacity(64);
 
     // Insert x-prefixed registers
     for i in 0..32 {
@@ -38,7 +53,7 @@ pub fn regs() -> RegMap {
 }
 
 pub fn floats() -> RegMap {
-    let mut map = RegMap::with_capacity_and_hasher(64, Default::default());
+    let mut map = RegMap::with_capacity(64);
 
     // Insert f-prefixed registers
     for i in 0..32 {
@@ -48,8 +63,8 @@ pub fn floats() -> RegMap {
     // Insert named registers
     let names = vec![
         "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", "fs0", "fs1", "fa0", "fa1", "fa2",
-        "fa3", "fa4", "fa5", "fa6", "fa7", "fs2", "fs3", "fs4", "fs5", "fs6", "fs7", "fs8",
-        "fs9", "fs10", "fs11", "ft8", "ft9", "ft10", "ft11",
+        "fa3", "fa4", "fa5", "fa6", "fa7", "fs2", "fs3", "fs4", "fs5", "fs6", "fs7", "fs8", "fs9",
+        "fs10", "fs11", "ft8", "ft9", "ft10", "ft11",
     ];
     insert_names(&mut map, &names);
 

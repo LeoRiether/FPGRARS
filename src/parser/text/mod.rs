@@ -1,42 +1,41 @@
 use super::{
     combinators::*,
-    register_names::{FullRegMap, RegMap},
     error::ParserError as Error,
+    register_names::{RegMap, RegNames},
     FloatInstruction, Instruction, PreLabelInstruction,
 };
 
 /// Parses a line that produces many instructions at a time, like `lw a0 label`.
-pub(super) fn parse_multi_instruction(s: &str, regmaps: &FullRegMap) -> Option<Vec<PreLabelInstruction>> {
-    let (regs, _floats, _status) = regmaps;
+pub(super) fn parse_multi_instruction(
+    s: &str,
+    regmaps: &RegNames,
+) -> Option<Vec<PreLabelInstruction>> {
+    let regs = &regmaps.regs;
 
-    use PreLabelInstruction as pre;
     use Instruction::*;
+    use PreLabelInstruction as pre;
 
     let (s, instruction) = match one_arg(s) {
         Ok((s, i)) => (s, i),
-        Err(_) => { return None; }
+        Err(_) => {
+            return None;
+        }
     };
 
     macro_rules! load {
         ($inst:ident) => {
             args_jal(s, &regs)
-                .map(|(rd, label)| vec![
-                    pre::La(rd, label),
-                    $inst(rd, 0, rd).into(),
-                ])
+                .map(|(rd, label)| vec![pre::La(rd, label), $inst(rd, 0, rd).into()])
                 .ok()
-        }
+        };
     }
 
     macro_rules! store {
         ($inst:ident) => {
             args_multi_store(s, &regs)
-                .map(|(rs2, label, tmp)| vec![
-                    pre::La(tmp, label),
-                    $inst(rs2, 0, tmp).into(),
-                ])
+                .map(|(rs2, label, tmp)| vec![pre::La(tmp, label), $inst(rs2, 0, tmp).into()])
                 .ok()
-        }
+        };
     }
 
     match instruction {
@@ -49,13 +48,17 @@ pub(super) fn parse_multi_instruction(s: &str, regmaps: &FullRegMap) -> Option<V
         "sb" => store!(Sb),
         "sh" => store!(Sh),
         "sw" => store!(Sw),
-        _ => None
+        _ => None,
     }
 }
 
 /// Parses a line that produces a single instruction
-pub(super) fn parse_instruction(s: &str, regmaps: &FullRegMap) -> Result<PreLabelInstruction, Error> {
-    let (regs, floats, status) = regmaps;
+pub(super) fn parse_instruction(s: &str, regmaps: &RegNames) -> Result<PreLabelInstruction, Error> {
+    let RegNames {
+        regs,
+        floats,
+        status,
+    } = regmaps;
 
     use FloatInstruction as F;
     use Instruction::*;
@@ -300,7 +303,11 @@ fn parse_jal(s: &str, regs: &RegMap) -> Result<PreLabelInstruction, Error> {
 }
 
 /// Parses a single line of RISC-V code and pushes one or more instructions to the `code` vector
-pub(super) fn parse_line(s: &str, regmaps: &FullRegMap, code: &mut Vec<PreLabelInstruction>) -> Result<(), Error> {
+pub(super) fn parse_line(
+    s: &str,
+    regmaps: &RegNames,
+    code: &mut Vec<PreLabelInstruction>,
+) -> Result<(), Error> {
     if let Some(instructions) = parse_multi_instruction(s, regmaps) {
         code.extend(instructions);
         return Ok(());
@@ -316,12 +323,10 @@ mod tests {
     use super::Instruction::*;
     use super::PreLabelInstruction as pre;
     use super::*;
-    use crate::parser::register_names as reg_names;
 
     use lazy_static::*;
     lazy_static! {
-        static ref FULLREG: FullRegMap =
-             (reg_names::regs(), reg_names::floats(), reg_names::status()) ;
+        static ref FULLREG: RegNames = RegNames::default();
     }
 
     #[test]
