@@ -9,6 +9,9 @@ use byteorder::{ByteOrder, LittleEndian};
 pub mod register_names;
 use register_names::{self as reg_names, FullRegMap};
 
+pub mod lexer;
+pub mod token;
+
 pub mod combinators;
 
 mod preprocessor;
