@@ -1,15 +1,33 @@
-use std::rc::Rc;
+use std::{fmt, rc::Rc};
 
 #[derive(Debug, Clone, PartialEq)]
 /// Token data
 pub enum Data {
     Identifier(String),
     Directive(String),
+    Label(String),
     Char(char),
     Integer(i32),
+    Float(f32),
     StringLiteral(String),
     CharLiteral(char),
     MacroArg(String),
+}
+
+impl fmt::Display for Data {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Data::Identifier(id) => write!(f, "{}", id),
+            Data::Directive(d) => write!(f, "{}", d),
+            Data::Label(l) => write!(f, "{}", l),
+            Data::Char(c) => write!(f, "{}", c),
+            Data::Integer(i) => write!(f, "{}", i),
+            Data::Float(x) => write!(f, "{}", x),
+            Data::StringLiteral(s) => write!(f, "{}", s),
+            Data::CharLiteral(c) => write!(f, "{}", c),
+            Data::MacroArg(a) => write!(f, "{}", a),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -56,7 +74,10 @@ pub struct Token {
 
 impl Token {
     pub fn new(data: Data) -> Self {
-        Self { data, ctx: Context::empty() }
+        Self {
+            data,
+            ctx: Context::empty(),
+        }
     }
 
     pub fn with_ctx(mut self, ctx: Context) -> Self {

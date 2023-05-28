@@ -1,16 +1,14 @@
-use super::{combinators::*, error::ParserError as Error};
+use crate::parser::error::Contextualize;
 
-use nom::{
-    bytes::complete::take_till1, character::complete::char as the_char, multi::separated_list,
-    sequence::preceded,
-};
+use super::error::ParserError;
+use super::token::Token;
+use super::ParserContext;
 
 use byteorder::{ByteOrder, LittleEndian};
-use std::borrow::{Borrow, Cow};
 use std::str::FromStr;
 
-#[derive(Debug, Default, Clone, Copy)]
-pub(super) enum Type {
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum Type {
     #[default]
     Word,
     Byte,
@@ -21,7 +19,7 @@ pub(super) enum Type {
 }
 
 impl FromStr for Type {
-    type Err = Error;
+    type Err = ParserError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use Type::*;
@@ -32,7 +30,7 @@ impl FromStr for Type {
             "align" | "space" => Ok(Align),
             "asciz" | "ascii" | "string" => Ok(Asciz),
             "float" => Ok(Float),
-            _ => Err(Error::UnrecognizedDataType(s.to_owned())),
+            _ => Err(ParserError::UnrecognizedDataType(s.to_owned())),
         }
     }
 }
@@ -44,29 +42,6 @@ pub(super) struct Label {
     pub(super) pos: usize,
     pub(super) dtype: Type,
     pub(super) label: String,
-}
-
-fn store_integer(x: u32, data: &mut Vec<u8>, dtype: Type) {
-    use Type::*;
-    match dtype {
-        Byte => {
-            data.push(x as u8);
-        }
-        Half => {
-            let pos = data.len();
-            data.resize(pos + 2, 0);
-            LittleEndian::write_u16(&mut data[pos..], x as u16);
-        }
-        Word => {
-            let pos = data.len();
-            data.resize(pos + 4, 0);
-            LittleEndian::write_u32(&mut data[pos..], x);
-        }
-        Align => {
-            data.resize(data.len() + x as usize, 0);
-        }
-        _ => unreachable!("store_integer should only be called with an integer dtype"),
-    }
 }
 
 /// Pushes a [Label](struct.Label.html) onto a vector and resizes the data accordingly
@@ -89,89 +64,59 @@ fn push_label(labels: &mut Vec<Label>, data: &mut Vec<u8>, dtype: Type, label: &
     });
 }
 
-fn store_token(
-    s: &str,
-    data: &mut Vec<u8>,
-    found_labels: &mut Vec<Label>,
-    dtype: Type,
-) -> Result<(), Error> {
+// TODO: assert alignment
+fn store_numerical(ctx: &mut ParserContext, token: &Token, value: u32) -> Result<(), ParserError> {
     use Type::*;
-    match dtype {
-        Byte | Half | Word => match immediate(s) {
-            // .word <immediate>
-            Ok((_, x)) => store_integer(x, data, dtype),
-
-            // might be a .word <label>, might be .word <junk>
-            Err(_) => push_label(found_labels, data, dtype, s),
-        },
-        Align => {
-            let (_, x) = immediate(s)?;
-            store_integer(x, data, dtype);
+    match ctx.data_type {
+        Byte => {
+            ctx.data.push(value as u8);
+        }
+        Half => {
+            let pos = ctx.data.len();
+            ctx.data.resize(pos + 2, 0);
+            LittleEndian::write_u16(&mut ctx.data[pos..], value as u16);
+        }
+        Word => {
+            let pos = ctx.data.len();
+            ctx.data.resize(pos + 4, 0);
+            LittleEndian::write_u32(&mut ctx.data[pos..], value);
         }
         Float => {
-            let x = match s.parse::<f32>() {
-                Ok(x) => x,
-                Err(e) => return Err(Error::FloatError(e)),
-            };
-
-            let pos = data.len();
-            data.resize(pos + 4, 0);
-            LittleEndian::write_f32(&mut data[pos..], x);
+            let pos = ctx.data.len();
+            ctx.data.resize(pos + 4, 0);
+            LittleEndian::write_f32(&mut ctx.data[pos..], f32::from_bits(value));
         }
-        Asciz => {
-            data.extend(s.bytes().chain(Some(b'\0')));
+        Align => {
+            ctx.data.resize(ctx.data.len() + value as usize, 0);
+        }
+        _ => {
+            return Err(
+                ParserError::InvalidDataType(token.data.clone(), ctx.data_type)
+                    .with_context(token.ctx.clone()),
+            )
         }
     }
 
     Ok(())
 }
 
-fn directive_to_type(s: &str) -> Result<(&str, Type), Error> {
-    let (i, dir_str) = preceded(the_char('.'), one_arg)(s)?;
-
-    dir_str.parse::<Type>().map(move |dtype| (i, dtype))
-}
-
-fn one_token(dtype: Type) -> impl Fn(&str) -> nom::IResult<&str, Cow<str>> {
-    move |s: &str| {
-        use Type::*;
-        match dtype {
-            Word | Byte | Half | Align | Float => {
-                let (i, parsed) = take_till1(is_separator)(s)?;
-                Ok((i, Cow::from(parsed)))
-            }
-            Asciz => {
-                let (i, parsed) = quoted_string(s)?;
-                Ok((i, Cow::from(parsed)))
+pub fn push_data(token: Token, ctx: &mut ParserContext) -> Result<(), ParserError> {
+    use super::token::Data::*;
+    match token.data {
+        Identifier(_label) => {
+            unimplemented!("This version of FPGRARS does not support labels in .data")
+        }
+        Integer(i) => store_numerical(ctx, &token, i as u32)?,
+        Float(f) => store_numerical(ctx, &token, f.to_bits())?,
+        CharLiteral(c) => store_numerical(ctx, &token, c as u32)?,
+        StringLiteral(s) => {
+            ctx.data.extend(s.as_bytes());
+            ctx.data.push(0);
+            if ctx.data_type == Type::Asciz {
+                ctx.data_type = Type::Byte;
             }
         }
+        _ => unreachable!("push_data should only be called with a data token"),
     }
-}
-
-/// Parses a line in the `.data` directive, puts the desired vales in `data` and
-/// updates the `type` parameter.
-/// If we find something that could be a label, we should store a [Label](struct.Label.html)
-/// so we can calculate the value to put in that position after parsing has been completed.
-pub(super) fn parse_line(
-    s: &str,
-    data: &mut Vec<u8>,
-    found_labels: &mut Vec<Label>,
-    dtype: &mut Type,
-) -> Result<(), Error> {
-    let (s, opt_new_dtype) = match directive_to_type(s) {
-        Ok((rest, new_dtype)) => (rest, Some(new_dtype)),
-        Err(_) => (s, None),
-    };
-
-    if let Some(new_dtype) = opt_new_dtype {
-        *dtype = new_dtype;
-    }
-
-    let (_i, tokens) = separated_list(separator1, one_token(*dtype))(s)?;
-
-    for tok in tokens {
-        store_token(tok.borrow(), data, found_labels, *dtype)?;
-    }
-
     Ok(())
 }

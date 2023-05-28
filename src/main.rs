@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sim_thread = thread::Builder::new()
         .name("FPGRARS Simulator".into())
         .spawn(move || {
-            let mut sim = match sim.load_from_file(file) {
+            let mut sim = match sim.load_from_file(&file) {
                 Ok(x) => x,
                 Err(e) => {
                     eprintln!("An error occurred while parsing your code:\n{:?}", e);

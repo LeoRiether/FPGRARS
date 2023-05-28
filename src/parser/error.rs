@@ -1,6 +1,11 @@
 use std::io;
 use thiserror::Error;
 
+use super::{
+    data,
+    token::{self, Token},
+};
+
 /// Represents any kind of error the parser may find
 #[derive(Debug, Error)]
 pub enum ParserError {
@@ -30,6 +35,31 @@ pub enum ParserError {
 
     #[error("Error while parsing float: {0}")]
     FloatError(std::num::ParseFloatError),
+
+    #[error("Value '{0}' cannot be stored in data type '{1:?}'")]
+    InvalidDataType(token::Data, data::Type),
+
+    #[error("Encountered an error in '{0}' at line {1}, column {2}:\n\n{err}", ctx.file, ctx.line, ctx.column)]
+    WithContext {
+        err: Box<ParserError>,
+        ctx: token::Context,
+    },
+}
+
+pub trait Contextualize {
+    fn with_context(self, ctx: token::Context) -> Self;
+}
+
+impl Contextualize for ParserError {
+    fn with_context(self, ctx: token::Context) -> Self {
+        match self {
+            ParserError::WithContext { err, .. } => ParserError::WithContext { err, ctx },
+            _ => ParserError::WithContext {
+                err: Box::new(self),
+                ctx,
+            },
+        }
+    }
 }
 
 impl<'a> From<nom::Err<(&'a str, nom::error::ErrorKind)>> for ParserError {
@@ -58,4 +88,3 @@ pub enum Error {
     #[error("Error while lexing the program.\n\n{0}")]
     Lexer(#[from] LexerError),
 }
-

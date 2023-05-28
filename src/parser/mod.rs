@@ -3,6 +3,8 @@
 //! We use a lot of mnemonics here, I'll try to link to a cheatsheet here later.
 //!
 
+// TODO: replace unwraps and panics by proper error handling
+
 pub mod combinators;
 mod data;
 pub mod error;
@@ -13,11 +15,15 @@ mod text;
 pub mod token;
 mod util;
 
-use crate::{instruction::{FloatInstruction, Instruction, PreLabelInstruction}, parser::register_names::RegNames};
+use self::{lexer::Lexer, token::Token};
+use crate::{
+    instruction::{FloatInstruction, Instruction},
+    parser::register_names::RegNames,
+};
 use byteorder::{ByteOrder, LittleEndian};
 use error::{Error, ParserError};
 use hashbrown::HashMap;
-pub use preprocessor::*;
+pub use preprocessor::Preprocess;
 pub use util::*;
 
 /// Represents a successful parser result. This is the same format the simulator
@@ -30,138 +36,104 @@ pub struct Parsed {
 pub type ParseResult = Result<Parsed, Error>;
 
 /// The "current" parser directive
-enum Directive {
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum Segment {
+    #[default]
     Text,
     Data,
 }
 
-pub trait RISCVParser {
-    /// Parses an iterator of preprocessed lines and returns the instructions and
-    /// the data it parsed. Remember to preprocess the iterator before calling this,
-    /// as `parse_riscv` does not understand macros and includes.
-    /// ```
-    /// parse::file_lines("riscv.s".to_owned())?
-    ///     .parse_includes()
-    ///     .parse_macros()
-    ///     .parse_riscv(DATA_SIZE)?;
-    /// ```
-    ///
-    /// The `data_segment_size` parameter is the final size of the data segment, in bytes.
-    fn parse_riscv(self, data_segment_size: usize) -> ParseResult;
+type Label = String;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LabelUse {
+    Code(usize),
+    Data(usize, data::Type),
 }
 
-impl<I: Iterator<Item = Result<String, ParserError>>> RISCVParser for I {
-    fn parse_riscv(self, data_segment_size: usize) -> ParseResult {
-        use combinators::*;
+#[derive(Debug, Default)]
+pub struct ParserContext {
+    pub code: Vec<Instruction>,
+    pub data: Vec<u8>,
+    pub data_type: data::Type,
+    pub segment: Segment,
+    pub labels: HashMap<Label, usize>,
+    /// This parser only makes one pass over the tokens. This means that some instructions will
+    /// reference labels which have not yet been defined. When this happens, we store the position
+    /// of the instruction or data in the backlog, so when the label is defined we can go back and
+    /// fill the labels in.
+    pub backlog: HashMap<Label, Vec<LabelUse>>,
+    pub regnames: RegNames,
+}
 
-        let regmaps = RegNames::default();
-        let mut labels = HashMap::<String, usize>::new();
+/// Parses a RISC-V file into a `code` and `data` segments.
+/// The `data_segment_size` parameter is the final size of the data segment, in bytes.
+/// ```
+/// parser::parse("riscv.s", DATA_SIZE)?
+/// ```
+pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
+    let mut tokens = Lexer::new(entry_file).preprocess();
+    let mut ctx = ParserContext::default();
 
-        let mut directive = Directive::Text;
-        let mut code = Vec::new();
-
-        let mut data = Vec::with_capacity(data_segment_size);
-        let mut current_data_type = data::Type::default();
-        let mut data_labels: Vec<data::Label> = Vec::new();
-
-        for line in self {
-            let line = line?;
-
-            let line = match parse_label(&line) {
-                Ok((rest, label)) => {
-                    let label_pos = match directive {
-                        Directive::Text => code.len() * 4,
-                        Directive::Data => data.len(),
-                    };
-                    labels.insert(label.to_owned(), label_pos);
-                    rest
-                }
-                Err(_) => &line,
-            };
-
-            let (line, _) = separator0(line).map_err(ParserError::from)?;
-            if line.is_empty() {
+    use token::Data::*;
+    while let Some(token) = tokens.next() {
+        match token.data {
+            Directive(d) if d == "text" => {
+                ctx.segment = Segment::Text;
                 continue;
             }
-
-            // Identify directives
-            // This accepts stuff like ".textSOMETHING" or ".database", but RARS accepts it too
-            // Gotta be consistent! ¯\_(ツ)_/¯
-            if line.starts_with(".data") {
-                directive = Directive::Data;
-                continue;
-            } else if line.starts_with(".text") {
-                directive = Directive::Text;
+            Directive(d) if d == "data" => {
+                ctx.segment = Segment::Data;
                 continue;
             }
-
-            let res = match directive {
-                Directive::Text => text::parse_line(line, &regmaps, &mut code),
-                Directive::Data => {
-                    data::parse_line(line, &mut data, &mut data_labels, &mut current_data_type)
-                }
-            };
+            _ => {}
         }
 
-        unlabel_data(data_labels, &mut data, &labels)?;
-
-        let code: Result<Vec<Instruction>, Error> = code
-            .into_iter()
-            .map(|i| unlabel_instruction(i, &labels))
-            .collect();
-        let mut code = code?;
-
-        // If the program ever drops off bottom, we make an "exit" ecall and terminate execution
-        code.extend(vec![
-            Instruction::Li(17, 10), // li a7 10
-            Instruction::Ecall,
-        ]);
-
-        data.resize(data_segment_size, 0);
-        Ok(Parsed { code, data })
-    }
-}
-
-/// Transforms a PreLabelInstruction into a normal Instruction by "commiting" the labels
-/// into positions in the code. For example, Jal(0, "Label") maps to Jal(0, labels_trie.get("Label"))
-fn unlabel_instruction(
-    instruction: PreLabelInstruction,
-    labels: &HashMap<String, usize>,
-) -> Result<Instruction, ParserError> {
-    use Instruction::*;
-    use PreLabelInstruction as p;
-
-    macro_rules! unlabel {
-        ($inst:ident, $rd:ident, $label:ident) => {
-            labels
-                .get(&$label)
-                .map(|&pos| $inst($rd, pos))
-                .ok_or(ParserError::LabelNotFound($label))
-        };
-        ($inst:ident, $rs1:ident, $rs2:ident, $label:ident) => {
-            labels
-                .get(&$label)
-                .map(|&pos| $inst($rs1, $rs2, pos))
-                .ok_or(ParserError::LabelNotFound($label))
-        };
+        match ctx.segment {
+            Segment::Text => match token.data {
+                Label(label) => {
+                    ctx.labels.insert(label, ctx.code.len() * 4);
+                }
+                Identifier(id) => text::parse_instruction(&mut tokens, &mut ctx, id)?,
+                _ => panic!(
+                    "Unexpected token: '{}' at {}:{}:{}",
+                    token.data, token.ctx.file, token.ctx.line, token.ctx.column
+                ),
+            },
+            Segment::Data => match token.data {
+                Label(label) => {
+                    ctx.labels.insert(label, ctx.data.len());
+                }
+                Directive(d) if d.parse::<data::Type>().is_ok() => {
+                    ctx.data_type = d.parse().unwrap();
+                }
+                Identifier(_) | CharLiteral(_) | StringLiteral(_) | Integer(_) | Float(_) => {
+                    data::push_data(token, &mut ctx)?
+                }
+                _ => panic!(
+                    "Unexpected token: '{}' at {}:{}:{}",
+                    token.data, token.ctx.file, token.ctx.line, token.ctx.column
+                ),
+            },
+        }
     }
 
-    match instruction {
-        p::Jal(rd, label) => unlabel!(Jal, rd, label),
-        p::Beq(rs1, rs2, label) => unlabel!(Beq, rs1, rs2, label),
-        p::Bne(rs1, rs2, label) => unlabel!(Bne, rs1, rs2, label),
-        p::Bge(rs1, rs2, label) => unlabel!(Bge, rs1, rs2, label),
-        p::Blt(rs1, rs2, label) => unlabel!(Blt, rs1, rs2, label),
-        p::Bltu(rs1, rs2, label) => unlabel!(Bltu, rs1, rs2, label),
-        p::Bgeu(rs1, rs2, label) => unlabel!(Bgeu, rs1, rs2, label),
-
-        p::La(rd, label) => labels
-            .get(&label)
-            .map(|&pos| Li(rd, pos as u32))
-            .ok_or(ParserError::LabelNotFound(label)),
-
-        p::Other(instruction) => Ok(instruction),
+    if !ctx.backlog.is_empty() {
+        panic!("Undefined labels: {:?}", ctx.backlog);
     }
+
+    // If the program ever drops off bottom, we make an "exit" ecall and terminate execution
+    ctx.code.extend(vec![
+        Instruction::Li(17, 10), // li a7 10
+        Instruction::Ecall,
+    ]);
+
+    ctx.data.resize(data_segment_size, 0);
+
+    Ok(Parsed {
+        code: ctx.code,
+        data: ctx.data,
+    })
 }
 
 /// Replaces all positions in the `.data` that had labels with their

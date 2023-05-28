@@ -115,35 +115,3 @@ pub enum Instruction {
     URet,
 }
 
-/// Also giant enum that represents a single RISC-V instruction, but we save
-/// labels as strings because it might not have parsed it yet (for example,
-/// consider a jump instruction that jumps to a label in the next line).
-///
-/// We process the labels stored after the entire file has been parsed.
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) enum PreLabelInstruction {
-    Beq(u8, u8, String),
-    Bne(u8, u8, String),
-    Blt(u8, u8, String),
-    Bge(u8, u8, String),
-    Bltu(u8, u8, String),
-    Bgeu(u8, u8, String),
-    Jal(u8, String),
-
-    /// Gets mapped to an Instruction::Li(rd, position) after unlabeling
-    La(u8, String),
-
-    Other(Instruction),
-}
-
-impl From<Instruction> for PreLabelInstruction {
-    fn from(i: Instruction) -> PreLabelInstruction {
-        PreLabelInstruction::Other(i)
-    }
-}
-
-impl From<FloatInstruction> for PreLabelInstruction {
-    fn from(i: FloatInstruction) -> PreLabelInstruction {
-        PreLabelInstruction::Other(Instruction::Float(i))
-    }
-}

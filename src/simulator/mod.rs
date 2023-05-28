@@ -7,7 +7,7 @@
 
 use std::time;
 
-use crate::parser::{self, Includable, MacroParseable, RISCVParser};
+use crate::parser;
 use crate::renderer::{FRAME_0, FRAME_1, HEIGHT, WIDTH};
 
 mod memory;
@@ -78,19 +78,10 @@ impl Simulator {
         }
     }
 
-    pub fn load_from_file(mut self, path: String) -> Result<Self, parser::error::Error> {
-        // TODO: some of this logic is duplicated from the Includer, try to dedup?
-        let pathbuf = std::path::PathBuf::from(&path);
-        let error = format!("Can't open file: <{:?}>", pathbuf.to_str());
-        let parser::Parsed { code, data } = parser::file_lines(&path)
-            .expect(&error)
-            .parse_includes(pathbuf)
-            .parse_macros()
-            .parse_riscv(DATA_SIZE)?;
-
+    pub fn load_from_file(mut self, path: &str) -> Result<Self, parser::error::Error> {
+        let parser::Parsed { code, data } = parser::parse(path, DATA_SIZE)?;
         self.code = code;
         self.memory.data = data;
-
         Ok(self)
     }
 

@@ -117,7 +117,7 @@ impl Lexer {
     fn next_number(&mut self) -> Token {
         let cursor = self.cursor;
         let mut i = 0;
-        while let Some('0'..='9' | 'x' | 'b' | 'd') = self.peek() {
+        while let Some('-' | '.' | '0'..='9' | 'x' | 'o' | 'a'..='f' | 'A'..='F') = self.peek() {
             self.consume().unwrap();
             i += 1; // Those characters are guaranteed to be ASCII!
         }
@@ -130,15 +130,27 @@ impl Lexer {
             negative = true;
         }
 
-        let res = if let Some(slice) = slice.strip_prefix("0x") {
+        let mut res = if let Some(slice) = slice.strip_prefix("0x") {
             i32::from_str_radix(slice, 16)
         } else if let Some(slice) = slice.strip_prefix("0b") {
             i32::from_str_radix(slice, 2)
+        } else if let Some(slice) = slice.strip_prefix("0o") {
+            i32::from_str_radix(slice, 8)
         } else if let Some(slice) = slice.strip_prefix("0d") {
             slice.parse::<i32>()
         } else {
             slice.parse::<i32>()
         };
+
+        if let Err(_) = res {
+            let fres = slice.parse::<f32>();
+            if let Ok(mut x) = fres {
+                if negative {
+                    x = -x;
+                }
+                return Token::new(Data::Float(x));
+            }
+        }
 
         let mut x = res.unwrap();
         if negative {
@@ -168,7 +180,6 @@ impl Iterator for Lexer {
 
             // comments
             '#' => {
-                self.consume().unwrap();
                 self.consume_comment();
                 self.next()
             }
@@ -200,7 +211,21 @@ impl Iterator for Lexer {
 
             '-' | '0'..='9' => Some(self.next_number().with_ctx(ctx)),
 
-            allowed_identifier!(start) => Some(self.next_identifier().with_ctx(ctx)),
+            allowed_identifier!(start) => {
+                let identifier = self.next_identifier();
+                if let Some(':') = self.peek() {
+                    // label
+                    self.consume().unwrap();
+                    let id = match identifier.data {
+                        Data::Identifier(id) => id,
+                        _ => unreachable!(),
+                    };
+                    Some(Token::new(Data::Label(id)).with_ctx(ctx))
+                } else {
+                    // just an identifier
+                    Some(identifier.with_ctx(ctx))
+                }
+            }
 
             _ => panic!("Unimplemented character: {}", next_char),
         }
@@ -249,8 +274,7 @@ main:
                 Directive("include".into()),
                 StringLiteral("another_file.s".into()),
                 Directive("text".into()),
-                Identifier("main".into()),
-                Char(':'),
+                Label("main".into()),
                 Identifier("li".into()),
                 Identifier("a0".into()),
                 Integer(1),
@@ -310,17 +334,64 @@ DE1(t0, LABEL)
     }
 
     #[test]
-    fn test_corner_cases() {
+    fn test_numbers() {
+        let data = r#"
+            addi sp, sp, -40
+            li a7 0x5F
+            li a7 -0b101
+            li a7 0o777
+            li a7 0d123
+            li a7 0x1a2B3c
+"#;
+        let lexer = Lexer::from_content(String::from(data), "test_macros.s");
+        let tokens = lexer.map(|t| t.data).collect::<Vec<_>>();
+
+        use crate::parser::token::Data::*;
+        assert_eq!(
+            tokens,
+            &[
+                Identifier("addi".into()),
+                Identifier("sp".into()),
+                Identifier("sp".into()),
+                Integer(-40),
+                Identifier("li".into()),
+                Identifier("a7".into()),
+                Integer(0x5F),
+                Identifier("li".into()),
+                Identifier("a7".into()),
+                Integer(-0b101),
+                Identifier("li".into()),
+                Identifier("a7".into()),
+                Integer(0o777),
+                Identifier("li".into()),
+                Identifier("a7".into()),
+                Integer(123),
+                Identifier("li".into()),
+                Identifier("a7".into()),
+                Integer(0x1A2B3C),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_label() {
         let lexer = Lexer::from_content(String::from("LABEL_ONE: nop"), "test_corner.s");
         let tokens = lexer.map(|t| t.data).collect::<Vec<_>>();
         use crate::parser::token::Data::*;
         assert_eq!(
             tokens,
-            &[
-                Identifier("LABEL_ONE".into()),
-                Char(':'),
-                Identifier("nop".into())
-            ]
+            &[Label("LABEL_ONE".into()), Identifier("nop".into())]
+        );
+    }
+
+    #[test]
+    fn test_float() {
+        let lexer = Lexer::from_content(String::from(".float 123.456 -3.1415"), "test_float.s");
+        let tokens = lexer.map(|t| t.data).collect::<Vec<_>>();
+        use crate::parser::token::Data::*;
+        assert_eq!(
+            tokens,
+            &[Directive("float".into()), Float(123.456), Float(-3.1415)]
         );
     }
 }

@@ -1,3 +1,4 @@
+use super::error::ParserError as Error;
 use hashbrown::HashMap;
 
 pub const TIME_INDEX: u8 = 0;
@@ -7,10 +8,9 @@ pub const USTATUS_INDEX: u8 = 3;
 pub const UTVEC_INDEX: u8 = 4;
 pub const UCAUSE_INDEX: u8 = 5;
 
-use super::error::ParserError as Error;
-
 pub type RegMap = HashMap<String, u8>;
 
+#[derive(Debug)]
 pub struct RegNames {
     pub regs: RegMap,
     pub floats: RegMap,
