@@ -16,8 +16,8 @@ mod util;
 use crate::instruction::{FloatInstruction, Instruction, PreLabelInstruction};
 use byteorder::{ByteOrder, LittleEndian};
 use error::{Error, ParserError};
+use hashbrown::HashMap;
 pub use preprocessor::*;
-use radix_trie::Trie;
 use register_names::{self as reg_names, FullRegMap};
 pub use util::*;
 
@@ -56,7 +56,7 @@ impl<I: Iterator<Item = Result<String, ParserError>>> RISCVParser for I {
         use combinators::*;
 
         let regmaps: FullRegMap = (reg_names::regs(), reg_names::floats(), reg_names::status());
-        let mut labels = Trie::<String, usize>::new();
+        let mut labels = HashMap::<String, usize>::new();
 
         let mut directive = Directive::Text;
         let mut code = Vec::new();
@@ -127,7 +127,7 @@ impl<I: Iterator<Item = Result<String, ParserError>>> RISCVParser for I {
 /// into positions in the code. For example, Jal(0, "Label") maps to Jal(0, labels_trie.get("Label"))
 fn unlabel_instruction(
     instruction: PreLabelInstruction,
-    labels: &Trie<String, usize>,
+    labels: &HashMap<String, usize>,
 ) -> Result<Instruction, ParserError> {
     use Instruction::*;
     use PreLabelInstruction as p;
@@ -170,7 +170,7 @@ fn unlabel_instruction(
 fn unlabel_data(
     data_labels: Vec<data::Label>,
     data: &mut [u8],
-    labels: &Trie<String, usize>,
+    labels: &HashMap<String, usize>,
 ) -> Result<(), Error> {
     for dl in data_labels {
         let data::Label { pos, dtype, label } = dl;
