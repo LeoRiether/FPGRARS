@@ -1,6 +1,6 @@
 use crate::parser::error::Contextualize;
 
-use super::error::ParserError;
+use super::error::{Error, ParserError};
 use super::token::Token;
 use super::ParserContext;
 
@@ -19,7 +19,7 @@ pub enum Type {
 }
 
 impl FromStr for Type {
-    type Err = ParserError;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use Type::*;
@@ -30,7 +30,7 @@ impl FromStr for Type {
             "align" | "space" => Ok(Align),
             "asciz" | "ascii" | "string" => Ok(Asciz),
             "float" => Ok(Float),
-            _ => Err(ParserError::UnrecognizedDataType(s.to_owned())),
+            _ => Err(ParserError::UnrecognizedDataType(s.to_owned()).into()),
         }
     }
 }
@@ -65,7 +65,7 @@ fn push_label(labels: &mut Vec<Label>, data: &mut Vec<u8>, dtype: Type, label: &
 }
 
 // TODO: assert alignment
-fn store_numerical(ctx: &mut ParserContext, token: &Token, value: u32) -> Result<(), ParserError> {
+fn store_numerical(ctx: &mut ParserContext, token: &Token, value: u32) -> Result<(), Error> {
     use Type::*;
     match ctx.data_type {
         Byte => {
@@ -100,7 +100,7 @@ fn store_numerical(ctx: &mut ParserContext, token: &Token, value: u32) -> Result
     Ok(())
 }
 
-pub fn push_data(token: Token, ctx: &mut ParserContext) -> Result<(), ParserError> {
+pub fn push_data(token: Token, ctx: &mut ParserContext) -> Result<(), Error> {
     use super::token::Data::*;
     match token.data {
         Identifier(_label) => {

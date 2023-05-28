@@ -1,9 +1,9 @@
-use super::{error::ParserError, token::Token, ParserContext};
+use super::{error::Error, token::Token, ParserContext};
 
 pub fn parse_instruction(
-    tokens: &mut impl Iterator<Item = Token>,
+    tokens: &mut impl Iterator<Item = Result<Token, Error>>,
     ctx: &mut ParserContext,
     id: String,
-) -> Result<(), ParserError> {
+) -> Result<(), Error> {
     Ok(())
 }

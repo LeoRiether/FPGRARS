@@ -77,6 +77,8 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
 
     use token::Data::*;
     while let Some(token) = tokens.next() {
+        let token = token?;
+
         match token.data {
             Directive(d) if d == "text" => {
                 ctx.segment = Segment::Text;

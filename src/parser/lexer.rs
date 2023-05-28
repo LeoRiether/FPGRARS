@@ -385,6 +385,7 @@ DE1(t0, LABEL)
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn test_float() {
         let lexer = Lexer::from_content(String::from(".float 123.456 -3.1415"), "test_float.s");
         let tokens = lexer.map(|t| t.data).collect::<Vec<_>>();
