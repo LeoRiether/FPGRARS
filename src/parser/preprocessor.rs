@@ -1,4 +1,4 @@
-use fnv::FnvHashMap;
+use hashbrown::HashMap;
 
 use std::path::PathBuf;
 
@@ -98,7 +98,7 @@ struct MacroLine {
 }
 
 impl MacroLine {
-    fn from_string(s: &str, arg_names: &FnvHashMap<String, usize>) -> Result<Self, Error> {
+    fn from_string(s: &str, arg_names: &HashMap<String, usize>) -> Result<Self, Error> {
         use nom::bytes::complete::take_till;
         let take_raw = |s| take_till::<_, _, ()>(|c| c == '%')(s).unwrap();
         let take_arg = |s| take_till::<_, _, ()>(|c| is_separator(c) || c == '(' || c == ')')(s).unwrap();
@@ -153,7 +153,7 @@ impl MacroLine {
 /// lines: this is a [Macro](struct.Macro.html)
 struct MacroBuilder {
     /// Maps a argument string to its index in the macro declaration
-    arg_names: FnvHashMap<String, usize>,
+    arg_names: HashMap<String, usize>,
 
     /// Stack of macro lines
     lines: Vec<MacroLine>,
@@ -211,8 +211,8 @@ where
     /// Stack of lines we should process before consuming items
     buf: Vec<String>,
 
-    macros: FnvHashMap<(String, usize), Macro>,
-    eqvs: FnvHashMap<String, String>,
+    macros: HashMap<(String, usize), Macro>,
+    eqvs: HashMap<String, String>,
 }
 
 impl<I: Iterator<Item = String>> MacroParser<I> {
@@ -344,8 +344,8 @@ impl<I: Sized + Iterator<Item = String>> MacroParseable<I> for I {
         MacroParser {
             items: self,
             buf: Vec::new(),
-            macros: FnvHashMap::default(),
-            eqvs: FnvHashMap::default(),
+            macros: HashMap::default(),
+            eqvs: HashMap::default(),
         }
     }
 }

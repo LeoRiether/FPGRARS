@@ -1,4 +1,4 @@
-use fnv::FnvHashMap;
+use hashbrown::HashMap;
 
 pub const TIME_INDEX: u8 = 0;
 pub const MISA_INDEX: u8 = 1;
@@ -9,7 +9,7 @@ pub const UCAUSE_INDEX: u8 = 5;
 
 use super::util::Error;
 
-pub type RegMap = FnvHashMap<String, u8>;
+pub type RegMap = HashMap<String, u8>;
 pub type FullRegMap = (RegMap, RegMap, RegMap);
 
 fn insert_names(map: &mut RegMap, names: &[&'static str]) {

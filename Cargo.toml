@@ -30,10 +30,10 @@ pixel-canvas = "0.2.3"
 glium = "0.31.0"
 nom = "5.1.2"
 radix_trie = "0.2"
-fnv = "1.0"
 byteorder = "1.4"
 midir = "0.9"
 parking_lot = "0.12"
+hashbrown = "0.13.2"
 
 [dependencies.clap]
 version = "4.3"
