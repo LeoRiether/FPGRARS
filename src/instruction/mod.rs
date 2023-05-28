@@ -4,6 +4,7 @@
 /// floating point instructions.
 /// Everything here is single precision, no doubles allowed.
 #[derive(Debug, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum FloatInstruction {
     /// rd, rs1, rs2
     Add(u8, u8, u8),
@@ -35,6 +36,7 @@ pub enum FloatInstruction {
 
 /// Giant enum that represents a single RISC-V instruction and its arguments
 #[derive(Debug, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum Instruction {
     // Type R
     /// rd, rs1, rs2

@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use super::{
     data,
-    token::{self, Token},
+    token,
 };
 
 fn some_or_eof<T: fmt::Display>(s: &Option<T>) -> Cow<'static, str> {
@@ -21,50 +21,16 @@ pub enum ParserError {
     #[error("I/O Error: {0}")]
     IO(#[from] io::Error),
 
-    #[error("Label '{0}' not found")]
-    LabelNotFound(String),
-    #[error("Parser error '{0}': {1:?}")]
-    Nom(String, nom::error::ErrorKind), // I'm feeling lazy
     #[error("Expected a register name, but found '{0}'")]
     RegisterNotFound(String),
-    #[error("The instruction '{0}' is either invalid or not implemented in FPGRARS")]
-    InstructionNotFound(String),
-
-    #[error("Error while parsing macro '{0}'. No corresponding '.end_macro' found.")]
-    UnendedMacro(String),
-
-    #[error("Macro argument '{0}' was not found.")]
-    ArgNotFoundMacro(String),
 
     /// Didn't recognize a type/directive in the `.data` directive
     /// (like `.double` or `.nothing`)
     #[error("Unrecognized data type '{0}'")]
     UnrecognizedDataType(String),
 
-    #[error("Error while parsing float: {0}")]
-    FloatError(std::num::ParseFloatError),
-
     #[error("Value '{0}' cannot be stored in data type '{1:?}'")]
     InvalidDataType(token::Data, data::Type),
-
-    #[error("Encountered an error in '{0}' at line {1}, column {2}:\n\n{err}", ctx.file, ctx.line, ctx.column)]
-    WithContext {
-        err: Box<ParserError>,
-        ctx: token::Context,
-    },
-}
-
-impl<'a> From<nom::Err<(&'a str, nom::error::ErrorKind)>> for ParserError {
-    fn from(err: nom::Err<(&'a str, nom::error::ErrorKind)>) -> Self {
-        use nom::Err as e;
-        match err {
-            e::Incomplete(_) => {
-                unreachable!("nom::Err::Incomplete should only exist in streaming parsers")
-            }
-            e::Error((i, e)) => ParserError::Nom(i.into(), e),
-            e::Failure((i, e)) => ParserError::Nom(i.into(), e),
-        }
-    }
 }
 
 #[derive(Debug, Error)]

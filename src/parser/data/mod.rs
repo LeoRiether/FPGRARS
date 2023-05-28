@@ -35,36 +35,8 @@ impl FromStr for Type {
     }
 }
 
-/// Stores the information of a label we found in the `.data` directive, so we can
-/// later populate the memory with the actual label values
-pub(super) struct Label {
-    /// Position in memory
-    pub(super) pos: usize,
-    pub(super) dtype: Type,
-    pub(super) label: String,
-}
-
-/// Pushes a [Label](struct.Label.html) onto a vector and resizes the data accordingly
-fn push_label(labels: &mut Vec<Label>, data: &mut Vec<u8>, dtype: Type, label: &str) {
-    use Type::*;
-
-    let pos = data.len();
-
-    match dtype {
-        Byte => data.resize(pos + 1, 0),
-        Half => data.resize(pos + 2, 0),
-        Word => data.resize(pos + 4, 0),
-        _ => unreachable!("push_label should only be called with byte, half, or word directive"),
-    }
-
-    labels.push(Label {
-        pos,
-        dtype,
-        label: label.to_owned(),
-    });
-}
-
 // TODO: assert alignment
+/// Stores a numerical token with value `value` in the data vector.
 fn store_numerical(ctx: &mut ParserContext, token: &Token, value: u32) -> Result<(), Error> {
     use Type::*;
     match ctx.data_type {
@@ -100,6 +72,7 @@ fn store_numerical(ctx: &mut ParserContext, token: &Token, value: u32) -> Result
     Ok(())
 }
 
+/// Pushes a data token onto the data vector.
 pub fn push_data(token: Token, ctx: &mut ParserContext) -> Result<(), Error> {
     use super::token::Data::*;
     match token.data {

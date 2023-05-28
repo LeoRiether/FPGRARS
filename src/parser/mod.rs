@@ -12,7 +12,6 @@ mod preprocessor;
 pub mod register_names;
 mod text;
 pub mod token;
-mod util;
 
 use self::lexer::Lexer;
 use crate::{
@@ -23,7 +22,6 @@ use byteorder::{ByteOrder, LittleEndian};
 use error::{Error, ParserError};
 use hashbrown::HashMap;
 pub use preprocessor::Preprocess;
-pub use util::*;
 
 /// Represents a successful parser result. This is the same format the simulator
 /// will use to execute the instructions
@@ -137,31 +135,3 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
     })
 }
 
-/// Replaces all positions in the `.data` that had labels with their
-/// actual values
-fn unlabel_data(
-    data_labels: Vec<data::Label>,
-    data: &mut [u8],
-    labels: &HashMap<String, usize>,
-) -> Result<(), Error> {
-    for dl in data_labels {
-        let data::Label { pos, dtype, label } = dl;
-
-        let value = match labels.get(&label) {
-            Some(x) => *x,
-            None => return Err(ParserError::LabelNotFound(label).into()),
-        };
-
-        use data::Type::*;
-        match dtype {
-            Byte => {
-                data[pos] = value as u8;
-            }
-            Half => LittleEndian::write_u16(&mut data[pos..], value as u16),
-            Word => LittleEndian::write_u32(&mut data[pos..], value as u32),
-            _ => unreachable!("label can only be parsed in .byte, .half or .word"),
-        }
-    }
-
-    Ok(())
-}
