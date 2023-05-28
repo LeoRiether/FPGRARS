@@ -5,7 +5,6 @@
 
 // TODO: replace unwraps and panics by proper error handling
 
-pub mod combinators;
 mod data;
 pub mod error;
 pub mod lexer;
@@ -15,7 +14,7 @@ mod text;
 pub mod token;
 mod util;
 
-use self::{lexer::Lexer, token::Token};
+use self::lexer::Lexer;
 use crate::{
     instruction::{FloatInstruction, Instruction},
     parser::register_names::RegNames,
