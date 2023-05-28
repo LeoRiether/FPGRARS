@@ -68,10 +68,8 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
     fn consume_macro(&mut self, macro_ctx: token::Context) -> Result<(), Error> {
         use super::token::Data::{Char, Directive, Identifier};
 
-        let mut r#macro = Macro::default();
-
         // Read macro name
-        r#macro.name = match self.tokens.next() {
+        let name = match self.tokens.next() {
             Some(Token {
                 data: Identifier(d),
                 ..
@@ -79,6 +77,11 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
 
             None => return Err(PreprocessorError::ExpectedMacroName(None).with_context(macro_ctx)),
             Some(other) => return Err(PreprocessorError::ExpectedMacroName(Some(other.data)).with_context(other.ctx)),
+        };
+
+        let mut r#macro = Macro {
+            name,
+            ..Macro::default()
         };
 
         // Read macro args
@@ -89,7 +92,7 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
             },
         ) = peek
         {
-            self.consume_macro_args(&mut r#macro, token.ctx.clone())?;
+            self.consume_macro_args(&mut r#macro, token.ctx)?;
             peek = None;
         }
 
@@ -104,10 +107,7 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
                     r#macro.body.push(other_token);
                 }
 
-                None => panic!(
-                    "Macro '{0}' was not terminated by .endmacro",
-                    r#macro.body[0].data
-                ),
+                None => return Err(PreprocessorError::UnterminatedMacro(r#macro.name).with_context(macro_ctx)),
             }
         }
     }

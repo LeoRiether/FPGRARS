@@ -130,7 +130,7 @@ impl Lexer {
             negative = true;
         }
 
-        let mut res = if let Some(slice) = slice.strip_prefix("0x") {
+        let res = if let Some(slice) = slice.strip_prefix("0x") {
             i32::from_str_radix(slice, 16)
         } else if let Some(slice) = slice.strip_prefix("0b") {
             i32::from_str_radix(slice, 2)
@@ -142,7 +142,7 @@ impl Lexer {
             slice.parse::<i32>()
         };
 
-        if let Err(_) = res {
+        if res.is_err() {
             let fres = slice.parse::<f32>();
             if let Ok(mut x) = fres {
                 if negative {
