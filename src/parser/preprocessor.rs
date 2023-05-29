@@ -10,6 +10,12 @@ use super::{
     token::{self, Token},
 };
 
+static MACRO_EXAMPLE_TIP: &str =
+    "\x1b[1mHere's an example of a macro using arguments correctly:\x1b[0m
+   .macro Name(%arg1, %arg2)
+       add %arg1, %arg1, %arg2
+   .end_macro";
+
 /// Defines the `preprocess` methods for iterators of tokens.
 /// ```
 /// let tokens = Lexer::new("riscv.s").preprocess();
@@ -77,12 +83,17 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
             }) => s,
 
             other => {
-                let err = if let Some(other) = other {
-                    PreprocessorError::ExpectedStringLiteral(Some(other.data))
-                        .with_context(other.ctx)
+                let found = if let Some(other) = other {
+                    Some(other.data)
                 } else {
-                    PreprocessorError::ExpectedStringLiteral(None).with_context(include_ctx)
+                    None
                 };
+                let err = PreprocessorError::ExpectedStringLiteral(found)
+                    .with_context(include_ctx)
+                    .with_tip(format!(
+                        "The correct usage is {}",
+                        ".include \"filename.s\"".bright_blue()
+                    ));
                 return Err(err);
             }
         };
@@ -143,7 +154,8 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
                                 macro_name: r#macro.name.clone(),
                                 arg: arg.clone(),
                             }
-                            .with_context(token.ctx));
+                            .with_context(token.ctx)
+                            .with_tip(MACRO_EXAMPLE_TIP));
                         }
                     }
 
@@ -151,9 +163,9 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
                 }
 
                 None => {
-                    return Err(
-                        PreprocessorError::UnterminatedMacro(r#macro.name).with_context(macro_ctx)
-                    )
+                    return Err(PreprocessorError::UnterminatedMacro(r#macro.name)
+                        .with_context(macro_ctx)
+                        .with_tip(MACRO_EXAMPLE_TIP))
                 }
             }
         }
@@ -187,7 +199,8 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
                             macro_name: r#macro.name.clone(),
                             arg,
                         }
-                        .with_context(ctx));
+                        .with_context(ctx)
+                        .with_tip(MACRO_EXAMPLE_TIP));
                     }
 
                     entry.or_insert(index);
@@ -202,7 +215,7 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
                 Some(other) => {
                     let mut err = PreprocessorError::UnexpectedToken(Some(other.data.clone()))
                         .with_context(other.ctx)
-                        .with_tip(format!("{}:\n   .macro MyMacro(%arg1, %arg2)\n       mv %arg1, %arg2\n   .end_macro", "Here's an example of a valid macro".bold()));
+                        .with_tip(MACRO_EXAMPLE_TIP);
 
                     if let Identifier(id) = &other.data {
                         err = err.with_tip(format!(

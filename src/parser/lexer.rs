@@ -162,12 +162,13 @@ impl Iterator for Lexer {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let ctx = self.context.clone();
-
         let next_char = match self.peek() {
             None => return None,
             Some(c) => c,
         };
+
+        let mut ctx = self.context.clone();
+        ctx.advance_char(next_char);
 
         match next_char {
             // whitespace

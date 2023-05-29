@@ -94,7 +94,15 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
                     ctx.labels.insert(label, ctx.code.len() * 4);
                 }
                 Identifier(id) => text::parse_instruction(&mut tokens, &mut ctx, id)?,
-                _ => return Err(ParserError::UnexpectedToken(Some(token.data)).with_context(token.ctx)),
+
+                Directive(d) => {
+                    return Err(ParserError::UnknownDirective(d).with_context(token.ctx))
+                }
+                _ => {
+                    return Err(
+                        ParserError::UnexpectedToken(Some(token.data)).with_context(token.ctx)
+                    )
+                }
             },
             Segment::Data => match token.data {
                 Label(label) => {
@@ -106,7 +114,15 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
                 Identifier(_) | CharLiteral(_) | StringLiteral(_) | Integer(_) | Float(_) => {
                     data::push_data(token, &mut ctx)?
                 }
-                _ => return Err(ParserError::UnexpectedToken(Some(token.data)).with_context(token.ctx)),
+
+                Directive(d) => {
+                    return Err(ParserError::UnknownDirective(d).with_context(token.ctx))
+                }
+                _ => {
+                    return Err(
+                        ParserError::UnexpectedToken(Some(token.data)).with_context(token.ctx)
+                    )
+                }
             },
         }
     }
