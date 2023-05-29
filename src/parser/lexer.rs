@@ -3,6 +3,7 @@
 use super::error::{Error, LexerError};
 use super::token::{Context, ContextualizeResult, Data, Token};
 use std::fs;
+use std::rc::Rc;
 
 macro_rules! allowed_identifier {
     () => {
@@ -57,6 +58,10 @@ impl Lexer {
             cursor: 0,
             context: Context::new(filename),
         }
+    }
+
+    pub fn file(&self) -> Rc<String> {
+        self.context.file.clone()
     }
 
     pub fn peek(&self) -> Option<char> {

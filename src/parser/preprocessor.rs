@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, path::Path};
 
 use crate::{inner_bail, parser::error::Contextualize};
 use hashbrown::HashMap;
@@ -6,6 +6,7 @@ use owo_colors::OwoColorize;
 
 use super::{
     error::{Error, PreprocessorError},
+    lexer::Lexer,
     token::{self, Token},
 };
 
@@ -15,16 +16,16 @@ static MACRO_EXAMPLE_TIP: &str =
        add %arg1, %arg1, %arg2
    .end_macro";
 
-/// Defines the `preprocess` methods for iterators of tokens.
+/// Defines the `preprocess` methods for a lexer
 /// ```
 /// let tokens = Lexer::new("riscv.s").preprocess();
 /// ```
-pub trait Preprocess<TI: Iterator<Item = Result<Token, Error>>> {
-    fn preprocess(self) -> Preprocessor<TI>;
+pub trait Preprocess {
+    fn preprocess(self) -> Preprocessor;
 }
 
-impl<TI: Iterator<Item = Result<Token, Error>>> Preprocess<TI> for TI {
-    fn preprocess(self) -> Preprocessor<TI> {
+impl Preprocess for Lexer {
+    fn preprocess(self) -> Preprocessor {
         Preprocessor::new(self)
     }
 }
@@ -38,20 +39,35 @@ struct Macro {
 
 /// A preprocessor for RISC-V assembly files that supports includes, macros and equs.
 /// Generally constructed by calling the [`Preprocess::preprocess`] method.
-pub struct Preprocessor<TI: Iterator<Item = Result<Token, Error>>> {
-    tokens: TI,
+pub struct Preprocessor {
+    /// Stack of lexers. When we find an `.include` directive, we push a new lexer onto the stack.
+    lexers: Vec<Lexer>,
     buffer: VecDeque<Token>,
     macros: HashMap<String, Macro>,
     equs: HashMap<String, Token>,
 }
 
-impl<TI: Iterator<Item = Result<Token, Error>>> Preprocessor<TI> {
-    pub fn new(tokens: TI) -> Self {
+impl Preprocessor {
+    pub fn new(tokens: Lexer) -> Self {
         Self {
-            tokens,
+            lexers: vec![tokens],
             buffer: VecDeque::new(),
             macros: HashMap::new(),
             equs: HashMap::new(),
+        }
+    }
+
+    pub fn next_token(&mut self) -> Option<Result<Token, Error>> {
+        if let Some(token) = self.buffer.pop_front() {
+            return Some(Ok(token));
+        }
+
+        loop {
+            let lexer = self.lexers.last_mut()?;
+            if let Some(token) = lexer.next() {
+                return Some(token);
+            }
+            self.lexers.pop();
         }
     }
 
@@ -77,7 +93,7 @@ impl<TI: Iterator<Item = Result<Token, Error>>> Preprocessor<TI> {
     fn consume_include(&mut self, include_ctx: token::Context) -> Result<(), Error> {
         use super::token::Data::StringLiteral;
 
-        let filename = match inner_bail!(self.tokens.next()).map(|t| t.data) {
+        let include_path = match inner_bail!(self.next_token()).map(|t| t.data) {
             Some(StringLiteral(s)) => s,
 
             other => {
@@ -91,6 +107,17 @@ impl<TI: Iterator<Item = Result<Token, Error>>> Preprocessor<TI> {
             }
         };
 
+        let path = Path::new(self.lexers.last().unwrap().file().as_str())
+            .parent()
+            .unwrap()
+            .join(include_path);
+        let path = path
+            .as_os_str()
+            .to_str()
+            .unwrap_or_else(|| panic!("Path is not valid UTF-8: {}", path.display().bright_red()));
+
+        let lexer = Lexer::new(path);
+        self.lexers.push(lexer);
         Ok(())
     }
 
@@ -99,7 +126,7 @@ impl<TI: Iterator<Item = Result<Token, Error>>> Preprocessor<TI> {
         use super::token::Data::{Char, Directive, Identifier, MacroArg};
 
         // Read macro name
-        let token = inner_bail!(self.tokens.next());
+        let token = inner_bail!(self.next_token());
         let name = match token.as_ref().map(|t| &t.data) {
             Some(Identifier(d)) => d,
 
@@ -117,7 +144,7 @@ impl<TI: Iterator<Item = Result<Token, Error>>> Preprocessor<TI> {
         };
 
         // Read macro args
-        let mut peek = inner_bail!(self.tokens.next());
+        let mut peek = inner_bail!(self.next_token());
         if let Some(
             token @ Token {
                 data: Char('('), ..
@@ -132,7 +159,7 @@ impl<TI: Iterator<Item = Result<Token, Error>>> Preprocessor<TI> {
         loop {
             let token = match peek.take() {
                 Some(token) => Some(token),
-                None => inner_bail!(self.tokens.next()),
+                None => inner_bail!(self.next_token()),
             };
 
             match token {
@@ -176,7 +203,7 @@ impl<TI: Iterator<Item = Result<Token, Error>>> Preprocessor<TI> {
     ) -> Result<(), Error> {
         use super::token::Data::{Char, Identifier, MacroArg};
         loop {
-            match inner_bail!(self.tokens.next()) {
+            match inner_bail!(self.next_token()) {
                 Some(Token {
                     data: Char(')'), ..
                 }) => break Ok(()),
@@ -229,7 +256,7 @@ impl<TI: Iterator<Item = Result<Token, Error>>> Preprocessor<TI> {
     fn consume_equ(&mut self, ctx: token::Context) -> Result<(), Error> {
         use token::Data::Identifier;
 
-        let (name, value) = (self.tokens.next(), self.tokens.next());
+        let (name, value) = (self.next_token(), self.next_token());
         let name = inner_bail!(name).map(|t| t.data);
         let value = inner_bail!(value);
 
@@ -248,17 +275,11 @@ impl<TI: Iterator<Item = Result<Token, Error>>> Preprocessor<TI> {
     }
 }
 
-impl<TI: Iterator<Item = Result<Token, Error>>> Iterator for Preprocessor<TI> {
+impl Iterator for Preprocessor {
     type Item = Result<Token, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let token = self
-            .buffer
-            .pop_front()
-            .map(Ok)
-            .or_else(|| self.tokens.next());
-
-        let token = match token? {
+        let token = match self.next_token()? {
             Ok(t) => t,
             Err(e) => return Some(Err(e)),
         };
