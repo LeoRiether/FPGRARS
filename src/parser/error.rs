@@ -27,6 +27,18 @@ pub enum ParserError {
     #[error("Unknown directive '{}{}'", ".".bright_yellow(), .0.bright_yellow())]
     UnknownDirective(String),
 
+    #[error("Unknown instruction '{}'", .0.bright_yellow())]
+    UnknownInstruction(String),
+
+    #[error("Expected a register name, but found '{}'", some_or_eof(.0).bright_yellow())]
+    ExpectedRegister(Option<String>),
+
+    #[error("Expected an immediate value, but found '{}'", some_or_eof(.0).bright_yellow())]
+    ExpectedImmediate(Option<String>),
+
+    #[error("Expected the token '{}', but found '{}' instead.", .0.bright_blue(), some_or_eof(.1).bright_yellow())]
+    ExpectedToken(token::Data, Option<token::Data>),
+
     #[error("Did not expect token '{}' here.", some_or_eof(.0).bright_yellow())]
     UnexpectedToken(Option<token::Data>),
 }

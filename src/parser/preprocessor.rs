@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::parser::error::Contextualize;
+use crate::{inner_bail, parser::error::Contextualize};
 use hashbrown::HashMap;
 use owo_colors::OwoColorize;
 
@@ -14,17 +14,6 @@ static MACRO_EXAMPLE_TIP: &str =
    .macro Name(%arg1, %arg2)
        add %arg1, %arg1, %arg2
    .end_macro";
-
-/// Question mark operator for Option<Result<T, E>>
-macro_rules! inner_bail {
-    ($e:expr) => {
-        match $e {
-            None => None,
-            Some(Ok(x)) => Some(x),
-            Some(Err(e)) => return Err(e.into()),
-        }
-    };
-}
 
 /// Defines the `preprocess` methods for iterators of tokens.
 /// ```

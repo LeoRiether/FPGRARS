@@ -57,6 +57,7 @@ pub enum Instruction {
 
     // Type I
     Ecall,
+    Ebreak,
     /// rd, imm, rs1
     Lb(u8, u32, u8),
     Lh(u8, u32, u8),
@@ -80,7 +81,7 @@ pub enum Instruction {
     Sh(u8, u32, u8),
     Sw(u8, u32, u8),
 
-    // Type SB + jumps
+    // Type B + jumps
     /// rs1, rs2, label
     Beq(u8, u8, usize),
     Bne(u8, u8, usize),

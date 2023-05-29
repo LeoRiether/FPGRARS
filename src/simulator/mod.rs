@@ -161,6 +161,7 @@ impl Simulator {
                         Nothing => {}
                     }
                 }
+                Ebreak => unimplemented!("ebreak has not yet been implemented in FPGRARS!"),
                 Addi(rd, rs1, imm) => set! { rd = get!(rs1 i32) + (imm as i32) },
                 Slli(rd, rs1, imm) => set! { rd = get!(rs1 u32) << (imm & 0x1f) },
                 Slti(rd, rs1, imm) => set! { rd = from_bool(get!(rs1 i32) < (imm as i32)) },

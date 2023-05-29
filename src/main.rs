@@ -19,6 +19,7 @@ mod parser;
 mod renderer;
 mod simulator;
 pub mod utf8_lossy_lines;
+pub mod util;
 
 use std::error::Error;
 use std::thread;

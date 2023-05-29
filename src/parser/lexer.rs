@@ -121,8 +121,8 @@ impl Lexer {
     }
 
     fn next_char_literal(&mut self) -> Result<Token, Error> {
-        let mut c = self.consume().unwrap();
         expect!(Some('\'') = self.consume());
+        let mut c = self.consume().unwrap();
         if c == '\\' {
             c = self.next_escape_sequence();
         }
@@ -422,6 +422,25 @@ DE1(t0, LABEL)
                 Identifier("main$loop".into()),
                 Identifier("main@loop".into()),
                 Identifier("@global".into()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_char_literal() {
+        let input = ".string 'H' 'e' 'l' 'l' 'o'";
+        let lexer = Lexer::from_content(String::from(input), "chars.s");
+        let tokens = lexer.map(|t| t.unwrap().data).collect::<Vec<_>>();
+        use crate::parser::token::Data::*;
+        assert_eq!(
+            tokens,
+            &[
+                Directive("string".into()),
+                CharLiteral('H'),
+                CharLiteral('e'),
+                CharLiteral('l'),
+                CharLiteral('l'),
+                CharLiteral('o'),
             ]
         );
     }
