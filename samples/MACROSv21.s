@@ -198,9 +198,9 @@ div10.pula2:	csrw	%rd,uscratch
 .eqv MusicAddress       0xFF200188
 
 
-.eqv IrDA_CTRL 		0xFF20 0500	
-.eqv IrDA_RX 		0xFF20 0504
-.eqv IrDA_TX		0xFF20 0508
+.eqv IrDA_CTRL 		0xFF200500	
+.eqv IrDA_RX 		0xFF200504
+.eqv IrDA_TX		0xFF200508
 
 .eqv STOPWATCH		0xFF200510
 
