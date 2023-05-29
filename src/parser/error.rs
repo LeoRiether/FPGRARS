@@ -1,7 +1,7 @@
 use core::fmt;
 use std::{borrow::Cow, io};
 use thiserror::Error;
-
+use owo_colors::OwoColorize;
 use super::{data, token};
 
 fn some_or_eof<T: fmt::Display>(s: &Option<T>) -> Cow<'static, str> {
@@ -28,6 +28,9 @@ pub enum ParserError {
 
     #[error("Value '{0}' cannot be stored in data type '{1:?}'")]
     InvalidDataType(token::Data, data::Type),
+
+    #[error("Did not expect token '{}' here.", some_or_eof(.0).bright_yellow())]
+    UnexpectedToken(Option<token::Data>),
 }
 
 #[derive(Debug, Error)]
@@ -53,7 +56,7 @@ pub enum PreprocessorError {
     #[error("The argument '{arg}' in macro '{macro_name}' was used in the macro body, but not defined.\n\nHere's an example of a macro using arguments correctly:\n.macro Name(%arg1, %arg2)\n  add %arg1, %arg1, %arg2\n.end_macro")]
     UndefinedMacroArg { macro_name: String, arg: String },
 
-    #[error("Did not expect token '{}' here.", some_or_eof(.0))]
+    #[error("Did not expect token '{}' here.", some_or_eof(.0).bright_yellow())]
     UnexpectedToken(Option<token::Data>),
 }
 
@@ -65,12 +68,12 @@ pub enum Error {
     Lexer(#[from] LexerError),
     #[error("{0}")]
     Preprocessor(#[from] PreprocessorError),
-    #[error("{err}")]
+    #[error("{}\n{}", err.bold(), ctx)]
     WithContext {
         err: Box<Error>,
         ctx: token::Context,
     },
-    #[error("{err}")]
+    #[error("{err}\n   {}: {tip}\n", "[tip]".bright_yellow())]
     WithTip {
         err: Box<Error>,
         tip: Cow<'static, str>,

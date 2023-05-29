@@ -22,6 +22,8 @@ mod simulator;
 use std::error::Error;
 use std::thread;
 
+use owo_colors::OwoColorize;
+
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = args::get_args();
     let file = std::mem::take(&mut args.file);
@@ -35,14 +37,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut sim = match sim.load_from_file(&file) {
                 Ok(x) => x,
                 Err(e) => {
-                    eprintln!("An error occurred while parsing your code:\n{:?}", e);
-                    std::process::exit(0);
+                    eprintln!("   {}: {}\n", "[error]".bright_red().bold(), e);
+                    std::process::exit(1);
                 }
             };
 
             let start_time = std::time::Instant::now();
             sim.run();
-            println!("Finished in {}ms", start_time.elapsed().as_millis());
+            eprintln!("Finished in {}ms", start_time.elapsed().as_millis());
             std::process::exit(0);
         })?;
 

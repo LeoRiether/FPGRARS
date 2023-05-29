@@ -16,7 +16,7 @@ pub mod token;
 use self::lexer::Lexer;
 use crate::{
     instruction::{FloatInstruction, Instruction},
-    parser::register_names::RegNames,
+    parser::{error::Contextualize, register_names::RegNames},
 };
 use byteorder::{ByteOrder, LittleEndian};
 use error::{Error, ParserError};
@@ -94,10 +94,7 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
                     ctx.labels.insert(label, ctx.code.len() * 4);
                 }
                 Identifier(id) => text::parse_instruction(&mut tokens, &mut ctx, id)?,
-                _ => panic!(
-                    "Unexpected token: '{}' at {}:{}:{}",
-                    token.data, token.ctx.file, token.ctx.line, token.ctx.column
-                ),
+                _ => return Err(ParserError::UnexpectedToken(Some(token.data)).with_context(token.ctx)),
             },
             Segment::Data => match token.data {
                 Label(label) => {
@@ -109,10 +106,7 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
                 Identifier(_) | CharLiteral(_) | StringLiteral(_) | Integer(_) | Float(_) => {
                     data::push_data(token, &mut ctx)?
                 }
-                _ => panic!(
-                    "Unexpected token: '{}' at {}:{}:{}",
-                    token.data, token.ctx.file, token.ctx.line, token.ctx.column
-                ),
+                _ => return Err(ParserError::UnexpectedToken(Some(token.data)).with_context(token.ctx)),
             },
         }
     }

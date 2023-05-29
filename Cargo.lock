@@ -491,6 +491,7 @@ dependencies = [
  "lazy_static",
  "midir",
  "nom 5.1.3",
+ "owo-colors",
  "parking_lot 0.12.1",
  "pixel-canvas",
  "rand",
@@ -1001,6 +1002,12 @@ checksum = "88cfece6e95d2e717e0872a7f53a8684712ad13822a7979bc760b9c77ec0013b"
 dependencies = [
  "shared_library",
 ]
+
+[[package]]
+name = "owo-colors"
+version = "3.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1b04fb49957986fdce4d6ee7a65027d55d4b6d2265e5848bbb507b58ccfdb6f"
 
 [[package]]
 name = "parking_lot"

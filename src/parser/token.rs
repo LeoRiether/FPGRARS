@@ -1,4 +1,5 @@
-use std::{fmt, rc::Rc};
+use owo_colors::OwoColorize;
+use std::{fmt, fs::File, io::{self, BufReader, BufRead}, rc::Rc};
 
 #[derive(Debug, Clone, PartialEq)]
 /// Token data
@@ -79,6 +80,43 @@ impl Context {
         } else {
             self.column += 1;
         }
+    }
+}
+
+impl fmt::Display for Context {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "   {} {} at line {}, column {}",
+            "-->".bright_blue().bold(),
+            self.file.bright_yellow(),
+            self.line.bright_yellow(),
+            self.column.bright_yellow(),
+        )?;
+
+        let file = File::open(&*self.file);
+        if let Err(e) = file {
+            return writeln!(
+                f, 
+                "   While we were printing this error another error ocurred!\n   Couldn't open '{}' because: {}",
+                self.file.bright_yellow(), e.bold()
+            );
+        }
+
+        let reader = BufReader::new(file.unwrap());
+        let from = self.line.saturating_sub(2) as usize;
+        for (line, i) in reader.lines().skip(from).take(3).zip(from+1..) {
+            let line = line.unwrap();
+            writeln!(f, "{:3} {} {}", i.bright_blue(), "|".bright_blue(), line)?;
+
+            // BUG: this breaks for files over 999 lines ¯\_(ツ)_/¯
+            if i == self.line as usize {
+                (0..self.column + 6).for_each(|_| write!(f, "{}", ".".bright_red()).unwrap());
+                writeln!(f, "{}", "^ Here".bright_red())?;
+            }
+        }
+
+        Ok(())
     }
 }
 

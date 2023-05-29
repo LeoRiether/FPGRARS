@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use hashbrown::HashMap;
+use owo_colors::OwoColorize;
 
 use crate::parser::error::Contextualize;
 
@@ -86,7 +87,7 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
             }
         };
 
-        eprintln!("> including <{}>", filename);
+        // TODO: actually include files here
 
         Ok(())
     }
@@ -167,18 +168,12 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
         r#macro: &mut Macro,
         args_start_ctx: token::Context,
     ) -> Result<(), Error> {
-        use super::token::Data::{Char, MacroArg};
+        use super::token::Data::{Char, Identifier, MacroArg};
         loop {
             match self.tokens.next() {
                 Some(Token {
                     data: Char(')'), ..
                 }) => break Ok(()),
-
-                None => {
-                    return Err(PreprocessorError::UnexpectedToken(None)
-                        .with_context(args_start_ctx)
-                        .with_tip("Did you forget to close the macro arguments with ')'?"))
-                }
 
                 Some(Token {
                     data: MacroArg(arg),
@@ -198,10 +193,26 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
                     entry.or_insert(index);
                 }
 
+                None => {
+                    return Err(PreprocessorError::UnexpectedToken(None)
+                        .with_context(args_start_ctx)
+                        .with_tip("Did you forget to close the macro arguments with ')'?"))
+                }
+
                 Some(other) => {
-                    return Err(PreprocessorError::UnexpectedToken(Some(other.data))
+                    let mut err = PreprocessorError::UnexpectedToken(Some(other.data.clone()))
                         .with_context(other.ctx)
-                        .with_tip("Here's an example of a valid macro:\n\n.macro MyMacro(%arg1, %arg2)\n  mv %arg1, %arg2\n.end_macro"))
+                        .with_tip(format!("{}:\n   .macro MyMacro(%arg1, %arg2)\n       mv %arg1, %arg2\n   .end_macro", "Here's an example of a valid macro".bold()));
+
+                    if let Identifier(id) = &other.data {
+                        err = err.with_tip(format!(
+                            "Maybe you forgot to put a {0} before the argument name? e.g. '{0}{1}'",
+                            "%".bright_yellow(),
+                            id.bright_yellow()
+                        ));
+                    }
+
+                    return Err(err);
                 }
             }
         }

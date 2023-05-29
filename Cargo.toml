@@ -34,6 +34,7 @@ midir = "0.9"
 parking_lot = "0.12"
 hashbrown = "0.13.2"
 thiserror = "1.0.40"
+owo-colors = "3.5.0"
 
 [dependencies.clap]
 version = "4.3"
