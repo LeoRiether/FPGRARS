@@ -42,10 +42,10 @@ pub enum Segment {
 
 type Label = String;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LabelUse {
-    Code(usize),
-    Data(usize, data::Type),
+    Code(usize, token::Context),
+    Data(usize, data::Type, token::Context),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,13 +70,13 @@ pub struct ParserContext {
 }
 
 impl ParserContext {
-    pub fn use_label(&mut self, label: &str, use_type: LabelUseType) -> u32 {
+    pub fn use_label(&mut self, label: &str, use_type: LabelUseType, ctx: token::Context) -> u32 {
         match self.labels.get(label) {
             Some(&pos) => pos as u32,
             None => {
                 let entry = match use_type {
-                    LabelUseType::Code => LabelUse::Code(self.code.len()),
-                    LabelUseType::Data => LabelUse::Data(self.data.len(), self.data_type),
+                    LabelUseType::Code => LabelUse::Code(self.code.len(), ctx),
+                    LabelUseType::Data => LabelUse::Data(self.data.len(), self.data_type, ctx),
                 };
                 self.backlog
                     .entry(label.to_string())
@@ -156,8 +156,21 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
         }
     }
 
+    // Check for undefined labels used
     if !ctx.backlog.is_empty() {
-        panic!("Undefined labels: {:?}", ctx.backlog);
+        let mut ctxs: Vec<token::Context> = ctx
+            .backlog
+            .iter()
+            .flat_map(|(_label, uses)| {
+                // extract contexts
+                uses.iter().map(|u| match u {
+                    LabelUse::Code(_, c) => c.clone(),
+                    LabelUse::Data(_, _, c) => c.clone(),
+                })
+            })
+            .collect();
+        ctxs.sort();
+        return Err(ParserError::UndefinedLabels(ctxs).into());
     }
 
     // If the program ever drops off bottom, we make an "exit" ecall and terminate execution

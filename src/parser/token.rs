@@ -52,7 +52,7 @@ impl fmt::Display for Data {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 /// Token context, including the current filename, line and column
 pub struct Context {
     pub file: Rc<String>,
@@ -113,14 +113,21 @@ impl fmt::Display for Context {
             let line = line.unwrap();
             writeln!(f, "{:^4}{} {}", i.bright_blue(), "|".bright_blue(), line)?;
 
-            // BUG: this breaks for files over 999 lines ¯\_(ツ)_/¯
+            // BUG: this breaks for files over 9999 lines ¯\_(ツ)_/¯
             if i == self.line as usize {
-                (0..self.column + 5).for_each(|_| write!(f, "{}", ".".bright_red()).unwrap());
+                (0..self.column + 4).for_each(|_| write!(f, "{}", ".".bright_red()).unwrap());
                 writeln!(f, "{}", "^ Here".bright_red())?;
             }
         }
 
         Ok(())
+    }
+}
+
+pub struct ManyContexts<'a>(pub &'a Vec<Context>);
+impl<'a> fmt::Display for ManyContexts<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|ctx| writeln!(f, "{}", ctx))
     }
 }
 

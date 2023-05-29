@@ -1,4 +1,4 @@
-use super::{data, token};
+use super::{data, token::{self, ManyContexts}, LabelUse};
 use core::fmt;
 use owo_colors::OwoColorize;
 use std::{borrow::Cow, io};
@@ -33,6 +33,9 @@ pub enum ParserError {
     #[error("Expected a register name, but found '{}'", some_or_eof(.0).bright_yellow())]
     ExpectedRegister(Option<String>),
 
+    #[error("Expected a status register name (like `{}` or `{}`), but found '{}'", "time".bright_blue(), "ustatus".bright_blue(), some_or_eof(.0).bright_yellow())]
+    ExpectedStatusRegister(Option<String>),
+
     #[error("Expected an immediate value, but found '{}'", some_or_eof(.0).bright_yellow())]
     ExpectedImmediate(Option<String>),
 
@@ -41,6 +44,9 @@ pub enum ParserError {
 
     #[error("Did not expect token '{}' here.", some_or_eof(.0).bright_yellow())]
     UnexpectedToken(Option<token::Data>),
+
+    #[error("You have used labels without defining them:\n{}", ManyContexts(.0))]
+    UndefinedLabels(Vec<token::Context>),
 }
 
 #[derive(Debug, Error)]

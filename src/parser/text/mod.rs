@@ -32,7 +32,8 @@ pub fn parse_instruction(
     let found = ipc.parse_type_r()?
         || ipc.parse_type_i()?
         || ipc.parse_type_s()?
-        || ipc.parse_type_b_and_jumps()?;
+        || ipc.parse_type_b_and_jumps()?
+        || ipc.parse_csr()?;
     if !found {
         let err = ParserError::UnknownInstruction(instruction).with_context(instr_ctx);
         return Err(err);
@@ -81,6 +82,24 @@ where
         }
     }
 
+    fn status_register(&mut self) -> Result<u8, Error> {
+        let token = inner_bail!(self.tokens.next());
+        let status = &self.parser.regnames.status;
+
+        use token::Data::Identifier;
+        match token.as_ref().map(|t| &t.data) {
+            Some(Identifier(id)) if status.contains_key(id) => Ok(status[id]),
+
+            None => {
+                Err(ParserError::ExpectedStatusRegister(None).with_context(self.instr_ctx.clone()))
+            }
+            Some(other) => {
+                let ctx = token.as_ref().unwrap().ctx.clone();
+                Err(ParserError::ExpectedStatusRegister(Some(other.to_string())).with_context(ctx))
+            }
+        }
+    }
+
     fn immediate(&mut self) -> Result<u32, Error> {
         let token = inner_bail!(self.tokens.next());
         self.immediate_from(token)
@@ -91,7 +110,8 @@ where
         match token.as_ref().map(|t| (&t.data, t.data.extract_u32())) {
             Some((Identifier(label), _)) => {
                 // The immediate is a label
-                let x = self.parser.use_label(&label, LabelUseType::Code);
+                let ctx = token.as_ref().unwrap().ctx.clone();
+                let x = self.parser.use_label(label, LabelUseType::Code, ctx);
                 Ok(x)
             }
 
@@ -308,6 +328,44 @@ where
             "jr" => Jalr(reg!(), 0, 0),
             "call" => Jal(1, imm!() as usize),
             "j" | "tail" | "b" => Jal(0, imm!() as usize),
+            _ => return Ok(false),
+        };
+
+        self.parser.code.push(instr);
+        Ok(true)
+    }
+
+    fn parse_csr(&mut self) -> Result<bool, Error> {
+        use super::Instruction::*;
+
+        #[rustfmt::skip]
+        macro_rules! reg { () => { self.register()? }; }
+        #[rustfmt::skip]
+        macro_rules! fcsr { () => { self.status_register()? }; }
+        #[rustfmt::skip]
+        macro_rules! imm { () => { self.immediate()? }; }
+
+        macro_rules! csr_small {
+            ($inst:expr) => {{
+                let (rs1, fcsr) = (reg!(), fcsr!());
+                $inst(0, fcsr, rs1)
+            }};
+        }
+
+        let instr = match self.instr {
+            "csrw" => csr_small!(CsrRw),
+            "csrc" => csr_small!(CsrRc),
+            "csrs" => csr_small!(CsrRs),
+            "csrwi" => CsrRwi(0, fcsr!(), imm!()),
+            "csrci" => CsrRci(0, fcsr!(), imm!()),
+            "csrsi" => CsrRsi(0, fcsr!(), imm!()),
+            "csrrs" => CsrRs(reg!(), fcsr!(), reg!()),
+            "csrrw" => CsrRw(reg!(), fcsr!(), reg!()),
+            "csrrc" => CsrRc(reg!(), fcsr!(), reg!()),
+            "csrrsi" => CsrRsi(reg!(), fcsr!(), imm!()),
+            "csrrwi" => CsrRwi(reg!(), fcsr!(), imm!()),
+            "csrrci" => CsrRci(reg!(), fcsr!(), imm!()),
+            "csrr" => CsrRs(reg!(), fcsr!(), 0),
             _ => return Ok(false),
         };
 
