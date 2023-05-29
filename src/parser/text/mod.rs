@@ -3,7 +3,7 @@ use super::{
     token::{self, Token},
     ParserContext,
 };
-use crate::{inner_bail, parser::LabelUseType};
+use crate::{inner_bail, instruction::Instruction, parser::LabelUseType};
 use lazy_static::lazy_static;
 use owo_colors::OwoColorize;
 
@@ -83,7 +83,10 @@ where
 
     fn immediate(&mut self) -> Result<u32, Error> {
         let token = inner_bail!(self.tokens.next());
+        self.immediate_from(token)
+    }
 
+    fn immediate_from(&mut self, token: Option<Token>) -> Result<u32, Error> {
         use token::Data::Identifier;
         match token.as_ref().map(|t| (&t.data, t.data.extract_u32())) {
             Some((Identifier(label), _)) => {
@@ -121,6 +124,34 @@ where
             Some(other) => {
                 let ctx = token.as_ref().unwrap().ctx.clone();
                 Err(ParserError::ExpectedToken(data, Some(other.clone())).with_context(ctx))
+            }
+        }
+    }
+
+    /// The arguments for a jal can be either `jal label` or `jal rd, label`. This method parses
+    /// these arguments
+    fn jal_hack(&mut self) -> Result<Instruction, Error> {
+        use token::Data::Identifier;
+        let regs = &self.parser.regnames.regs;
+        let token = inner_bail!(self.tokens.next());
+
+        match token.as_ref().map(|t| &t.data) {
+            Some(Identifier(id)) if regs.contains_key(id) => {
+                let rd = regs[id];
+                let imm = self.immediate()? as usize;
+                Ok(Instruction::Jal(rd, imm))
+            }
+
+            Some(data) => {
+                let imm = self.immediate_from(token)? as usize;
+                Ok(Instruction::Jal(0, imm))
+            }
+
+            // TODO: ExpectedJalArgs
+            None => Err(ParserError::ExpectedImmediate(None).with_context(self.instr_ctx.clone())),
+            Some(other) => {
+                let ctx = token.as_ref().unwrap().ctx.clone();
+                Err(ParserError::ExpectedImmediate(Some(other.to_string())).with_context(ctx))
             }
         }
     }
@@ -166,41 +197,44 @@ where
     }
 
     fn parse_type_i(&mut self) -> Result<bool, Error> {
-        use super::Instruction::{self, *};
+        use super::Instruction::*;
+        use token::Data::Char;
 
         #[rustfmt::skip]
         macro_rules! reg { () => { self.register()? }; }
         #[rustfmt::skip]
         macro_rules! imm { () => { self.immediate()? }; }
-        let instr: Option<Instruction> = match self.instr {
-            "ecall" => Ecall.into(),
-            "ebreak" => Ebreak.into(),
-            "lb" => Lb(reg!(), imm!(), reg!()).into(),
-            "lh" => Lh(reg!(), imm!(), reg!()).into(),
-            "lw" => Lw(reg!(), imm!(), reg!()).into(),
-            "lbu" => Lbu(reg!(), imm!(), reg!()).into(),
-            "lhu" => Lhu(reg!(), imm!(), reg!()).into(),
-            "addi" => Addi(reg!(), reg!(), imm!()).into(),
-            "slti" => Slti(reg!(), reg!(), imm!()).into(),
-            "sltiu" => Sltiu(reg!(), reg!(), imm!()).into(),
-            "slli" => Slli(reg!(), reg!(), imm!()).into(),
-            "srli" => Srli(reg!(), reg!(), imm!()).into(),
-            "srai" => Srai(reg!(), reg!(), imm!()).into(),
-            "ori" => Ori(reg!(), reg!(), imm!()).into(),
-            "andi" => Andi(reg!(), reg!(), imm!()).into(),
-            "xori" => Xori(reg!(), reg!(), imm!()).into(),
-            "seqz" => Sltiu(reg!(), reg!(), 1).into(),
-            "li" => Li(reg!(), imm!()).into(),
-            _ => None,
-        };
-
-        match instr {
-            Some(instr) => {
-                self.parser.code.push(instr);
-                Ok(true)
-            }
-            None => Ok(false),
+        macro_rules! paren {
+            ($inner:expr) => {{
+                self.the_token(Char('('))?;
+                let res = $inner;
+                self.the_token(Char(')'))?;
+                res
+            }};
         }
+        let instr = match self.instr {
+            "ecall" => Ecall,
+            "ebreak" => Ebreak,
+            "lb" => Lb(reg!(), imm!(), paren!(reg!())),
+            "lh" => Lh(reg!(), imm!(), paren!(reg!())),
+            "lw" => Lw(reg!(), imm!(), paren!(reg!())),
+            "lbu" => Lbu(reg!(), imm!(), paren!(reg!())),
+            "lhu" => Lhu(reg!(), imm!(), paren!(reg!())),
+            "addi" => Addi(reg!(), reg!(), imm!()),
+            "slti" => Slti(reg!(), reg!(), imm!()),
+            "sltiu" => Sltiu(reg!(), reg!(), imm!()),
+            "slli" => Slli(reg!(), reg!(), imm!()),
+            "srli" => Srli(reg!(), reg!(), imm!()),
+            "srai" => Srai(reg!(), reg!(), imm!()),
+            "ori" => Ori(reg!(), reg!(), imm!()),
+            "andi" => Andi(reg!(), reg!(), imm!()),
+            "xori" => Xori(reg!(), reg!(), imm!()),
+            "seqz" => Sltiu(reg!(), reg!(), 1),
+            "li" | "la" => Li(reg!(), imm!()),
+            _ => return Ok(false),
+        };
+        self.parser.code.push(instr);
+        Ok(true)
     }
 
     fn parse_type_s(&mut self) -> Result<bool, Error> {
@@ -219,21 +253,16 @@ where
                 res
             }};
         }
-        let instr: Option<Instruction> = match self.instr {
-            "sb" => Sb(reg!(), imm!(), paren!(reg!())).into(),
-            "sh" => Sh(reg!(), imm!(), paren!(reg!())).into(),
-            "sw" => Sw(reg!(), imm!(), paren!(reg!())).into(),
-            "ret" => Jalr(0, 1, 0).into(),
-            _ => None,
+        let instr = match self.instr {
+            "sb" => Sb(reg!(), imm!(), paren!(reg!())),
+            "sh" => Sh(reg!(), imm!(), paren!(reg!())),
+            "sw" => Sw(reg!(), imm!(), paren!(reg!())),
+            "ret" => Jalr(0, 1, 0),
+            _ => return Ok(false),
         };
 
-        match instr {
-            Some(instr) => {
-                self.parser.code.push(instr);
-                Ok(true)
-            }
-            None => Ok(false),
-        }
+        self.parser.code.push(instr);
+        Ok(true)
     }
 
     fn parse_type_b_and_jumps(&mut self) -> Result<bool, Error> {
@@ -243,52 +272,47 @@ where
         macro_rules! reg { () => { self.register()? }; }
         #[rustfmt::skip]
         macro_rules! imm { () => { self.immediate()? }; }
-        let instr: Option<Instruction> = match self.instr {
-            "beq" => Beq(reg!(), reg!(), imm!() as usize).into(),
-            "bne" => Bne(reg!(), reg!(), imm!() as usize).into(),
-            "blt" => Blt(reg!(), reg!(), imm!() as usize).into(),
-            "bge" => Bge(reg!(), reg!(), imm!() as usize).into(),
-            "bltu" => Bltu(reg!(), reg!(), imm!() as usize).into(),
-            "bgeu" => Bgeu(reg!(), reg!(), imm!() as usize).into(),
-            "beqz" => Beq(reg!(), 0, imm!() as usize).into(),
-            "bnez" => Bne(reg!(), 0, imm!() as usize).into(),
-            "bltz" => Blt(reg!(), 0, imm!() as usize).into(),
-            "bgez" => Bge(reg!(), 0, imm!() as usize).into(),
-            "bltuz" => Bltu(reg!(), 0, imm!() as usize).into(),
-            "bgeuz" => Bgeu(reg!(), 0, imm!() as usize).into(),
-            "blez" => Bge(0, reg!(), imm!() as usize).into(),
-            "bgtz" => Blt(0, reg!(), imm!() as usize).into(),
+        let instr = match self.instr {
+            "beq" => Beq(reg!(), reg!(), imm!() as usize),
+            "bne" => Bne(reg!(), reg!(), imm!() as usize),
+            "blt" => Blt(reg!(), reg!(), imm!() as usize),
+            "bge" => Bge(reg!(), reg!(), imm!() as usize),
+            "bltu" => Bltu(reg!(), reg!(), imm!() as usize),
+            "bgeu" => Bgeu(reg!(), reg!(), imm!() as usize),
+            "beqz" => Beq(reg!(), 0, imm!() as usize),
+            "bnez" => Bne(reg!(), 0, imm!() as usize),
+            "bltz" => Blt(reg!(), 0, imm!() as usize),
+            "bgez" => Bge(reg!(), 0, imm!() as usize),
+            "bltuz" => Bltu(reg!(), 0, imm!() as usize),
+            "bgeuz" => Bgeu(reg!(), 0, imm!() as usize),
+            "blez" => Bge(0, reg!(), imm!() as usize),
+            "bgtz" => Blt(0, reg!(), imm!() as usize),
             "ble" => {
                 let (r1, r2) = (reg!(), reg!());
-                Bge(r2, r1, imm!() as usize).into()
+                Bge(r2, r1, imm!() as usize)
             }
             "bgt" => {
                 let (r1, r2) = (reg!(), reg!());
-                Blt(r2, r1, imm!() as usize).into()
+                Blt(r2, r1, imm!() as usize)
             }
             "bleu" => {
                 let (r1, r2) = (reg!(), reg!());
-                Bgeu(r2, r1, imm!() as usize).into()
+                Bgeu(r2, r1, imm!() as usize)
             }
             "bgtu" => {
                 let (r1, r2) = (reg!(), reg!());
-                Bltu(r2, r1, imm!() as usize).into()
+                Bltu(r2, r1, imm!() as usize)
             }
-            "jal" => Jal(reg!(), imm!() as usize).into(),
-            "jalr" => Jalr(reg!(), reg!(), imm!()).into(),
-            "jr" => Jalr(reg!(), 0, 0).into(),
-            "call" => Jal(1, imm!() as usize).into(),
-            "j" | "tail" | "b" => Jal(0, imm!() as usize).into(),
-            _ => None,
+            "jal" => self.jal_hack()?,
+            "jalr" => Jalr(reg!(), reg!(), imm!()),
+            "jr" => Jalr(reg!(), 0, 0),
+            "call" => Jal(1, imm!() as usize),
+            "j" | "tail" | "b" => Jal(0, imm!() as usize),
+            _ => return Ok(false),
         };
 
-        match instr {
-            Some(instr) => {
-                self.parser.code.push(instr);
-                Ok(true)
-            }
-            None => Ok(false),
-        }
+        self.parser.code.push(instr);
+        Ok(true)
     }
 }
 
@@ -296,6 +320,25 @@ where
 mod tests {
     use super::*;
     use crate::parser::lexer::Lexer;
+
+    #[test]
+    fn test_la() {
+        let input = "la x10 0x800";
+        let mut tokens = Lexer::from_content(String::from(input), "type_r.s");
+        let mut parser = ParserContext::default();
+
+        let instruction = tokens.next().unwrap().unwrap().data.to_string();
+        let res = parse_instruction(
+            &mut tokens,
+            &mut parser,
+            instruction,
+            token::Context::empty(),
+        );
+        assert!(res.is_ok());
+
+        use super::super::Instruction::*;
+        assert_eq!(&parser.code, &[Li(10, 0x800)])
+    }
 
     #[test]
     fn test_type_r() {

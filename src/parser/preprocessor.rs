@@ -264,11 +264,13 @@ impl<TI: Iterator<Item = Result<Token, Error>>> Iterator for Preprocessor<TI> {
     type Item = Result<Token, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(token) = self.buffer.pop_front() {
-            return Some(Ok(token));
-        }
+        let token = self
+            .buffer
+            .pop_front()
+            .map(Ok)
+            .or_else(|| self.tokens.next());
 
-        let token = match self.tokens.next()? {
+        let token = match token? {
             Ok(t) => t,
             Err(e) => return Some(Err(e)),
         };
