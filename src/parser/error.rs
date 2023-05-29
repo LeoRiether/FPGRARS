@@ -18,18 +18,13 @@ pub enum ParserError {
     #[error("I/O Error: {0}")]
     IO(#[from] io::Error),
 
-    #[error("Expected a register name, but found '{0}'")]
+    #[error("Expected a register name, but found '{}'", .0.bright_blue())]
     RegisterNotFound(String),
 
-    /// Didn't recognize a type/directive in the `.data` directive
-    /// (like `.double` or `.nothing`)
-    #[error("Unrecognized data type '{0}'")]
-    UnrecognizedDataType(String),
-
-    #[error("Value '{0}' cannot be stored in data type '{1:?}'")]
+    #[error("Value '{}' cannot be stored in data type '{1:?}'", .0.bright_blue())]
     InvalidDataType(token::Data, data::Type),
 
-    #[error("Unknown directive '{}'", .0.bright_yellow())]
+    #[error("Unknown directive '{}{}'", ".".bright_yellow(), .0.bright_yellow())]
     UnknownDirective(String),
 
     #[error("Did not expect token '{}' here.", some_or_eof(.0).bright_yellow())]
@@ -56,7 +51,9 @@ pub enum PreprocessorError {
     #[error("The argument '{arg}' in macro '{macro_name}' was defined more than once.")]
     DuplicateMacroArg { macro_name: String, arg: String },
 
-    #[error("The argument '{arg}' in macro '{macro_name}' was used in the macro body, but not defined.")]
+    #[error(
+        "The argument '{arg}' in macro '{macro_name}' was used in the macro body, but not defined."
+    )]
     UndefinedMacroArg { macro_name: String, arg: String },
 
     #[error("Did not expect token '{}' here.", some_or_eof(.0).bright_yellow())]

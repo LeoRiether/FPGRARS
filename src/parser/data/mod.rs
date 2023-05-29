@@ -30,17 +30,17 @@ impl FromStr for Type {
             "align" | "space" => Ok(Align),
             "asciz" | "ascii" | "string" => Ok(Asciz),
             "float" => Ok(Float),
-            _ => Err(ParserError::UnrecognizedDataType(s.to_owned()).into()),
+            _ => Err(ParserError::UnknownDirective(s.to_owned()).into()),
         }
     }
 }
 
 // TODO: assert alignment
 /// Stores a numerical token with value `value` in the data vector.
-fn store_numerical(ctx: &mut ParserContext, token: &Token, value: u32) -> Result<(), Error> {
+fn store_numerical(ctx: &mut ParserContext, value: u32) -> Result<(), Error> {
     use Type::*;
     match ctx.data_type {
-        Byte => {
+        Byte | Asciz => {
             ctx.data.push(value as u8);
         }
         Half => {
@@ -61,12 +61,6 @@ fn store_numerical(ctx: &mut ParserContext, token: &Token, value: u32) -> Result
         Align => {
             ctx.data.resize(ctx.data.len() + value as usize, 0);
         }
-        _ => {
-            return Err(
-                ParserError::InvalidDataType(token.data.clone(), ctx.data_type)
-                    .with_context(token.ctx.clone()),
-            )
-        }
     }
 
     Ok(())
@@ -79,14 +73,19 @@ pub fn push_data(token: Token, ctx: &mut ParserContext) -> Result<(), Error> {
         Identifier(_label) => {
             unimplemented!("This version of FPGRARS does not support labels in .data")
         }
-        Integer(i) => store_numerical(ctx, &token, i as u32)?,
-        Float(f) => store_numerical(ctx, &token, f.to_bits())?,
-        CharLiteral(c) => store_numerical(ctx, &token, c as u32)?,
+        Integer(i) => store_numerical(ctx, i as u32)?,
+        Float(f) => store_numerical(ctx, f.to_bits())?,
+        CharLiteral(c) => store_numerical(ctx, c as u32)?,
         StringLiteral(s) => {
             ctx.data.extend(s.as_bytes());
             ctx.data.push(0);
             if ctx.data_type == Type::Asciz {
                 ctx.data_type = Type::Byte;
+            } else {
+                return Err(
+                    ParserError::InvalidDataType(StringLiteral(s), ctx.data_type)
+                        .with_context(token.ctx),
+                );
             }
         }
         _ => unreachable!("push_data should only be called with a data token"),
