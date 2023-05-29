@@ -1,8 +1,8 @@
 //! TODO: replace unwraps and panics in this file by proper error handling
 
+use super::error::{Error, LexerError};
+use super::token::{Context, ContextualizeResult, Data, Token};
 use std::fs;
-
-use super::token::{Context, Data, Token};
 
 macro_rules! allowed_identifier {
     () => {
@@ -10,6 +10,25 @@ macro_rules! allowed_identifier {
     };
     (start) => {
         'a'..='z' | 'A'..='Z' | '_' | '$' | '@'
+    };
+}
+
+macro_rules! expect {
+    (Some($exp:expr) = $found:expr) => {
+        if !matches!($found, Some($exp)) {
+            return Err(Error::from(LexerError::UnexpectedChar {
+                expected: $exp,
+                found: $found.unwrap_or('\0'),
+            }));
+        }
+    };
+    (None = $found:expr) => {
+        if !matches!($found, None) {
+            return Err(Error::from(LexerError::UnexpectedChar {
+                expected: '\0',
+                found: $found.unwrap(),
+            }));
+        }
     };
 }
 
@@ -86,9 +105,9 @@ impl Lexer {
         }
     }
 
-    fn next_string_literal(&mut self) -> Token {
+    fn next_string_literal(&mut self) -> Result<Token, Error> {
         let mut string = String::new();
-        self.consume().unwrap(); // TODO: assert it's a "
+        expect!(Some('"') = self.consume());
         while self.peek() != Some('"') {
             let mut c = self.consume().unwrap();
             if c == '\\' {
@@ -96,20 +115,20 @@ impl Lexer {
             }
             string.push(c);
         }
-        self.consume().unwrap(); // TODO: assert it's a "
+        expect!(Some('"') = self.consume());
 
-        Token::new(Data::StringLiteral(string))
+        Ok(Token::new(Data::StringLiteral(string)))
     }
 
-    fn next_char_literal(&mut self) -> Token {
+    fn next_char_literal(&mut self) -> Result<Token, Error> {
         let mut c = self.consume().unwrap();
-        self.consume().unwrap(); // TODO: assert it's a '
+        expect!(Some('\'') = self.consume());
         if c == '\\' {
             c = self.next_escape_sequence();
         }
-        self.consume().unwrap(); // TODO: assert it's a '
+        expect!(Some('\'') = self.consume());
 
-        Token::new(Data::CharLiteral(c))
+        Ok(Token::new(Data::CharLiteral(c)))
     }
 
     fn next_number(&mut self) -> Token {
@@ -159,7 +178,7 @@ impl Lexer {
 }
 
 impl Iterator for Lexer {
-    type Item = Token;
+    type Item = Result<Token, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let next_char = match self.peek() {
@@ -189,7 +208,7 @@ impl Iterator for Lexer {
                     Data::Identifier(id) => id,
                     _ => unreachable!(),
                 };
-                Some(Token::new(Data::Directive(id)).with_ctx(ctx))
+                Some(Ok(Token::new(Data::Directive(id)).with_ctx(ctx)))
             }
 
             '%' => {
@@ -198,17 +217,17 @@ impl Iterator for Lexer {
                     Data::Identifier(id) => id,
                     _ => unreachable!(),
                 };
-                Some(Token::new(Data::MacroArg(id)).with_ctx(ctx))
+                Some(Ok(Token::new(Data::MacroArg(id)).with_ctx(ctx)))
             }
 
             '"' => Some(self.next_string_literal().with_ctx(ctx)),
             '\'' => Some(self.next_char_literal().with_ctx(ctx)),
             ':' | '(' | ')' => {
                 self.consume().unwrap();
-                Some(Token::new(Data::Char(next_char)).with_ctx(ctx))
+                Some(Ok(Token::new(Data::Char(next_char)).with_ctx(ctx)))
             }
 
-            '-' | '0'..='9' => Some(self.next_number().with_ctx(ctx)),
+            '-' | '0'..='9' => Some(Ok(self.next_number().with_ctx(ctx))),
 
             allowed_identifier!(start) => {
                 let identifier = self.next_identifier();
@@ -219,10 +238,10 @@ impl Iterator for Lexer {
                         Data::Identifier(id) => id,
                         _ => unreachable!(),
                     };
-                    Some(Token::new(Data::Label(id)).with_ctx(ctx))
+                    Some(Ok(Token::new(Data::Label(id)).with_ctx(ctx)))
                 } else {
                     // just an identifier
-                    Some(identifier.with_ctx(ctx))
+                    Some(Ok(identifier.with_ctx(ctx)))
                 }
             }
 
@@ -238,7 +257,7 @@ mod tests {
     #[test]
     fn test_lexer_creation() {
         let lexer = Lexer::from_content(String::default(), "test1.s");
-        let tokens = lexer.map(|t| t.data).collect::<Vec<_>>();
+        let tokens = lexer.map(|t| t.unwrap().data).collect::<Vec<_>>();
         assert_eq!(tokens, &[]);
     }
 
@@ -264,7 +283,7 @@ main:
     add 1, 2, 0(a4)
 "#;
         let lexer = Lexer::from_content(String::from(data), "test1.s");
-        let tokens = lexer.map(|t| t.data).collect::<Vec<_>>();
+        let tokens = lexer.map(|t| t.unwrap().data).collect::<Vec<_>>();
 
         use crate::parser::token::Data::*;
         assert_eq!(
@@ -303,7 +322,7 @@ main:
 DE1(t0, LABEL)
 "#;
         let lexer = Lexer::from_content(String::from(data), "test_macros.s");
-        let tokens = lexer.map(|t| t.data).collect::<Vec<_>>();
+        let tokens = lexer.map(|t| t.unwrap().data).collect::<Vec<_>>();
 
         use crate::parser::token::Data::*;
         assert_eq!(
@@ -341,7 +360,7 @@ DE1(t0, LABEL)
             0d123 0x1a2B3c
             0xFF200710";
         let lexer = Lexer::from_content(String::from(data), "test_macros.s");
-        let tokens = lexer.map(|t| t.data).collect::<Vec<_>>();
+        let tokens = lexer.map(|t| t.unwrap().data).collect::<Vec<_>>();
 
         use crate::parser::token::Data::*;
         assert_eq!(
@@ -366,7 +385,7 @@ DE1(t0, LABEL)
     #[test]
     fn test_label() {
         let lexer = Lexer::from_content(String::from("LABEL_ONE: nop"), "test_corner.s");
-        let tokens = lexer.map(|t| t.data).collect::<Vec<_>>();
+        let tokens = lexer.map(|t| t.unwrap().data).collect::<Vec<_>>();
         use crate::parser::token::Data::*;
         assert_eq!(
             tokens,
@@ -378,7 +397,7 @@ DE1(t0, LABEL)
     #[allow(clippy::approx_constant)]
     fn test_float() {
         let lexer = Lexer::from_content(String::from(".float 123.456 -3.1415"), "test_float.s");
-        let tokens = lexer.map(|t| t.data).collect::<Vec<_>>();
+        let tokens = lexer.map(|t| t.unwrap().data).collect::<Vec<_>>();
         use crate::parser::token::Data::*;
         assert_eq!(
             tokens,
@@ -392,7 +411,7 @@ DE1(t0, LABEL)
             String::from("abc ABC main.loop main$loop main@loop @global"),
             "identifiers.s",
         );
-        let tokens = lexer.map(|t| t.data).collect::<Vec<_>>();
+        let tokens = lexer.map(|t| t.unwrap().data).collect::<Vec<_>>();
         use crate::parser::token::Data::*;
         assert_eq!(
             tokens,

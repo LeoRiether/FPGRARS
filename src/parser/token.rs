@@ -3,6 +3,8 @@ use std::{fmt, fs::File, io::{self, BufReader, BufRead}, rc::Rc};
 
 use crate::utf8_lossy_lines::Utf8LossyLinesExt;
 
+use super::error::{Error, Contextualize};
+
 #[derive(Debug, Clone, PartialEq)]
 /// Token data
 pub enum Data {
@@ -142,3 +144,17 @@ impl Token {
         self
     }
 }
+
+pub trait ContextualizeResult {
+    fn with_ctx(self, ctx: Context) -> Self;
+}
+
+impl ContextualizeResult for Result<Token, Error> {
+    fn with_ctx(self, ctx: Context) -> Self {
+        match self {
+            Ok(token) => Ok(token.with_ctx(ctx)),
+            Err(e) => Err(e.with_context(ctx)),
+        }
+    }
+}
+

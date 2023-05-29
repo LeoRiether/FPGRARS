@@ -15,15 +15,26 @@ static MACRO_EXAMPLE_TIP: &str =
        add %arg1, %arg1, %arg2
    .end_macro";
 
+/// Question mark operator for Option<Result<T, E>>
+macro_rules! inner_bail {
+    ($e:expr) => {
+        match $e {
+            None => None,
+            Some(Ok(x)) => Some(x),
+            Some(Err(e)) => return Err(e.into()),
+        }
+    };
+}
+
 /// Defines the `preprocess` methods for iterators of tokens.
 /// ```
 /// let tokens = Lexer::new("riscv.s").preprocess();
 /// ```
-pub trait Preprocess<TI: Iterator<Item = Token>> {
+pub trait Preprocess<TI: Iterator<Item = Result<Token, Error>>> {
     fn preprocess(self) -> Preprocessor<TI>;
 }
 
-impl<TI: Iterator<Item = Token>> Preprocess<TI> for TI {
+impl<TI: Iterator<Item = Result<Token, Error>>> Preprocess<TI> for TI {
     fn preprocess(self) -> Preprocessor<TI> {
         Preprocessor::new(self)
     }
@@ -38,14 +49,14 @@ struct Macro {
 
 /// A preprocessor for RISC-V assembly files that supports includes, macros and equs.
 /// Generally constructed by calling the [`Preprocess::preprocess`] method.
-pub struct Preprocessor<TI: Iterator<Item = Token>> {
+pub struct Preprocessor<TI: Iterator<Item = Result<Token, Error>>> {
     tokens: TI,
     buffer: VecDeque<Token>,
     macros: HashMap<String, Macro>,
     equs: HashMap<String, Token>,
 }
 
-impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
+impl<TI: Iterator<Item = Result<Token, Error>>> Preprocessor<TI> {
     pub fn new(tokens: TI) -> Self {
         Self {
             tokens,
@@ -77,7 +88,7 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
     fn consume_include(&mut self, include_ctx: token::Context) -> Result<(), Error> {
         use super::token::Data::StringLiteral;
 
-        let filename = match self.tokens.next() {
+        let filename = match inner_bail!(self.tokens.next()) {
             Some(Token {
                 data: StringLiteral(s),
                 ..
@@ -109,7 +120,7 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
         use super::token::Data::{Char, Directive, Identifier, MacroArg};
 
         // Read macro name
-        let name = match self.tokens.next() {
+        let name = match inner_bail!(self.tokens.next()) {
             Some(Token {
                 data: Identifier(d),
                 ..
@@ -129,7 +140,7 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
         };
 
         // Read macro args
-        let mut peek = self.tokens.next();
+        let mut peek = inner_bail!(self.tokens.next());
         if let Some(
             token @ Token {
                 data: Char('('), ..
@@ -142,7 +153,12 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
 
         // Read macro body until .end_macro
         loop {
-            match peek.take().or_else(|| self.tokens.next()) {
+            let token = match peek.take() {
+                Some(token) => Some(token),
+                None => inner_bail!(self.tokens.next()),
+            };
+
+            match token {
                 Some(Token {
                     data: Directive(d), ..
                 }) if d == "endmacro" || d == "end_macro" => break,
@@ -183,7 +199,7 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
     ) -> Result<(), Error> {
         use super::token::Data::{Char, Identifier, MacroArg};
         loop {
-            match self.tokens.next() {
+            match inner_bail!(self.tokens.next()) {
                 Some(Token {
                     data: Char(')'), ..
                 }) => break Ok(()),
@@ -235,7 +251,12 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
     /// Read an .equ
     fn consume_equ(&mut self, ctx: token::Context) -> Result<(), Error> {
         use token::Data::Identifier;
-        match (self.tokens.next().map(|t| t.data), self.tokens.next()) {
+
+        let (name, value) = (self.tokens.next(), self.tokens.next());
+        let name = inner_bail!(name).map(|t| t.data);
+        let value = inner_bail!(value);
+
+        match (name, value) {
             (Some(Identifier(name)), Some(value)) => {
                 self.equs.insert(name, value);
                 Ok(())
@@ -250,7 +271,7 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
     }
 }
 
-impl<TI: Iterator<Item = Token>> Iterator for Preprocessor<TI> {
+impl<TI: Iterator<Item = Result<Token, Error>>> Iterator for Preprocessor<TI> {
     type Item = Result<Token, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -258,7 +279,11 @@ impl<TI: Iterator<Item = Token>> Iterator for Preprocessor<TI> {
             return Some(Ok(token));
         }
 
-        let token = self.tokens.next()?;
+        let token = match self.tokens.next()? {
+            Ok(t) => t,
+            Err(e) => return Some(Err(e)),
+        };
+
         use super::token::Data::*;
 
         match token.data {

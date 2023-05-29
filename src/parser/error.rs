@@ -35,6 +35,9 @@ pub enum ParserError {
 pub enum LexerError {
     #[error("I/O Error: {0}")]
     IO(#[from] io::Error),
+
+    #[error("Expected '{}', but found '{}'", expected.bright_blue(), found.bright_yellow())]
+    UnexpectedChar { expected: char, found: char },
 }
 
 #[derive(Debug, thiserror::Error)]
