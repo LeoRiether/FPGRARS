@@ -1,4 +1,8 @@
-use super::{data, token::{self, ManyContexts}, LabelUse};
+use super::{
+    data,
+    token::{self, ManyContexts},
+    LabelUse,
+};
 use core::fmt;
 use owo_colors::OwoColorize;
 use std::{borrow::Cow, io};
@@ -35,6 +39,9 @@ pub enum ParserError {
 
     #[error("Expected a status register name (like `{}` or `{}`), but found '{}'", "time".bright_blue(), "ustatus".bright_blue(), some_or_eof(.0).bright_yellow())]
     ExpectedStatusRegister(Option<String>),
+
+    #[error("Expected a float register name (like `{}` or `{}`), but found '{}'", "ft0".bright_blue(), "fs8".bright_blue(), some_or_eof(.0).bright_yellow())]
+    ExpectedFloatRegister(Option<String>),
 
     #[error("Expected an immediate value, but found '{}'", some_or_eof(.0).bright_yellow())]
     ExpectedImmediate(Option<String>),

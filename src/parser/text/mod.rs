@@ -33,7 +33,8 @@ pub fn parse_instruction(
         || ipc.parse_type_i()?
         || ipc.parse_type_s()?
         || ipc.parse_type_b_and_jumps()?
-        || ipc.parse_csr()?;
+        || ipc.parse_csr()?
+        || ipc.parse_float()?;
     if !found {
         let err = ParserError::UnknownInstruction(instruction).with_context(instr_ctx);
         return Err(err);
@@ -96,6 +97,24 @@ where
             Some(other) => {
                 let ctx = token.as_ref().unwrap().ctx.clone();
                 Err(ParserError::ExpectedStatusRegister(Some(other.to_string())).with_context(ctx))
+            }
+        }
+    }
+
+    fn float_register(&mut self) -> Result<u8, Error> {
+        let token = inner_bail!(self.tokens.next());
+        let floats = &self.parser.regnames.floats;
+
+        use token::Data::Identifier;
+        match token.as_ref().map(|t| &t.data) {
+            Some(Identifier(id)) if floats.contains_key(id) => Ok(floats[id]),
+
+            None => {
+                Err(ParserError::ExpectedFloatRegister(None).with_context(self.instr_ctx.clone()))
+            }
+            Some(other) => {
+                let ctx = token.as_ref().unwrap().ctx.clone();
+                Err(ParserError::ExpectedFloatRegister(Some(other.to_string())).with_context(ctx))
             }
         }
     }
@@ -177,7 +196,7 @@ where
     }
 
     fn parse_type_r(&mut self) -> Result<bool, Error> {
-        use super::Instruction::{self, *};
+        use super::Instruction::*;
 
         #[rustfmt::skip]
         macro_rules! reg { () => { self.register()? }; }
@@ -251,6 +270,7 @@ where
             "xori" => Xori(reg!(), reg!(), imm!()),
             "seqz" => Sltiu(reg!(), reg!(), 1),
             "li" | "la" => Li(reg!(), imm!()),
+            "nop" => Addi(0, 0, 0),
             _ => return Ok(false),
         };
         self.parser.code.push(instr);
@@ -258,7 +278,7 @@ where
     }
 
     fn parse_type_s(&mut self) -> Result<bool, Error> {
-        use super::Instruction::{self, *};
+        use super::Instruction::*;
         use token::Data::Char;
 
         #[rustfmt::skip]
@@ -286,7 +306,7 @@ where
     }
 
     fn parse_type_b_and_jumps(&mut self) -> Result<bool, Error> {
-        use super::Instruction::{self, *};
+        use super::Instruction::*;
 
         #[rustfmt::skip]
         macro_rules! reg { () => { self.register()? }; }
@@ -370,6 +390,67 @@ where
         };
 
         self.parser.code.push(instr);
+        Ok(true)
+    }
+
+    fn parse_float(&mut self) -> Result<bool, Error> {
+        use super::FloatInstruction as F;
+        use token::Data::Char;
+
+        #[rustfmt::skip]
+        macro_rules! reg { () => { self.register()? }; }
+        #[rustfmt::skip]
+        macro_rules! imm { () => { self.immediate()? }; }
+        #[rustfmt::skip]
+        macro_rules! freg { () => { self.float_register()? }; }
+        macro_rules! paren {
+            ($inner:expr) => {{
+                self.the_token(Char('('))?;
+                let res = $inner;
+                self.the_token(Char(')'))?;
+                res
+            }};
+        }
+
+        let instr = match self.instr {
+            "fadd.s" => F::Add(freg!(), freg!(), freg!()),
+            "fsub.s" => F::Sub(freg!(), freg!(), freg!()),
+            "fmul.s" => F::Mul(freg!(), freg!(), freg!()),
+            "fdiv.s" => F::Div(freg!(), freg!(), freg!()),
+            "feq.s" => F::Equ(reg!(), freg!(), freg!()),
+            "fle.s" => F::Le(reg!(), freg!(), freg!()),
+            "flt.s" => F::Lt(reg!(), freg!(), freg!()),
+            "fmax.s" => F::Max(freg!(), freg!(), freg!()),
+            "fmin.s" => F::Min(freg!(), freg!(), freg!()),
+            "fsgnj.s" => F::SgnjS(freg!(), freg!(), freg!()),
+            "fsgnjn.s" => F::SgnjNS(freg!(), freg!(), freg!()),
+            "fsgnjx.s" => F::SgnjXS(freg!(), freg!(), freg!()),
+            "fclass.s" => F::Class(reg!(), freg!()),
+            "fcvt.s.w" => F::CvtSW(freg!(), reg!()),
+            "fcvt.s.wu" => F::CvtSWu(freg!(), reg!()),
+            "fcvt.w.s" => F::CvtWS(reg!(), freg!()),
+            "fcvt.wu.s" => F::CvtWuS(reg!(), freg!()),
+            "fmv.s.x" => F::MvSX(freg!(), reg!()),
+            "fmv.x.s" => F::MvXS(reg!(), freg!()),
+            "fsqrt.s" => F::Sqrt(freg!(), freg!()),
+            "fabs.s" => {
+                let (rd, rs1) = (freg!(), freg!());
+                F::SgnjXS(rd, rs1, rs1)
+            }
+            "fmv.s" => {
+                let (rd, rs1) = (freg!(), freg!());
+                F::SgnjNS(rd, rs1, rs1)
+            }
+            "fneg.s" => {
+                let (rd, rs1) = (freg!(), freg!());
+                F::SgnjNS(rd, rs1, rs1)
+            }
+            "flw" => F::Lw(freg!(), imm!(), paren!(reg!())),
+            "fsw" => F::Sw(freg!(), imm!(), paren!(reg!())),
+            _ => return Ok(false),
+        };
+
+        self.parser.code.push(Instruction::Float(instr));
         Ok(true)
     }
 }

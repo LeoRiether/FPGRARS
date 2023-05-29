@@ -1,59 +1,14 @@
 use owo_colors::OwoColorize;
-use std::{fmt, fs::File, io::{self, BufReader, BufRead}, rc::Rc};
-
+use std::{
+    fmt,
+    fs::File,
+    io::BufReader,
+    rc::Rc,
+};
 use crate::utf8_lossy_lines::Utf8LossyLinesExt;
 
-use super::error::{Error, Contextualize};
-
-#[derive(Debug, Clone, PartialEq)]
-/// Token data
-pub enum Data {
-    Identifier(String),
-    Directive(String),
-    Label(String),
-    Char(char),
-    Integer(i32),
-    Float(f32),
-    StringLiteral(String),
-    CharLiteral(char),
-    MacroArg(String),
-}
-
-impl Data {
-    pub fn extract_u32(&self) -> Option<u32> {
-        match self {
-            Data::Integer(i) => Some(*i as u32),
-            Data::CharLiteral(c) => Some(*c as u32),
-            _ => None,
-        }
-    }
-
-    pub fn extract_f32(&self) -> Option<u32> {
-        match self {
-            Data::Float(f) => Some(*f as u32),
-            _ => None,
-        }
-    }
-}
-
-impl fmt::Display for Data {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Data::Identifier(id) => write!(f, "{}", id),
-            Data::Directive(d) => write!(f, ".{}", d),
-            Data::Label(l) => write!(f, "{}:", l),
-            Data::Char(c) => write!(f, "{}", c),
-            Data::Integer(i) => write!(f, "{}", i),
-            Data::Float(x) => write!(f, "{}", x),
-            Data::StringLiteral(s) => write!(f, "\"{}\"", s),
-            Data::CharLiteral(c) => write!(f, "'{}'", c),
-            Data::MacroArg(a) => write!(f, "%{}", a),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 /// Token context, including the current filename, line and column
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Context {
     pub file: Rc<String>,
     pub line: u32,
@@ -130,38 +85,3 @@ impl<'a> fmt::Display for ManyContexts<'a> {
         self.0.iter().try_for_each(|ctx| writeln!(f, "{}", ctx))
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-/// Token given by the lexer
-pub struct Token {
-    pub data: Data,
-    pub ctx: Context,
-}
-
-impl Token {
-    pub fn new(data: Data) -> Self {
-        Self {
-            data,
-            ctx: Context::empty(),
-        }
-    }
-
-    pub fn with_ctx(mut self, ctx: Context) -> Self {
-        self.ctx = ctx;
-        self
-    }
-}
-
-pub trait ContextualizeResult {
-    fn with_ctx(self, ctx: Context) -> Self;
-}
-
-impl ContextualizeResult for Result<Token, Error> {
-    fn with_ctx(self, ctx: Context) -> Self {
-        match self {
-            Ok(token) => Ok(token.with_ctx(ctx)),
-            Err(e) => Err(e.with_context(ctx)),
-        }
-    }
-}
-
