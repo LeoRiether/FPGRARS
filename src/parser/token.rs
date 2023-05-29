@@ -1,6 +1,8 @@
 use owo_colors::OwoColorize;
 use std::{fmt, fs::File, io::{self, BufReader, BufRead}, rc::Rc};
 
+use crate::utf8_lossy_lines::Utf8LossyLinesExt;
+
 #[derive(Debug, Clone, PartialEq)]
 /// Token data
 pub enum Data {
@@ -105,7 +107,7 @@ impl fmt::Display for Context {
 
         let reader = BufReader::new(file.unwrap());
         let from = self.line.saturating_sub(2) as usize;
-        for (line, i) in reader.lines().skip(from).take(3).zip(from+1..) {
+        for (line, i) in reader.utf8_lossy_lines().skip(from).take(3).zip(from+1..) {
             let line = line.unwrap();
             writeln!(f, "{:^4}{} {}", i.bright_blue(), "|".bright_blue(), line)?;
 
