@@ -22,13 +22,6 @@ impl Data {
             _ => None,
         }
     }
-
-    pub fn extract_f32(&self) -> Option<u32> {
-        match self {
-            Data::Float(f) => Some(*f as u32),
-            _ => None,
-        }
-    }
 }
 
 impl fmt::Display for Data {

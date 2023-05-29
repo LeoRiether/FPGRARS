@@ -15,6 +15,7 @@ use memory::*;
 
 mod into_register;
 use into_register::*;
+use owo_colors::OwoColorize;
 
 mod files;
 mod midi;
@@ -82,6 +83,13 @@ impl Simulator {
         let parser::Parsed { code, data } = parser::parse(path, DATA_SIZE)?;
         self.code = code;
         self.memory.data = data;
+
+        if crate::ARGS.print_instructions {
+            eprintln!("{}", "Instructions: ---------------".bright_blue());
+            self.code.iter().for_each(|i| eprintln!("{:?}", i));
+            eprintln!("{}", "-----------------------------".bright_blue());
+        }
+
         Ok(self)
     }
 
@@ -98,6 +106,16 @@ impl Simulator {
 
         self.started_at = time::Instant::now();
         self.status[parser::register_names::MISA_INDEX as usize] = 0x40001128;
+    }
+
+    pub fn print_state(&self) {
+        for i in 0..32 {
+            eprint!("{}{:02}: {:08x} ", "x".bright_blue(), i.bright_blue(), self.registers[i]);
+            if i % 4 == 3 {
+                eprintln!();
+            }
+        }
+        eprintln!();
     }
 
     pub fn run(&mut self) {

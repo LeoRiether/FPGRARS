@@ -10,6 +10,9 @@ pub struct Args {
     #[arg(long)]
     pub no_video: bool,
 
+    #[arg(long)]
+    pub print_instructions: bool,
+
     /// The RISC-V file to execute
     pub file: String,
 }

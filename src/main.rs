@@ -23,20 +23,22 @@ pub mod util;
 
 use std::error::Error;
 use std::thread;
-
+use lazy_static::lazy_static;
 use owo_colors::OwoColorize;
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let mut args = args::get_args();
-    let file = std::mem::take(&mut args.file);
+lazy_static! {
+    pub static ref ARGS: args::Args = args::get_args();
+}
 
-    let sim = simulator::Simulator::new(args.port);
+fn main() -> Result<(), Box<dyn Error>> {
+    let file = &ARGS.file;
+    let sim = simulator::Simulator::new(ARGS.port);
     let mmio = sim.memory.mmio.clone();
 
     let sim_thread = thread::Builder::new()
         .name("FPGRARS Simulator".into())
         .spawn(move || {
-            let mut sim = match sim.load_from_file(&file) {
+            let mut sim = match sim.load_from_file(file) {
                 Ok(x) => x,
                 Err(e) => {
                     eprintln!("   {}: {}\n", "[error]".bright_red().bold(), e);
@@ -50,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             std::process::exit(0);
         })?;
 
-    if !args.no_video {
+    if !ARGS.no_video {
         renderer::init(mmio);
     }
 

@@ -1,6 +1,7 @@
 pub mod unlabel;
 pub use unlabel::unlabel;
 
+use crate::parser::LabelUseType;
 use crate::parser::error::Contextualize;
 
 use super::error::{Error, ParserError};
@@ -73,8 +74,9 @@ fn store_numerical(ctx: &mut ParserContext, value: u32) -> Result<(), Error> {
 pub fn push_data(token: Token, ctx: &mut ParserContext) -> Result<(), Error> {
     use super::token::Data::*;
     match token.data {
-        Identifier(_label) => {
-            unimplemented!("This version of FPGRARS does not support labels in .data")
+        Identifier(label) => {
+            let pos = ctx.use_label(&label, LabelUseType::Data, token.ctx.clone());
+            store_numerical(ctx, pos)?;
         }
         Integer(i) => store_numerical(ctx, i as u32)?,
         Float(f) => store_numerical(ctx, f.to_bits())?,
