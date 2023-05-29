@@ -129,15 +129,15 @@ impl Lexer {
         }
 
         let res = if let Some(slice) = slice.strip_prefix("0x") {
-            i32::from_str_radix(slice, 16)
+            u32::from_str_radix(slice, 16)
         } else if let Some(slice) = slice.strip_prefix("0b") {
-            i32::from_str_radix(slice, 2)
+            u32::from_str_radix(slice, 2)
         } else if let Some(slice) = slice.strip_prefix("0o") {
-            i32::from_str_radix(slice, 8)
+            u32::from_str_radix(slice, 8)
         } else if let Some(slice) = slice.strip_prefix("0d") {
-            slice.parse::<i32>()
+            slice.parse::<u32>()
         } else {
-            slice.parse::<i32>()
+            slice.parse::<u32>()
         };
 
         if res.is_err() {
@@ -150,7 +150,7 @@ impl Lexer {
             }
         }
 
-        let mut x = res.unwrap();
+        let mut x = res.unwrap() as i32;
         if negative {
             x = -x;
         }
@@ -334,14 +334,12 @@ DE1(t0, LABEL)
 
     #[test]
     fn test_numbers() {
-        let data = r#"
+        let data = "
             addi sp, sp, -40
             li a7 0x5F
-            li a7 -0b101
-            li a7 0o777
-            li a7 0d123
-            li a7 0x1a2B3c
-"#;
+            -0b101 0o777
+            0d123 0x1a2B3c
+            0xFF200710";
         let lexer = Lexer::from_content(String::from(data), "test_macros.s");
         let tokens = lexer.map(|t| t.data).collect::<Vec<_>>();
 
@@ -356,18 +354,11 @@ DE1(t0, LABEL)
                 Identifier("li".into()),
                 Identifier("a7".into()),
                 Integer(0x5F),
-                Identifier("li".into()),
-                Identifier("a7".into()),
                 Integer(-0b101),
-                Identifier("li".into()),
-                Identifier("a7".into()),
                 Integer(0o777),
-                Identifier("li".into()),
-                Identifier("a7".into()),
                 Integer(123),
-                Identifier("li".into()),
-                Identifier("a7".into()),
                 Integer(0x1A2B3C),
+                Integer(0xFF200710_u32 as i32)
             ]
         );
     }

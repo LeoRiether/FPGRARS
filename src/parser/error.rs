@@ -56,6 +56,13 @@ pub enum PreprocessorError {
     )]
     UndefinedMacroArg { macro_name: String, arg: String },
 
+    #[error("{} is not a valid name for an .equ. The name must be a valid identifier.", .0.bright_blue())]
+    EquWithInvalidName(token::Data),
+    #[error(".equ should have a name and a value: {}", ".equ <name> <value>".bright_blue())]
+    UnnamedEqu,
+    #[error(".equ {} has no value! Valid usage: {}", .0.bright_yellow(), ".equ <name> <value>".bright_blue())]
+    EquWithNoValue(token::Data),
+
     #[error("Did not expect token '{}' here.", some_or_eof(.0).bright_yellow())]
     UnexpectedToken(Option<token::Data>),
 }

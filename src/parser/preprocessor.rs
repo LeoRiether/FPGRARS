@@ -1,9 +1,8 @@
 use std::collections::VecDeque;
 
+use crate::parser::error::Contextualize;
 use hashbrown::HashMap;
 use owo_colors::OwoColorize;
-
-use crate::parser::error::Contextualize;
 
 use super::{
     error::{Error, PreprocessorError},
@@ -43,6 +42,7 @@ pub struct Preprocessor<TI: Iterator<Item = Token>> {
     tokens: TI,
     buffer: VecDeque<Token>,
     macros: HashMap<String, Macro>,
+    equs: HashMap<String, Token>,
 }
 
 impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
@@ -51,6 +51,7 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
             tokens,
             buffer: VecDeque::new(),
             macros: HashMap::new(),
+            equs: HashMap::new(),
         }
     }
 
@@ -230,6 +231,23 @@ impl<TI: Iterator<Item = Token>> Preprocessor<TI> {
             }
         }
     }
+
+    /// Read an .equ
+    fn consume_equ(&mut self, ctx: token::Context) -> Result<(), Error> {
+        use token::Data::Identifier;
+        match (self.tokens.next().map(|t| t.data), self.tokens.next()) {
+            (Some(Identifier(name)), Some(value)) => {
+                self.equs.insert(name, value);
+                Ok(())
+            }
+
+            (Some(name), None) => Err(PreprocessorError::EquWithNoValue(name).with_context(ctx)),
+            (None, _) => Err(PreprocessorError::UnnamedEqu.with_context(ctx)),
+            (Some(other_token), _) => {
+                Err(PreprocessorError::EquWithInvalidName(other_token).with_context(ctx))
+            }
+        }
+    }
 }
 
 impl<TI: Iterator<Item = Token>> Iterator for Preprocessor<TI> {
@@ -252,6 +270,12 @@ impl<TI: Iterator<Item = Token>> Iterator for Preprocessor<TI> {
             }
             Directive(d) if d == "macro" => {
                 if let Err(e) = self.consume_macro(token.ctx.clone()) {
+                    return Some(Err(e));
+                }
+                self.next()
+            }
+            Directive(d) if d == "equ" || d == "eqv" => {
+                if let Err(e) = self.consume_equ(token.ctx.clone()) {
                     return Some(Err(e));
                 }
                 self.next()
