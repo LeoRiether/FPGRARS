@@ -2,7 +2,7 @@
 name = "fpgrars"
 version = "1.13.1"
 authors = ["Leonardo Riether <leonardoalves8217@gmail.com>"]
-edition = "2018"
+edition = "2021"
 description = "Fast Pretty Good RISC-V Assembly Rendering System"
 license = "MIT"
 

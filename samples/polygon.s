@@ -13,6 +13,10 @@ V: .space 404 # máximo de 50 vértices
 .text
 
 main:
+    la t0 raio
+	lw a0 0(t0)
+    # -----
+
 	li s0 0 # frame
 	li s1 0 # angulo
 
