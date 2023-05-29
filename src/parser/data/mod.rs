@@ -77,10 +77,9 @@ pub fn push_data(token: Token, ctx: &mut ParserContext) -> Result<(), Error> {
         Float(f) => store_numerical(ctx, f.to_bits())?,
         CharLiteral(c) => store_numerical(ctx, c as u32)?,
         StringLiteral(s) => {
-            ctx.data.extend(s.as_bytes());
-            ctx.data.push(0);
             if ctx.data_type == Type::Asciz {
-                ctx.data_type = Type::Byte;
+                ctx.data.extend(s.as_bytes());
+                ctx.data.push(0);
             } else {
                 return Err(
                     ParserError::InvalidDataType(StringLiteral(s), ctx.data_type)
