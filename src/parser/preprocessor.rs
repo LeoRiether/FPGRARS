@@ -77,19 +77,11 @@ impl<TI: Iterator<Item = Result<Token, Error>>> Preprocessor<TI> {
     fn consume_include(&mut self, include_ctx: token::Context) -> Result<(), Error> {
         use super::token::Data::StringLiteral;
 
-        let filename = match inner_bail!(self.tokens.next()) {
-            Some(Token {
-                data: StringLiteral(s),
-                ..
-            }) => s,
+        let filename = match inner_bail!(self.tokens.next()).map(|t| t.data) {
+            Some(StringLiteral(s)) => s,
 
             other => {
-                let found = if let Some(other) = other {
-                    Some(other.data)
-                } else {
-                    None
-                };
-                let err = PreprocessorError::ExpectedStringLiteral(found)
+                let err = PreprocessorError::ExpectedStringLiteral(other)
                     .with_context(include_ctx)
                     .with_tip(format!(
                         "The correct usage is {}",
@@ -99,8 +91,6 @@ impl<TI: Iterator<Item = Result<Token, Error>>> Preprocessor<TI> {
             }
         };
 
-        // TODO: actually include files here
-
         Ok(())
     }
 
@@ -109,22 +99,20 @@ impl<TI: Iterator<Item = Result<Token, Error>>> Preprocessor<TI> {
         use super::token::Data::{Char, Directive, Identifier, MacroArg};
 
         // Read macro name
-        let name = match inner_bail!(self.tokens.next()) {
-            Some(Token {
-                data: Identifier(d),
-                ..
-            }) => d,
+        let token = inner_bail!(self.tokens.next());
+        let name = match token.as_ref().map(|t| &t.data) {
+            Some(Identifier(d)) => d,
 
-            None => return Err(PreprocessorError::ExpectedMacroName(None).with_context(macro_ctx)),
-            Some(other) => {
-                return Err(
-                    PreprocessorError::ExpectedMacroName(Some(other.data)).with_context(other.ctx)
-                )
+            _ => {
+                let ctx = token.as_ref().map(|t| t.ctx.clone()).unwrap_or(macro_ctx);
+                return Err(PreprocessorError::ExpectedMacroName(token.map(|t| t.data))
+                    .with_context(ctx)
+                    .with_tip(MACRO_EXAMPLE_TIP));
             }
         };
 
         let mut r#macro = Macro {
-            name,
+            name: name.to_string(),
             ..Macro::default()
         };
 

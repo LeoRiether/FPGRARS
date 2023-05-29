@@ -109,8 +109,17 @@ impl Simulator {
     }
 
     pub fn print_state(&self) {
+        eprintln!("{}", "Registers:".bright_blue());
         for i in 0..32 {
             eprint!("{}{:02}: {:08x} ", "x".bright_blue(), i.bright_blue(), self.registers[i]);
+            if i % 4 == 3 {
+                eprintln!();
+            }
+        }
+        eprintln!();
+        eprintln!("{}", "Float Registers:".bright_blue());
+        for i in 0..32 {
+            eprint!("{}{:02}: {:<8} ", "f".bright_blue(), i.bright_blue(), self.floats[i]);
             if i % 4 == 3 {
                 eprintln!();
             }
@@ -171,7 +180,7 @@ impl Simulator {
                     use EcallSignal::*;
                     match self.ecall() {
                         Exit => {
-                            return;
+                            break;
                         }
                         Continue => {
                             continue;
@@ -407,6 +416,10 @@ impl Simulator {
             }
 
             self.pc += 4;
+        }
+
+        if crate::ARGS.print_state {
+            self.print_state();
         }
     }
 
