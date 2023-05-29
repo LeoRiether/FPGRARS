@@ -54,6 +54,7 @@ pub enum Instruction {
     Divu(u8, u8, u8),
     Rem(u8, u8, u8),
     Remu(u8, u8, u8),
+    URet,
 
     // Type I
     Ecall,
@@ -112,7 +113,4 @@ pub enum Instruction {
     Li(u8, u32),
     /// rd, rs1
     Mv(u8, u8),
-
-    Ret,
-    URet,
 }

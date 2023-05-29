@@ -381,10 +381,6 @@ impl Simulator {
                 // Pseudoinstructions
                 Li(rd, imm) => self.set_reg(rd, imm),
                 Mv(rd, rs1) => self.registers[rd as usize] = self.registers[rs1 as usize],
-                Ret => {
-                    self.pc = self.registers[1] as usize;
-                    continue;
-                }
                 URet => {
                     use crate::parser::register_names::UEPC_INDEX;
                     self.pc = self.status[UEPC_INDEX as usize] as usize;

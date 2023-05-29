@@ -29,7 +29,10 @@ pub fn parse_instruction(
 
     let mut ipc = InstructionParsingContext::new(tokens, parser, instr, instr_ctx.clone());
 
-    let found = ipc.parse_type_r()? || ipc.parse_type_i()? || ipc.parse_type_s()?;
+    let found = ipc.parse_type_r()?
+        || ipc.parse_type_i()?
+        || ipc.parse_type_s()?
+        || ipc.parse_type_b_and_jumps()?;
     if !found {
         let err = ParserError::UnknownInstruction(instruction).with_context(instr_ctx);
         return Err(err);
@@ -143,6 +146,13 @@ where
             "divu" => Divu(reg!(), reg!(), reg!()).into(),
             "rem" => Rem(reg!(), reg!(), reg!()).into(),
             "remu" => Remu(reg!(), reg!(), reg!()).into(),
+            "uret" => URet.into(),
+            "neg" => Sub(reg!(), 0, reg!()).into(),
+            "not" => Xori(reg!(), reg!(), (-1i32) as u32).into(),
+            "mv" => Mv(reg!(), reg!()).into(),
+            "snez" => Sltu(reg!(), 0, reg!()).into(),
+            "sltz" => Slt(reg!(), reg!(), 0).into(),
+            "sgtz" => Slt(reg!(), 0, reg!()).into(),
             _ => None,
         };
 
@@ -179,6 +189,8 @@ where
             "ori" => Ori(reg!(), reg!(), imm!()).into(),
             "andi" => Andi(reg!(), reg!(), imm!()).into(),
             "xori" => Xori(reg!(), reg!(), imm!()).into(),
+            "seqz" => Sltiu(reg!(), reg!(), 1).into(),
+            "li" => Li(reg!(), imm!()).into(),
             _ => None,
         };
 
@@ -211,6 +223,62 @@ where
             "sb" => Sb(reg!(), imm!(), paren!(reg!())).into(),
             "sh" => Sh(reg!(), imm!(), paren!(reg!())).into(),
             "sw" => Sw(reg!(), imm!(), paren!(reg!())).into(),
+            "ret" => Jalr(0, 1, 0).into(),
+            _ => None,
+        };
+
+        match instr {
+            Some(instr) => {
+                self.parser.code.push(instr);
+                Ok(true)
+            }
+            None => Ok(false),
+        }
+    }
+
+    fn parse_type_b_and_jumps(&mut self) -> Result<bool, Error> {
+        use super::Instruction::{self, *};
+
+        #[rustfmt::skip]
+        macro_rules! reg { () => { self.register()? }; }
+        #[rustfmt::skip]
+        macro_rules! imm { () => { self.immediate()? }; }
+        let instr: Option<Instruction> = match self.instr {
+            "beq" => Beq(reg!(), reg!(), imm!() as usize).into(),
+            "bne" => Bne(reg!(), reg!(), imm!() as usize).into(),
+            "blt" => Blt(reg!(), reg!(), imm!() as usize).into(),
+            "bge" => Bge(reg!(), reg!(), imm!() as usize).into(),
+            "bltu" => Bltu(reg!(), reg!(), imm!() as usize).into(),
+            "bgeu" => Bgeu(reg!(), reg!(), imm!() as usize).into(),
+            "beqz" => Beq(reg!(), 0, imm!() as usize).into(),
+            "bnez" => Bne(reg!(), 0, imm!() as usize).into(),
+            "bltz" => Blt(reg!(), 0, imm!() as usize).into(),
+            "bgez" => Bge(reg!(), 0, imm!() as usize).into(),
+            "bltuz" => Bltu(reg!(), 0, imm!() as usize).into(),
+            "bgeuz" => Bgeu(reg!(), 0, imm!() as usize).into(),
+            "blez" => Bge(0, reg!(), imm!() as usize).into(),
+            "bgtz" => Blt(0, reg!(), imm!() as usize).into(),
+            "ble" => {
+                let (r1, r2) = (reg!(), reg!());
+                Bge(r2, r1, imm!() as usize).into()
+            }
+            "bgt" => {
+                let (r1, r2) = (reg!(), reg!());
+                Blt(r2, r1, imm!() as usize).into()
+            }
+            "bleu" => {
+                let (r1, r2) = (reg!(), reg!());
+                Bgeu(r2, r1, imm!() as usize).into()
+            }
+            "bgtu" => {
+                let (r1, r2) = (reg!(), reg!());
+                Bltu(r2, r1, imm!() as usize).into()
+            }
+            "jal" => Jal(reg!(), imm!() as usize).into(),
+            "jalr" => Jalr(reg!(), reg!(), imm!()).into(),
+            "jr" => Jalr(reg!(), 0, 0).into(),
+            "call" => Jal(1, imm!() as usize).into(),
+            "j" | "tail" | "b" => Jal(0, imm!() as usize).into(),
             _ => None,
         };
 
