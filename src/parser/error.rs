@@ -1,7 +1,6 @@
 use super::{
     data,
     token::{self, ManyContexts},
-    LabelUse,
 };
 use core::fmt;
 use owo_colors::OwoColorize;

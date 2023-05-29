@@ -1,3 +1,6 @@
+pub mod unlabel;
+pub use unlabel::unlabel;
+
 use super::{
     error::{Contextualize, Error, ParserError},
     token::{self, Token},
@@ -181,16 +184,9 @@ where
                 Ok(Instruction::Jal(rd, imm))
             }
 
-            Some(data) => {
+            _ => {
                 let imm = self.immediate_from(token)? as usize;
                 Ok(Instruction::Jal(0, imm))
-            }
-
-            // TODO: ExpectedJalArgs
-            None => Err(ParserError::ExpectedImmediate(None).with_context(self.instr_ctx.clone())),
-            Some(other) => {
-                let ctx = token.as_ref().unwrap().ctx.clone();
-                Err(ParserError::ExpectedImmediate(Some(other.to_string())).with_context(ctx))
             }
         }
     }

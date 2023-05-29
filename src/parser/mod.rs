@@ -18,7 +18,6 @@ use crate::{
     instruction::{FloatInstruction, Instruction},
     parser::{error::Contextualize, register_names::RegNames},
 };
-use byteorder::{ByteOrder, LittleEndian};
 use error::{Error, ParserError};
 use hashbrown::HashMap;
 pub use preprocessor::Preprocess;
@@ -87,8 +86,17 @@ impl ParserContext {
         }
     }
 
-    pub fn define_label(&mut self, label: impl Into<Label>, value: u32) {
-        // TODO: clear backlog[label]
+    pub fn define_label(&mut self, label: impl Into<Label>, value: usize) {
+        let label = label.into();
+        let backlog = self.backlog.remove(&label);
+        self.labels.insert(label, value);
+
+        for use_ in backlog.unwrap_or_default() {
+            match use_ {
+                LabelUse::Code(i, _) => text::unlabel(&mut self.code, i, value),
+                LabelUse::Data(i, t, _) => data::unlabel(&mut self.data, i, t, value as u32),
+            }
+        }
     }
 }
 
@@ -119,11 +127,8 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
 
         match ctx.segment {
             Segment::Text => match token.data {
-                Label(label) => {
-                    ctx.labels.insert(label, ctx.code.len() * 4);
-                }
+                Label(label) => ctx.define_label(label, 4 * ctx.code.len()),
                 Identifier(id) => text::parse_instruction(&mut tokens, &mut ctx, id, token.ctx)?,
-
                 Directive(d) => {
                     return Err(ParserError::UnknownDirective(d).with_context(token.ctx))
                 }
@@ -134,9 +139,7 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
                 }
             },
             Segment::Data => match token.data {
-                Label(label) => {
-                    ctx.labels.insert(label, ctx.data.len());
-                }
+                Label(label) => ctx.define_label(label, ctx.data.len()),
                 Directive(d) if d.parse::<data::Type>().is_ok() => {
                     ctx.data_type = d.parse().unwrap();
                 }
