@@ -44,7 +44,6 @@ jobs:
       - name: Install toolchain
         run: rustup target add ${{ matrix.target }}
       - name: Build
-        uses: actions-rs/cargo@v1
         run: cargo build --profile release-lto --features=${{ matrix.features.list }} --target=${{ matrix.case.target }}
       - name: Strip binary
         run: strip ${{ matrix.case.output }}
