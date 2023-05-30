@@ -35,9 +35,9 @@ jobs:
             os: macos-latest
         features:
           - list: ""
-            output-add: --24-bit-display
-          - list: 8-bit-display
-            output-add: --8-bit-display
+            output-add: --original
+          - list: unb
+            output-add: --unb
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -55,7 +55,7 @@ jobs:
         with:
           use-cross: ${{ matrix.case.use_cross }}
           command: build
-          args: --release --features=${{ matrix.features.list }} --target=${{ matrix.case.target }}
+          args: --profile release-lto --features=${{ matrix.features.list }} --target=${{ matrix.case.target }}
       - name: Strip binary
         run: strip ${{ matrix.case.output }}
       - name: Rename output
