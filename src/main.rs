@@ -21,10 +21,10 @@ mod simulator;
 pub mod utf8_lossy_lines;
 pub mod util;
 
-use std::error::Error;
-use std::thread;
 use lazy_static::lazy_static;
 use owo_colors::OwoColorize;
+use std::error::Error;
+use std::thread;
 
 lazy_static! {
     pub static ref ARGS: args::Args = args::get_args();

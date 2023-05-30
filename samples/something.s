@@ -17,7 +17,7 @@ main:
     li s1 1    # frame
     li s10 0   # last pressed key, only used for get_key
 
-main.loop :
+main.loop:
     mv a0 s0
     mv a1 s1
     jal print

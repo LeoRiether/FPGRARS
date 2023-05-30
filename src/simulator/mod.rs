@@ -111,7 +111,12 @@ impl Simulator {
     pub fn print_state(&self) {
         eprintln!("{}", "Registers:".bright_blue());
         for i in 0..32 {
-            eprint!("{}{:02}: {:08x} ", "x".bright_blue(), i.bright_blue(), self.registers[i]);
+            eprint!(
+                "{}{:02}: {:08x} ",
+                "x".bright_blue(),
+                i.bright_blue(),
+                self.registers[i]
+            );
             if i % 4 == 3 {
                 eprintln!();
             }
@@ -119,7 +124,12 @@ impl Simulator {
         eprintln!();
         eprintln!("{}", "Float Registers:".bright_blue());
         for i in 0..32 {
-            eprint!("{}{:02}: {:<8} ", "f".bright_blue(), i.bright_blue(), self.floats[i]);
+            eprint!(
+                "{}{:02}: {:<8} ",
+                "f".bright_blue(),
+                i.bright_blue(),
+                self.floats[i]
+            );
             if i % 4 == 3 {
                 eprintln!();
             }

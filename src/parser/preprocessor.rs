@@ -1,4 +1,4 @@
-use std::{path::Path};
+use std::path::Path;
 
 use crate::{inner_bail, parser::error::Contextualize};
 use hashbrown::HashMap;

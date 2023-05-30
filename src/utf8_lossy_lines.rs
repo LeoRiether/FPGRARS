@@ -1,4 +1,4 @@
-use std::io::{BufRead, self};
+use std::io::{self, BufRead};
 
 pub struct Utf8LossyLines<R: BufRead> {
     reader: R,
@@ -12,7 +12,9 @@ impl<R: BufRead> Iterator for Utf8LossyLines<R> {
         self.buf.clear();
         match self.reader.read_until(b'\n', &mut self.buf) {
             Ok(0) => None,
-            Ok(_) => Some(Ok(String::from_utf8_lossy(&self.buf[..self.buf.len()-1]).into_owned())),
+            Ok(_) => Some(Ok(
+                String::from_utf8_lossy(&self.buf[..self.buf.len() - 1]).into_owned()
+            )),
             Err(e) => Some(Err(e)),
         }
     }

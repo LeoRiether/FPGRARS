@@ -1,8 +1,8 @@
 pub mod unlabel;
 pub use unlabel::unlabel;
 
-use crate::parser::LabelUseType;
 use crate::parser::error::Contextualize;
+use crate::parser::LabelUseType;
 
 use super::error::{Error, ParserError};
 use super::token::Token;

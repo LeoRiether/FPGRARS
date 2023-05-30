@@ -10,4 +10,3 @@ macro_rules! inner_bail {
         }
     };
 }
-
