@@ -1,9 +1,6 @@
 use std::{collections::VecDeque, path::Path};
 
-use crate::{
-    inner_bail,
-    parser::error::{Contextualize, ParserError},
-};
+use crate::{inner_bail, parser::error::Contextualize};
 use hashbrown::HashMap;
 use lazy_static::lazy_static;
 use owo_colors::OwoColorize;
@@ -53,7 +50,7 @@ struct Macro {
 pub struct Preprocessor {
     /// Stack of lexers. When we find an `.include` directive, we push a new lexer onto the stack.
     lexers: Vec<Lexer>,
-    buffer: VecDeque<Token>,
+    buffer: VecDeque<Result<Token, Error>>,
     macros: HashMap<String, Macro>,
     equs: HashMap<String, Token>,
 }
@@ -68,9 +65,15 @@ impl Preprocessor {
         }
     }
 
+    pub fn peek(&mut self) -> Option<&Result<Token, Error>> {
+        let token = self.next_token()?;
+        self.buffer.push_front(token);
+        self.buffer.front()
+    }
+
     pub fn next_token(&mut self) -> Option<Result<Token, Error>> {
         if let Some(token) = self.buffer.pop_front() {
-            return Some(Ok(token));
+            return Some(token);
         }
 
         loop {
@@ -97,12 +100,14 @@ impl Preprocessor {
         let expanded_body = m.body.iter().map(|token| match token.data {
             token::Data::MacroArg(ref arg) => {
                 let index = m.args[arg];
-                args[index].clone()
+                Ok(args[index].clone())
             }
-            _ => token.clone(),
+            _ => Ok(token.clone()),
         });
 
-        self.buffer.extend(expanded_body);
+        for token in expanded_body {
+            self.buffer.push_front(token);
+        }
     }
 
     fn consume_include(&mut self, include_ctx: token::Context) -> Result<(), Error> {
@@ -201,6 +206,7 @@ impl Preprocessor {
             }
         }
 
+        r#macro.body.reverse(); // Macro bodies are stored in reverse!
         self.macros.insert(r#macro.name.clone(), r#macro);
         Ok(())
     }
@@ -295,23 +301,20 @@ impl Preprocessor {
     ) -> Result<Vec<Token>, Error> {
         use token::Data::Char;
 
-        // A lot of lines to match an opening parenthesis...
-        let open_paren = inner_bail!(self.next_token());
-        let ctx = open_paren
-            .as_ref()
-            .map(|t| t.ctx.clone())
-            .unwrap_or(args_start_ctx.clone());
-        match open_paren.map(|t| t.data) {
-            Some(Char('(')) => {}
-            other => {
-                return Err(ParserError::ExpectedToken(Char('('), other)
-                    .with_context(ctx)
-                    .with_tip(&*MACRO_ARGS_TIP))
+        // Match opening parenthesis
+        let open_paren = match self.peek() {
+            None => None,
+            Some(Err(_)) => None, // !
+            Some(Ok(t)) => Some(t),
+        };
+        match open_paren.map(|t| &t.data) {
+            Some(Char('(')) => {
+                self.next_token();
+                let tokens = self.consume_until(Char(')'), args_start_ctx)?;
+                Ok(tokens)
             }
+            _ => Ok(vec![]),
         }
-
-        let tokens = self.consume_until(Char(')'), args_start_ctx)?;
-        Ok(tokens)
     }
 
     /// Read an .equ
