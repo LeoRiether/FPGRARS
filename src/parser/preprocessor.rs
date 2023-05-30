@@ -86,6 +86,10 @@ impl Preprocessor {
         self.macros.contains_key(name)
     }
 
+    fn is_registered_equ(&self, name: &str) -> bool {
+        self.equs.contains_key(name)
+    }
+
     /// When a macro has been invoked in the assembly code, `expand_macro` expands the invocation,
     /// putting the body of the macro into `self.buffer`.
     fn expand_macro(&mut self, name: &str, args: &[Token]) {
@@ -369,19 +373,12 @@ impl Iterator for Preprocessor {
                     return Some(Err(e));
                 }
 
-                eprintln!(
-                    "Calling macro {} with args {:?}",
-                    id.bright_green(),
-                    args.as_ref()
-                        .unwrap()
-                        .iter()
-                        .map(|t| t.data.clone())
-                        .collect::<Vec<_>>()
-                        .bright_blue()
-                );
-
                 self.expand_macro(&id, &args.unwrap());
                 self.next()
+            }
+            Identifier(id) if self.is_registered_equ(&id) => {
+                let value = self.equs.get(&id).unwrap().clone();
+                Some(Ok(value.with_ctx(token.ctx.clone())))
             }
             _ => Some(Ok(token)),
         }

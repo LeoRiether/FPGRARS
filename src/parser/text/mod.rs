@@ -1,8 +1,11 @@
 pub mod unlabel;
+use std::iter::Peekable;
+
 pub use unlabel::unlabel;
 
 use super::{
     error::{Contextualize, Error, ParserError},
+    register_names::RegMap,
     token::{self, Token},
     ParserContext,
 };
@@ -12,17 +15,32 @@ use owo_colors::OwoColorize;
 
 lazy_static! {
     static ref TIP_IMMEDIATE: String = format!(
-        "Some immediate values are: {}, {}, {:x}, {:b} and '{}'",
+        "Some immediate values are: {}, {}, {}{:x}, {}{:b} and {}{}{}",
         10.bright_blue(),
         (-10).bright_blue(),
+        "0x".bright_blue(),
         0xFFAABBCC_u32.bright_blue(),
+        "0b".bright_blue(),
         0b101.bright_blue(),
-        'a'.bright_blue()
+        "'".bright_blue(),
+        'a'.bright_blue(),
+        "'".bright_blue(),
     );
 }
 
+fn is_register(regs: &RegMap, token: Option<&Result<Token, Error>>) -> bool {
+    use token::Data::Identifier;
+    match token {
+        Some(Ok(Token {
+            data: Identifier(id),
+            ..
+        })) => regs.contains_key(id),
+        _ => false,
+    }
+}
+
 pub fn parse_instruction(
-    tokens: &mut impl Iterator<Item = Result<Token, Error>>,
+    tokens: &mut Peekable<impl Iterator<Item = Result<Token, Error>>>,
     parser: &mut ParserContext,
     instruction: String,
     instr_ctx: token::Context,
@@ -46,7 +64,7 @@ pub fn parse_instruction(
 }
 
 struct InstructionParsingContext<'a, TI: Iterator<Item = Result<Token, Error>>> {
-    tokens: &'a mut TI,
+    tokens: &'a mut Peekable<TI>,
     parser: &'a mut ParserContext,
     instr: &'a str,
     instr_ctx: token::Context,
@@ -57,7 +75,7 @@ where
     TI: Iterator<Item = Result<Token, Error>>,
 {
     fn new(
-        tokens: &'a mut TI,
+        tokens: &'a mut Peekable<TI>,
         parser: &'a mut ParserContext,
         instr: &'a str,
         instr_ctx: token::Context,
@@ -170,27 +188,6 @@ where
         }
     }
 
-    /// The arguments for a jal can be either `jal label` or `jal rd, label`. This method parses
-    /// these arguments
-    fn jal_hack(&mut self) -> Result<Instruction, Error> {
-        use token::Data::Identifier;
-        let regs = &self.parser.regnames.regs;
-        let token = inner_bail!(self.tokens.next());
-
-        match token.as_ref().map(|t| &t.data) {
-            Some(Identifier(id)) if regs.contains_key(id) => {
-                let rd = regs[id];
-                let imm = self.immediate()? as usize;
-                Ok(Instruction::Jal(rd, imm))
-            }
-
-            _ => {
-                let imm = self.immediate_from(token)? as usize;
-                Ok(Instruction::Jal(1, imm))
-            }
-        }
-    }
-
     fn parse_type_r(&mut self) -> Result<bool, Error> {
         use super::Instruction::*;
 
@@ -247,12 +244,46 @@ where
                 res
             }};
         }
+
+        // TODO: improve error messages for this
+        macro_rules! load_madness {
+            ($instruction:expr) => {{
+                let rd = reg!();
+                if let Some(Ok(Token {
+                    data: Char('('), ..
+                })) = self.tokens.peek()
+                {
+                    // lw rd, (rs1)
+                    let rs1 = paren!(reg!());
+                    $instruction(rd, 0, rs1)
+                } else {
+                    let imm = imm!();
+                    if let Some(Ok(Token {
+                        data: Char('('), ..
+                    })) = self.tokens.peek()
+                    {
+                        // lw rd, imm(rs1)
+                        let rs1 = paren!(reg!());
+                        $instruction(rd, imm, rs1)
+                    } else {
+                        // lw rd, label
+                        // gets transformed to:
+                        // la rd label
+                        // lw rd, 0(rd)
+                        self.parser.code.push(Li(rd, imm));
+                        self.parser.code.push($instruction(rd, 0, rd));
+                        return Ok(true);
+                    }
+                }
+            }};
+        }
+
         let instr = match self.instr {
             "ecall" => Ecall,
             "ebreak" => Ebreak,
-            "lb" => Lb(reg!(), imm!(), paren!(reg!())),
-            "lh" => Lh(reg!(), imm!(), paren!(reg!())),
-            "lw" => Lw(reg!(), imm!(), paren!(reg!())),
+            "lb" => load_madness!(Lb),
+            "lh" => load_madness!(Lh),
+            "lw" => load_madness!(Lw),
             "lbu" => Lbu(reg!(), imm!(), paren!(reg!())),
             "lhu" => Lhu(reg!(), imm!(), paren!(reg!())),
             "addi" => Addi(reg!(), reg!(), imm!()),
@@ -265,6 +296,7 @@ where
             "andi" => Andi(reg!(), reg!(), imm!()),
             "xori" => Xori(reg!(), reg!(), imm!()),
             "seqz" => Sltiu(reg!(), reg!(), 1),
+            "lui" => Li(reg!(), imm!() << 12),
             "li" | "la" => Li(reg!(), imm!()),
             "nop" => Addi(0, 0, 0),
             _ => return Ok(false),
@@ -339,7 +371,10 @@ where
                 let (r1, r2) = (reg!(), reg!());
                 Bltu(r2, r1, imm!() as usize)
             }
-            "jal" => self.jal_hack()?,
+            "jal" if is_register(&self.parser.regnames.regs, self.tokens.peek()) => {
+                Jal(reg!(), imm!() as usize)
+            }
+            "jal" => Jal(1, imm!() as usize),
             "jalr" => Jalr(reg!(), reg!(), imm!()),
             "jr" => Jalr(reg!(), 0, 0),
             "call" => Jal(1, imm!() as usize),
@@ -459,7 +494,7 @@ mod tests {
     #[test]
     fn test_la() {
         let input = "la x10 0x800";
-        let mut tokens = Lexer::from_content(String::from(input), "type_r.s");
+        let mut tokens = Lexer::from_content(String::from(input), "type_r.s").peekable();
         let mut parser = ParserContext::default();
 
         let instruction = tokens.next().unwrap().unwrap().data.to_string();
@@ -483,7 +518,7 @@ mod tests {
             sltu s0, s1, s2
             xor t3, t4, t5
             divu s11, s10, s9";
-        let mut tokens = Lexer::from_content(String::from(input), "type_r.s");
+        let mut tokens = Lexer::from_content(String::from(input), "type_r.s").peekable();
         let mut parser = ParserContext::default();
 
         for _ in 0..6 {
@@ -516,7 +551,7 @@ mod tests {
         let input = "sb x1, 0(x2)
             sh x10, 0xFF(x30)
             sw x0, 'a'(x0)";
-        let mut tokens = Lexer::from_content(String::from(input), "type_s.s");
+        let mut tokens = Lexer::from_content(String::from(input), "type_s.s").peekable();
         let mut parser = ParserContext::default();
 
         for _ in 0..3 {

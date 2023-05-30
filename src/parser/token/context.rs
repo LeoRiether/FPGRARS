@@ -36,6 +36,8 @@ impl Context {
         if c == '\n' {
             self.column = 1;
             self.line += 1;
+        } else if c == '\t' {
+            self.column += 4;
         } else {
             self.column += 1;
         }
