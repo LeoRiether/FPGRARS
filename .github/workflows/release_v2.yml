@@ -16,18 +16,18 @@ jobs:
         # https://doc.rust-lang.org/nightly/rustc/platform-support.html
         case:
           - target: x86_64-pc-windows-msvc
-            output: target/x86_64-pc-windows-msvc/release-lto/fpgrars.exe
-            finalOutput: target/x86_64-pc-windows-msvc/release-lto/fpgrars-x86_64-pc-windows-msvc
+            output: target/x86_64-pc-windows-msvc/release/fpgrars.exe
+            finalOutput: target/x86_64-pc-windows-msvc/release/fpgrars-x86_64-pc-windows-msvc
             finalOutputExt: .exe
             os: windows-latest
           - target: x86_64-unknown-linux-gnu
-            output: target/x86_64-unknown-linux-gnu/release-lto/fpgrars
-            finalOutput: target/x86_64-unknown-linux-gnu/release-lto/fpgrars-x86_64-unknown-linux-gnu
+            output: target/x86_64-unknown-linux-gnu/release/fpgrars
+            finalOutput: target/x86_64-unknown-linux-gnu/release/fpgrars-x86_64-unknown-linux-gnu
             finalOutputExt: ""
             os: ubuntu-latest
           - target: x86_64-apple-darwin
-            output: target/x86_64-apple-darwin/release-lto/fpgrars
-            finalOutput: target/x86_64-apple-darwin/release-lto/fpgrars-x86_64-apple-darwin
+            output: target/x86_64-apple-darwin/release/fpgrars
+            finalOutput: target/x86_64-apple-darwin/release/fpgrars-x86_64-apple-darwin
             finalOutputExt: ""
             os: macos-latest
         features:
@@ -46,7 +46,7 @@ jobs:
         with:
           command: build
           target: ${{ matrix.case.target }}
-          args: "--profile release-lto --features=${{ matrix.features.list }}"
+          args: "--profile release --features=${{ matrix.features.list }}"
           strip: true
       - name: Rename output
         run: mv ${{ matrix.case.output }} ${{ matrix.case.finalOutput }}${{ matrix.features.output-add }}${{ matrix.case.finalOutputExt }}
