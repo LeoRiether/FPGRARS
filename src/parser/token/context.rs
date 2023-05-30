@@ -1,13 +1,16 @@
+use crate::utf8_lossy_lines::Utf8LossyLinesExt;
 use owo_colors::OwoColorize;
 use std::{
     fmt,
     fs::File,
     io::BufReader,
+    path::{Path, PathBuf},
     rc::Rc,
 };
-use crate::utf8_lossy_lines::Utf8LossyLinesExt;
 
-/// Token context, including the current filename, line and column
+/// Token context, including the current filename, line and column.
+/// Displaying a context will read the file and print the 3 lines surrounding it, as well as point
+/// to the position of the token.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Context {
     pub file: Rc<String>,
@@ -50,7 +53,7 @@ impl fmt::Display for Context {
             f,
             "   {} {} at line {}, column {}",
             "-->".bright_blue().bold(),
-            self.file.bright_yellow(),
+            Path::new(&*self.file).normalize().display().bright_yellow(),
             self.line.bright_yellow(),
             self.column.bright_yellow(),
         )?;
@@ -58,7 +61,7 @@ impl fmt::Display for Context {
         let file = File::open(&*self.file);
         if let Err(e) = file {
             return writeln!(
-                f, 
+                f,
                 "   While we were printing this error another error ocurred!\n   Couldn't open '{}' because: {}",
                 self.file.bright_yellow(), e.bold()
             );
@@ -66,7 +69,7 @@ impl fmt::Display for Context {
 
         let reader = BufReader::new(file.unwrap());
         let from = self.line.saturating_sub(2) as usize;
-        for (line, i) in reader.utf8_lossy_lines().skip(from).take(3).zip(from+1..) {
+        for (line, i) in reader.utf8_lossy_lines().skip(from).take(3).zip(from + 1..) {
             let line = line.unwrap();
             writeln!(f, "{:^4}{} {}", i.bright_blue(), "|".bright_blue(), line)?;
 
@@ -85,5 +88,51 @@ pub struct ManyContexts<'a>(pub &'a Vec<Context>);
 impl<'a> fmt::Display for ManyContexts<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.iter().try_for_each(|ctx| writeln!(f, "{}", ctx))
+    }
+}
+
+//////////////////////////////////
+//        Normalize Path        //
+//////////////////////////////////
+trait NormalizePathExt {
+    fn normalize(&self) -> PathBuf;
+}
+
+// Based on [the cargo implementation](https://github.com/rust-lang/cargo/blob/fede83ccf973457de319ba6fa0e36ead454d2e20/src/cargo/util/paths.rs#L61) and the
+impl NormalizePathExt for Path {
+    fn normalize(&self) -> PathBuf {
+        use std::path::Component::*;
+        let mut components = self.components().peekable();
+
+        let mut normalized = if let Some(c @ Prefix(..)) = components.peek().cloned() {
+            components.next();
+            PathBuf::from(c.as_os_str())
+        } else {
+            PathBuf::new()
+        };
+
+        let mut level = 0;
+        for component in components {
+            match component {
+                Prefix(..) => unreachable!(),
+                CurDir => {}
+                RootDir => {
+                    normalized.push(component.as_os_str());
+                    level += 1;
+                }
+                ParentDir if level == 0 => {
+                    normalized.push("..");
+                }
+                ParentDir => {
+                    normalized.pop();
+                    level -= 1;
+                }
+                Normal(path) => {
+                    normalized.push(path);
+                    level += 1;
+                }
+            }
+        }
+        normalized
     }
 }
