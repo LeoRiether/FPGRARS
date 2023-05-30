@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, path::Path};
+use std::{path::Path};
 
 use crate::{inner_bail, parser::error::Contextualize};
 use hashbrown::HashMap;
@@ -50,7 +50,7 @@ struct Macro {
 pub struct Preprocessor {
     /// Stack of lexers. When we find an `.include` directive, we push a new lexer onto the stack.
     lexers: Vec<Lexer>,
-    buffer: VecDeque<Result<Token, Error>>,
+    buffer: Vec<Result<Token, Error>>,
     macros: HashMap<String, Macro>,
     equs: HashMap<String, Token>,
 }
@@ -59,7 +59,7 @@ impl Preprocessor {
     pub fn new(tokens: Lexer) -> Self {
         Self {
             lexers: vec![tokens],
-            buffer: VecDeque::new(),
+            buffer: Vec::new(),
             macros: HashMap::new(),
             equs: HashMap::new(),
         }
@@ -67,12 +67,12 @@ impl Preprocessor {
 
     pub fn peek(&mut self) -> Option<&Result<Token, Error>> {
         let token = self.next_token()?;
-        self.buffer.push_front(token);
-        self.buffer.front()
+        self.buffer.push(token);
+        self.buffer.last()
     }
 
     pub fn next_token(&mut self) -> Option<Result<Token, Error>> {
-        if let Some(token) = self.buffer.pop_front() {
+        if let Some(token) = self.buffer.pop() {
             return Some(token);
         }
 
@@ -106,7 +106,7 @@ impl Preprocessor {
         });
 
         for token in expanded_body {
-            self.buffer.push_front(token);
+            self.buffer.push(token);
         }
     }
 
