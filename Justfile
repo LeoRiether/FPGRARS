@@ -2,7 +2,7 @@ run +ARGS:
     cargo run --release -- {{ARGS}}
 
 build-unb:
-    cargo build --features "8-bit-display" --release
+    cargo build --features unb --release
 
 unb +ARGS:
-    cargo run --features "8-bit-display" --release  -- {{ARGS}}
+    cargo run --features unb --release  -- {{ARGS}}

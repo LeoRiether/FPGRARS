@@ -6,12 +6,14 @@
 #############################################################
 
 .data
+N: .word 10000
 
 .text
-    # Allocates the array in the stack with 8000 integers
+    # Allocates the array in the stack with N integers
     # [sp .. s0)
     mv s0 sp
-    li t0 8000
+    lw t0 N
+    slli t0 t0 2
     sub sp sp t0
     mv s1 sp
 

@@ -177,7 +177,7 @@ fn init_with_provider(mmio: Arc<Mutex<Vec<u8>>>, color_prov: impl ColorProvider 
 }
 
 /// Init the 8-bit (BBGGGRRR) format bitmap display
-#[cfg(feature = "8-bit-display")]
+#[cfg(feature = "unb")]
 pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
     let color_to_rgb = |x: u8| {
         let r = x & 0b111;
@@ -211,7 +211,7 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
 /// Init the 24-bit (R8G8B8) format bitmap display
 /// Note: this format is word-aligned, which means every color takes up
 /// 32 bits in memory, but only 24 are actually used
-#[cfg(not(feature = "8-bit-display"))]
+#[cfg(not(feature = "unb"))]
 pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
     let color_provider = |mmio: &[u8], y: usize, x: usize| {
         let bytes_per_pixel = 4;

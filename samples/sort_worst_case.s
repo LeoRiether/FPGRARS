@@ -8,7 +8,7 @@
 .data
 
 .text
-    # Allocates the array in the stack with 8000 integers
+    # Allocates the array in the stack with 2000 integers
     # [sp .. s0)
     mv s0 sp
     li t0 8000
