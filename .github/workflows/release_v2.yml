@@ -16,20 +16,20 @@ jobs:
         # https://doc.rust-lang.org/nightly/rustc/platform-support.html
         case:
           - target: x86_64-pc-windows-gnu
-            output: target/x86_64-pc-windows-gnu/release/fpgrars.exe
-            finalOutput: target/x86_64-pc-windows-gnu/release/fpgrars-x86_64-pc-windows-gnu
+            output: target/x86_64-pc-windows-gnu/release-lto/fpgrars.exe
+            finalOutput: target/x86_64-pc-windows-gnu/release-lto/fpgrars-x86_64-pc-windows-gnu
             finalOutputExt: .exe
             use_cross: true
             os: ubuntu-latest
           - target: x86_64-unknown-linux-gnu
-            output: target/x86_64-unknown-linux-gnu/release/fpgrars
-            finalOutput: target/x86_64-unknown-linux-gnu/release/fpgrars-x86_64-unknown-linux-gnu
+            output: target/x86_64-unknown-linux-gnu/release-lto/fpgrars
+            finalOutput: target/x86_64-unknown-linux-gnu/release-lto/fpgrars-x86_64-unknown-linux-gnu
             finalOutputExt: ""
             use_cross: false
             os: ubuntu-latest
           - target: x86_64-apple-darwin
-            output: target/x86_64-apple-darwin/release/fpgrars
-            finalOutput: target/x86_64-apple-darwin/release/fpgrars-x86_64-apple-darwin
+            output: target/x86_64-apple-darwin/release-lto/fpgrars
+            finalOutput: target/x86_64-apple-darwin/release-lto/fpgrars-x86_64-apple-darwin
             finalOutputExt: ""
             use_cross: false
             os: macos-latest
