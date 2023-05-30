@@ -15,11 +15,11 @@ jobs:
       matrix:
         # https://doc.rust-lang.org/nightly/rustc/platform-support.html
         case:
-          - target: x86_64-pc-windows-gnu
-            output: target/x86_64-pc-windows-gnu/release-lto/fpgrars.exe
-            finalOutput: target/x86_64-pc-windows-gnu/release-lto/fpgrars-x86_64-pc-windows-gnu
+          - target: x86_64-pc-windows-msvc
+            output: target/x86_64-pc-windows-msvc/release-lto/fpgrars.exe
+            finalOutput: target/x86_64-pc-windows-msvc/release-lto/fpgrars-x86_64-pc-windows-msvc
             finalOutputExt: .exe
-            os: ubuntu-latest
+            os: windows-latest
           - target: x86_64-unknown-linux-gnu
             output: target/x86_64-unknown-linux-gnu/release-lto/fpgrars
             finalOutput: target/x86_64-unknown-linux-gnu/release-lto/fpgrars-x86_64-unknown-linux-gnu
@@ -39,14 +39,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install ALSA (for MIDI support)
-        if: matrix.case.os != 'macos-latest'
+        if: matrix.case.os == 'ubuntu-latest'
         run: sudo apt-get install libasound2-dev
-      - name: Install toolchain
-        run: rustup target add ${{ matrix.target }}
       - name: Build
-        run: cargo build --profile release-lto --features=${{ matrix.features.list }} --target=${{ matrix.case.target }}
-      - name: Strip binary
-        run: strip ${{ matrix.case.output }}
+        uses: houseabsolute/actions-rust-cross@v0
+        with:
+          command: build
+          target: ${{ matrix.case.target }}
+          args: "--profile release-lto --features=${{ matrix.features.list }}"
+          strip: true
       - name: Rename output
         run: mv ${{ matrix.case.output }} ${{ matrix.case.finalOutput }}${{ matrix.features.output-add }}${{ matrix.case.finalOutputExt }}
       - name: Release
