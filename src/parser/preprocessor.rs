@@ -1,7 +1,11 @@
 use std::{collections::VecDeque, path::Path};
 
-use crate::{inner_bail, parser::error::Contextualize};
+use crate::{
+    inner_bail,
+    parser::error::{Contextualize, ParserError},
+};
 use hashbrown::HashMap;
+use lazy_static::lazy_static;
 use owo_colors::OwoColorize;
 
 use super::{
@@ -15,6 +19,13 @@ static MACRO_EXAMPLE_TIP: &str =
    .macro Name(%arg1, %arg2)
        add %arg1, %arg1, %arg2
    .end_macro";
+
+lazy_static! {
+    static ref MACRO_ARGS_TIP: String = format!(
+        "Maybe you forgot to call the macro with parentheses?\n   e.g. {} or {}",
+        "my_macro()", "my_macro(t0, 2, \"Hello World\")"
+    );
+}
 
 /// Defines the `preprocess` methods for a lexer
 /// ```
@@ -145,14 +156,9 @@ impl Preprocessor {
 
         // Read macro args
         let mut peek = inner_bail!(self.next_token());
-        if let Some(
-            token @ Token {
-                data: Char('('), ..
-            },
-        ) = peek
-        {
-            self.consume_macro_args(&mut r#macro, token.ctx)?;
-            peek = None;
+        if let Some(Char('(')) = peek.as_ref().map(|t| &t.data) {
+            let token = peek.take().unwrap();
+            self.consume_macro_decl_args(&mut r#macro, token.ctx)?;
         }
 
         // Read macro body until .end_macro
@@ -195,23 +201,53 @@ impl Preprocessor {
         Ok(())
     }
 
-    /// Read macro arguments until the closing parenthesis.
-    fn consume_macro_args(
+    /// Reads tokens until a matching token is found.
+    ///
+    /// For example:
+    /// ```
+    /// use token::Data;
+    /// let preprocessor = Lexer::from("%arg1, %arg2)".into(), "test.s");
+    /// let res = preprocessor.consume_until(Data::Char(')'))
+    ///
+    /// let res: Vec<_> = res.unwrap().into_iter().map(|t| t.data).collect();
+    /// assert_eq!(res, &[Data::MacroArg("arg1".into()), Data::MacroArg("arg2".into())]);
+    /// ```
+    fn consume_until(
+        &mut self,
+        data: token::Data,
+        fallback_ctx: token::Context,
+    ) -> Result<Vec<Token>, Error> {
+        let mut tokens = Vec::new();
+        loop {
+            let token = inner_bail!(self.next_token());
+            match token {
+                Some(t) if t.data == data => break Ok(tokens),
+                Some(t) => tokens.push(t),
+
+                None => {
+                    return Err(PreprocessorError::UnexpectedToken(None).with_context(fallback_ctx))
+                }
+            }
+        }
+    }
+
+    /// Read macro arguments in a declaration until the closing parenthesis.
+    /// Assumes the opening parenthesis has already been consumed.
+    fn consume_macro_decl_args(
         &mut self,
         r#macro: &mut Macro,
         args_start_ctx: token::Context,
     ) -> Result<(), Error> {
         use super::token::Data::{Char, Identifier, MacroArg};
-        loop {
-            match inner_bail!(self.next_token()) {
-                Some(Token {
-                    data: Char(')'), ..
-                }) => break Ok(()),
 
-                Some(Token {
+        let tokens = self.consume_until(Char(')'), args_start_ctx)?;
+
+        for token in tokens {
+            match token {
+                Token {
                     data: MacroArg(arg),
                     ctx,
-                }) => {
+                } => {
                     use hashbrown::hash_map::Entry;
                     let index = r#macro.args.len();
                     let entry = r#macro.args.entry(arg.clone());
@@ -227,13 +263,7 @@ impl Preprocessor {
                     entry.or_insert(index);
                 }
 
-                None => {
-                    return Err(PreprocessorError::UnexpectedToken(None)
-                        .with_context(args_start_ctx)
-                        .with_tip("Did you forget to close the macro arguments with ')'?"))
-                }
-
-                Some(other) => {
+                other => {
                     let mut err = PreprocessorError::UnexpectedToken(Some(other.data.clone()))
                         .with_context(other.ctx)
                         .with_tip(MACRO_EXAMPLE_TIP);
@@ -250,6 +280,34 @@ impl Preprocessor {
                 }
             }
         }
+
+        Ok(())
+    }
+
+    /// Read macro arguments until the closing parenthesis.
+    fn consume_macro_invocation_args(
+        &mut self,
+        args_start_ctx: token::Context,
+    ) -> Result<Vec<Token>, Error> {
+        use token::Data::Char;
+
+        // A lot of lines to match an opening parenthesis...
+        let open_paren = inner_bail!(self.next_token());
+        let ctx = open_paren
+            .as_ref()
+            .map(|t| t.ctx.clone())
+            .unwrap_or(args_start_ctx.clone());
+        match open_paren.map(|t| t.data) {
+            Some(Char('(')) => {}
+            other => {
+                return Err(ParserError::ExpectedToken(Char('('), other)
+                    .with_context(ctx)
+                    .with_tip(&*MACRO_ARGS_TIP))
+            }
+        }
+
+        let tokens = self.consume_until(Char(')'), args_start_ctx)?;
+        Ok(tokens)
     }
 
     /// Read an .equ
@@ -306,9 +364,23 @@ impl Iterator for Preprocessor {
                 self.next()
             }
             Identifier(id) if self.is_registered_macro(&id) => {
-                // TODO: get_macro_args
-                // let args = self.get_macro_args();
-                self.expand_macro(&id, &[]);
+                let args = self.consume_macro_invocation_args(token.ctx.clone());
+                if let Err(e) = args {
+                    return Some(Err(e));
+                }
+
+                eprintln!(
+                    "Calling macro {} with args {:?}",
+                    id.bright_green(),
+                    args.as_ref()
+                        .unwrap()
+                        .iter()
+                        .map(|t| t.data.clone())
+                        .collect::<Vec<_>>()
+                        .bright_blue()
+                );
+
+                self.expand_macro(&id, &args.unwrap());
                 self.next()
             }
             _ => Some(Ok(token)),
