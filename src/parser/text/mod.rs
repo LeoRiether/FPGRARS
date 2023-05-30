@@ -186,7 +186,7 @@ where
 
             _ => {
                 let imm = self.immediate_from(token)? as usize;
-                Ok(Instruction::Jal(0, imm))
+                Ok(Instruction::Jal(1, imm))
             }
         }
     }
