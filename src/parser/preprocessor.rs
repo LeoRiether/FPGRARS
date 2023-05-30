@@ -396,6 +396,7 @@ mod tests {
     #[test]
     fn test_macros() {
         use crate::parser::token::Data::*;
+        // NOTE: macros are stored in reverse order!
         let testcases = &[
             (
                 r#".macro INC(%rd, %rs1)
@@ -403,10 +404,10 @@ mod tests {
                 .end_macro"#,
                 "INC",
                 &[
-                    Identifier("addi".into()),
-                    MacroArg("rd".into()),
-                    MacroArg("rs1".into()),
                     Integer(1),
+                    MacroArg("rs1".into()),
+                    MacroArg("rd".into()),
+                    Identifier("addi".into()),
                 ],
             ),
             (
@@ -415,10 +416,10 @@ mod tests {
                 .end_macro"#,
                 "NOP",
                 &[
-                    Identifier("addi".into()),
-                    Identifier("x0".into()),
-                    Identifier("zero".into()),
                     Integer(0),
+                    Identifier("zero".into()),
+                    Identifier("x0".into()),
+                    Identifier("addi".into()),
                 ],
             ),
         ];
