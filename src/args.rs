@@ -1,5 +1,4 @@
 use clap::Parser;
-use std::path::Path;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -23,11 +22,5 @@ pub struct Args {
 }
 
 pub fn get_args() -> Args {
-    let args = Args::parse();
-
-    if !Path::new(&args.file).is_file() {
-        panic!("<{}> must be a valid file", args.file);
-    }
-
-    args
+    Args::parse()
 }

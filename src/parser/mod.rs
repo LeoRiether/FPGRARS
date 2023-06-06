@@ -106,7 +106,7 @@ impl ParserContext {
 /// parser::parse("riscv.s", DATA_SIZE)?
 /// ```
 pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
-    let mut tokens = Lexer::new(entry_file).preprocess().peekable();
+    let mut tokens = Lexer::new(entry_file)?.preprocess().peekable();
 
     let mut ctx = ParserContext::default();
 

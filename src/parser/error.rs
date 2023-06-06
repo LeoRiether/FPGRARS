@@ -1,10 +1,10 @@
 use super::{
     data,
-    token::{self, ManyContexts},
+    token::{self, ManyContexts, context::NormalizePathExt},
 };
 use core::fmt;
 use owo_colors::OwoColorize;
-use std::{borrow::Cow, io};
+use std::{borrow::Cow, io, path::Path};
 use thiserror::Error;
 
 fn some_or_eof<T: fmt::Display>(s: &Option<T>) -> Cow<'static, str> {
@@ -59,6 +59,9 @@ pub enum ParserError {
 pub enum LexerError {
     #[error("I/O Error: {0}")]
     IO(#[from] io::Error),
+
+    #[error("The file '{}' does not exist", Path::new(.0).normalize().display().bright_blue())]
+    FileNotFound(String),
 
     #[error("Expected '{}', but found '{}'", expected.bright_blue(), found.bright_yellow())]
     UnexpectedChar { expected: char, found: char },

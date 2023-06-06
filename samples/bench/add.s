@@ -4,9 +4,7 @@ bignumber: .word 200000000
 
 .text
 main:
-    # lw s0 number
-    la s0 number
-    lw s0 0(s0)
+    lw s0 number
     csrr s1 time
 
 loop:

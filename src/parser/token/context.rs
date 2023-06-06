@@ -94,7 +94,7 @@ impl<'a> fmt::Display for ManyContexts<'a> {
 //////////////////////////////////
 //        Normalize Path        //
 //////////////////////////////////
-trait NormalizePathExt {
+pub(crate) trait NormalizePathExt {
     fn normalize(&self) -> PathBuf;
 }
 

@@ -2,8 +2,8 @@
 
 use super::error::{Error, LexerError};
 use super::token::{Context, ContextualizeResult, Data, Token};
-use std::fs;
 use std::rc::Rc;
+use std::{fs, io};
 
 macro_rules! allowed_identifier {
     () => {
@@ -45,11 +45,16 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    // TODO: should return Result<Self> if reading from the file fails
-    pub fn new(entry_file: &str) -> Self {
-        let buf = fs::read(entry_file).unwrap();
+    pub fn new(entry_file: &str) -> Result<Self, Error> {
+        let buf = match fs::read(entry_file) {
+            Ok(buf) => buf,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                return Err(LexerError::FileNotFound(entry_file.to_string()).into())
+            }
+            Err(e) => return Err(LexerError::IO(e).into()),
+        };
         let content = String::from_utf8_lossy(&buf).to_string();
-        Self::from_content(content, entry_file)
+        Ok(Self::from_content(content, entry_file))
     }
 
     pub fn from_content(content: String, filename: &str) -> Self {

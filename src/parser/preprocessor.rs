@@ -136,7 +136,7 @@ impl Preprocessor {
             .to_str()
             .unwrap_or_else(|| panic!("Path is not valid UTF-8: {}", path.display().bright_red()));
 
-        let lexer = Lexer::new(path);
+        let lexer = Lexer::new(path).map_err(|e| e.with_context(include_ctx))?;
         self.lexers.push(lexer);
         Ok(())
     }
