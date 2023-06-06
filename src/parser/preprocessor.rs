@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::{inner_bail, parser::error::Contextualize};
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use lazy_static::lazy_static;
 use owo_colors::OwoColorize;
 
@@ -42,6 +42,7 @@ impl Preprocess for Lexer {
 struct Macro {
     name: String,
     args: HashMap<String, usize>,
+    labels_defined: HashSet<String>,
     body: Vec<Token>,
 }
 
@@ -50,8 +51,13 @@ struct Macro {
 pub struct Preprocessor {
     /// Stack of lexers. When we find an `.include` directive, we push a new lexer onto the stack.
     lexers: Vec<Lexer>,
+    /// Tokens in the backlog. Generally created when a macro is expanded.
     buffer: Vec<Result<Token, Error>>,
+    /// Registered macros
     macros: HashMap<String, Macro>,
+    /// How many times have macros been invoked?
+    macro_invocations: u64,
+    /// Registered equs
     equs: HashMap<String, Token>,
 }
 
@@ -61,6 +67,7 @@ impl Preprocessor {
             lexers: vec![tokens],
             buffer: Vec::new(),
             macros: HashMap::new(),
+            macro_invocations: 0,
             equs: HashMap::new(),
         }
     }
@@ -96,11 +103,29 @@ impl Preprocessor {
     /// When a macro has been invoked in the assembly code, `expand_macro` expands the invocation,
     /// putting the body of the macro into `self.buffer`.
     fn expand_macro(&mut self, name: &str, args: &[Token]) {
+        use token::Data;
+        let index = self.macro_invocations;
+        self.macro_invocations += 1;
+
         let m = self.macros.get(name).unwrap();
-        let expanded_body = m.body.iter().map(|token| match token.data {
-            token::Data::MacroArg(ref arg) => {
+        let expanded_body = m.body.iter().map(|token| match &token.data {
+            Data::MacroArg(ref arg) => {
                 let index = m.args[arg];
                 Ok(args[index].clone())
+            }
+            Data::Label(label) => {
+                // NOTE: Labels are expanded with a unique suffix to avoid name collisions:
+                // `label:` => `label_M0:`, `label_M1:`, etc.
+                let mut token = token.clone();
+                token.data = Data::Label(format!("{}_M{}", label, index));
+                Ok(token)
+            }
+            Data::Identifier(id) if m.labels_defined.contains(id) => {
+                // NOTE: Labels that are used inside the macro body and were also defined within it
+                // are also expanded with the unique suffix. See NOTE above.
+                let mut token = token.clone();
+                token.data = Data::Identifier(format!("{}_M{}", id, index));
+                Ok(token)
             }
             _ => Ok(token.clone()),
         });
@@ -143,7 +168,7 @@ impl Preprocessor {
 
     /// Read a macro until the .end_macro directive
     fn consume_macro(&mut self, macro_ctx: token::Context) -> Result<(), Error> {
-        use super::token::Data::{Char, Directive, Identifier, MacroArg};
+        use super::token::Data::{Char, Directive, Identifier, Label, MacroArg};
 
         // Read macro name
         let token = inner_bail!(self.next_token());
@@ -182,6 +207,17 @@ impl Preprocessor {
                     data: Directive(d), ..
                 }) if d == "endmacro" || d == "end_macro" => break,
 
+                Some(Token {
+                    data: Label(d),
+                    ctx,
+                }) => {
+                    r#macro.labels_defined.insert(d.clone());
+                    r#macro.body.push(Token {
+                        data: Label(d),
+                        ctx,
+                    });
+                }
+
                 Some(token) => {
                     // Make sure the argument being used was defined
                     if let MacroArg(arg) = &token.data {
@@ -206,7 +242,7 @@ impl Preprocessor {
             }
         }
 
-        r#macro.body.reverse(); // Macro bodies are stored in reverse!
+        r#macro.body.reverse(); // NOTE: Macro bodies are stored in reverse!
         self.macros.insert(r#macro.name.clone(), r#macro);
         Ok(())
     }
@@ -437,5 +473,41 @@ mod tests {
 
             assert_eq!(m, *expected_macro);
         }
+    }
+
+    #[test]
+    fn test_macro_labels() {
+        let input = "
+            .macro For(%n)
+                li s3 %n
+                j Loop # tests \"forward labels\" as well :)
+                Loop:
+                    addi s3, s3, -1
+                    bgez s3, Loop
+            .end_macro
+
+            For(10)
+            For(20)";
+
+        let expanded = "
+            li s3 10
+            j Loop_M0
+            Loop_M0:
+                addi s3, s3, -1
+                bgez s3, Loop_M0 
+
+            li s3 20
+            j Loop_M1
+            Loop_M1:
+                addi s3, s3, -1
+                bgez s3, Loop_M1";
+
+        let tokens = Lexer::from_content(String::from(input), "macro.s").preprocess();
+        let expanded_tokens = Lexer::from_content(String::from(expanded), "expanded.s");
+
+        let tokens: Vec<_> = tokens.map(|t| t.unwrap().data).collect();
+        let expanded_tokens: Vec<_> = expanded_tokens.map(|t| t.unwrap().data).collect();
+
+        assert_eq!(tokens, expanded_tokens);
     }
 }
