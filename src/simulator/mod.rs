@@ -5,10 +5,9 @@
 //! and you can find how they're simulated at [Simulator::run](struct.Simulator.html#method.run)
 //!
 
-use std::time;
-
 use crate::parser;
 use crate::renderer::{FRAME_0, FRAME_1, HEIGHT, WIDTH};
+use std::time;
 
 pub mod memory;
 use memory::*;
@@ -56,7 +55,7 @@ impl Default for Simulator {
             started_at: time::Instant::now(), // Will be set again in run()
             open_files: files::FileHolder::new(),
             midi_player: midi::MidiPlayer::default(),
-            memory: Memory::default(),
+            memory: Memory::new(),
             code: Vec::new(),
             code_ctx: Vec::new(),
         }
@@ -64,25 +63,24 @@ impl Default for Simulator {
 }
 
 impl Simulator {
-    pub fn from_file(path: &str) -> Result<Self, parser::error::Error> {
-        let mut sim = Self::default();
-
+    pub fn load_file(&mut self, path: &str) -> Result<(), parser::error::Error> {
         let parser::Parsed {
             code,
             code_ctx,
             data,
         } = parser::parse(path, DATA_SIZE)?;
-        sim.code = code;
-        sim.code_ctx = code_ctx;
-        sim.memory.data = data;
+
+        self.code = code;
+        self.code_ctx = code_ctx;
+        self.memory.data = data;
 
         if crate::ARGS.print_instructions {
             eprintln!("{}", "Instructions: ---------------".bright_blue());
-            sim.code.iter().for_each(|i| eprintln!("{:?}", i));
+            self.code.iter().for_each(|i| eprintln!("{:?}", i));
             eprintln!("{}", "-----------------------------".bright_blue());
         }
 
-        Ok(sim)
+        Ok(())
     }
 
     pub fn with_midi_port(mut self, midi_port: Option<usize>) -> Self {

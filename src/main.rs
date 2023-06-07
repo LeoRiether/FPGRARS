@@ -38,14 +38,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sim_thread = thread::Builder::new()
         .name("FPGRARS Simulator".into())
         .spawn(move || {
-            let mut sim = match Simulator::from_file(&ARGS.file) {
-                Ok(x) => x,
-                Err(e) => {
-                    eprintln!("   {}: {}\n", "[error]".bright_red().bold(), e);
-                    std::process::exit(1);
-                }
+            let mut sim = Simulator::default()
+                .with_memory(memory)
+                .with_midi_port(ARGS.port);
+
+            if let Err(e) = sim.load_file(&ARGS.file) {
+                eprintln!("   {}: {}\n", "[error]".bright_red().bold(), e);
+                std::process::exit(1);
             };
-            sim = sim.with_memory(memory).with_midi_port(ARGS.port);
 
             let start_time = std::time::Instant::now();
             sim.run();
