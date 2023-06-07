@@ -63,7 +63,11 @@ fn store_numerical(ctx: &mut ParserContext, value: u32) -> Result<(), Error> {
             LittleEndian::write_f32(&mut ctx.data[pos..], f32::from_bits(value));
         }
         Align => {
-            ctx.data.resize(ctx.data.len() + value as usize, 0);
+            // `.align` Aligns the next data item along a specified byte boundary:
+            // 0 = byte, 1 = half, 2 = word, 3 = double.
+            let multiple = 1 << value;
+            let len = (ctx.data.len() + multiple - 1) / multiple; // ceil(len / multiple)
+            ctx.data.resize(len, 0);
         }
     }
 
