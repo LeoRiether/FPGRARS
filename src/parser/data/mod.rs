@@ -13,12 +13,21 @@ use std::str::FromStr;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Type {
+    /// 32-bit word
     #[default]
     Word,
+    /// 8-bit byte
     Byte,
+    /// 16-bit halfword
     Half,
+    /// Aligns the next data item along a specified byte boundary:
+    /// 0 = byte, 1 = half, 2 = word, 3 = double.
     Align,
+    /// Null-terminated string
     Asciz,
+    /// String that is not null-terminated
+    Ascii,
+    /// 32-bit floating point number
     Float,
 }
 
@@ -32,7 +41,8 @@ impl FromStr for Type {
             "byte" => Ok(Byte),
             "half" => Ok(Half),
             "align" | "space" => Ok(Align),
-            "asciz" | "ascii" | "string" => Ok(Asciz),
+            "asciz" | "string" => Ok(Asciz),
+            "ascii" => Ok(Ascii),
             "float" => Ok(Float),
             _ => Err(ParserError::UnknownDirective(s.to_owned()).into()),
         }
@@ -44,7 +54,7 @@ impl FromStr for Type {
 fn store_numerical(ctx: &mut ParserContext, value: u32) -> Result<(), Error> {
     use Type::*;
     match ctx.data_type {
-        Byte | Asciz => {
+        Byte | Ascii | Asciz => {
             ctx.data.push(value as u8);
         }
         Half => {
@@ -63,8 +73,6 @@ fn store_numerical(ctx: &mut ParserContext, value: u32) -> Result<(), Error> {
             LittleEndian::write_f32(&mut ctx.data[pos..], f32::from_bits(value));
         }
         Align => {
-            // `.align` Aligns the next data item along a specified byte boundary:
-            // 0 = byte, 1 = half, 2 = word, 3 = double.
             let multiple = 1 << value;
             let blocks = (ctx.data.len() + multiple - 1) / multiple; // ceil(len / multiple)
             let len = blocks * multiple;
@@ -87,9 +95,11 @@ pub fn push_data(token: Token, ctx: &mut ParserContext) -> Result<(), Error> {
         Float(f) => store_numerical(ctx, f.to_bits())?,
         CharLiteral(c) => store_numerical(ctx, c as u32)?,
         StringLiteral(s) => {
-            if ctx.data_type == Type::Asciz {
+            if let Type::Asciz | Type::Ascii = ctx.data_type {
                 ctx.data.extend(s.as_bytes());
-                ctx.data.push(0);
+                if let Type::Asciz = ctx.data_type {
+                    ctx.data.push(0);
+                }
             } else {
                 return Err(
                     ParserError::InvalidDataType(StringLiteral(s), ctx.data_type)
@@ -105,6 +115,7 @@ pub fn push_data(token: Token, ctx: &mut ParserContext) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::token::Data;
 
     #[test]
     fn test_alignment_manual() {
@@ -161,5 +172,28 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_strings() {
+        // Ascii (.ascii, not null-terminated)
+        let mut ctx = ParserContext {
+            data_type: Type::Ascii,
+            ..Default::default()
+        };
+
+        let token = Token::new(Data::StringLiteral("Hello world!".to_owned()));
+        assert!(push_data(token, &mut ctx).is_ok());
+        assert_eq!(&ctx.data, b"Hello world!");
+
+        // Asciz (.asciz or .string, null-terminated)
+        let mut ctx = ParserContext {
+            data_type: Type::Asciz,
+            ..Default::default()
+        };
+
+        let token = Token::new(Data::StringLiteral("Hello world!".to_owned()));
+        assert!(push_data(token, &mut ctx).is_ok());
+        assert_eq!(&ctx.data, b"Hello world!\0");
     }
 }

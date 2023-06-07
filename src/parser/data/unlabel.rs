@@ -3,7 +3,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 pub fn unlabel(data: &mut [u8], i: usize, dt: super::Type, value: u32) {
     match dt {
-        Type::Byte | Type::Asciz => {
+        Type::Byte | Type::Asciz | Type::Ascii => {
             data[i] = value as u8;
         }
         Type::Half => LittleEndian::write_u16(&mut data[i..], value as u16),
