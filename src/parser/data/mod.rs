@@ -49,7 +49,15 @@ impl FromStr for Type {
     }
 }
 
-// TODO: assert alignment
+/// Inserts padding into `data` so it's aligned to `alignment`.
+/// alignment 0 = byte, 1 = half, 2 = word, 3 = double.
+fn align(data: &mut Vec<u8>, alignment: u32) {
+    let multiple = 1 << alignment;
+    let blocks = (data.len() + multiple - 1) / multiple; // ceil(len / multiple)
+    let len = blocks * multiple;
+    data.resize(len, 0);
+}
+
 /// Stores a numerical token with value `value` in the data vector.
 fn store_numerical(ctx: &mut ParserContext, value: u32) -> Result<(), Error> {
     use Type::*;
@@ -58,26 +66,24 @@ fn store_numerical(ctx: &mut ParserContext, value: u32) -> Result<(), Error> {
             ctx.data.push(value as u8);
         }
         Half => {
+            align(&mut ctx.data, 1);
             let pos = ctx.data.len();
             ctx.data.resize(pos + 2, 0);
             LittleEndian::write_u16(&mut ctx.data[pos..], value as u16);
         }
         Word => {
+            align(&mut ctx.data, 2);
             let pos = ctx.data.len();
             ctx.data.resize(pos + 4, 0);
             LittleEndian::write_u32(&mut ctx.data[pos..], value);
         }
         Float => {
+            align(&mut ctx.data, 2);
             let pos = ctx.data.len();
             ctx.data.resize(pos + 4, 0);
             LittleEndian::write_f32(&mut ctx.data[pos..], f32::from_bits(value));
         }
-        Align => {
-            let multiple = 1 << value;
-            let blocks = (ctx.data.len() + multiple - 1) / multiple; // ceil(len / multiple)
-            let len = blocks * multiple;
-            ctx.data.resize(len, 0);
-        }
+        Align => align(&mut ctx.data, value),
     }
 
     Ok(())
