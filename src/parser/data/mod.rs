@@ -66,7 +66,8 @@ fn store_numerical(ctx: &mut ParserContext, value: u32) -> Result<(), Error> {
             // `.align` Aligns the next data item along a specified byte boundary:
             // 0 = byte, 1 = half, 2 = word, 3 = double.
             let multiple = 1 << value;
-            let len = (ctx.data.len() + multiple - 1) / multiple; // ceil(len / multiple)
+            let blocks = (ctx.data.len() + multiple - 1) / multiple; // ceil(len / multiple)
+            let len = blocks * multiple;
             ctx.data.resize(len, 0);
         }
     }
@@ -99,4 +100,66 @@ pub fn push_data(token: Token, ctx: &mut ParserContext) -> Result<(), Error> {
         _ => unreachable!("push_data should only be called with a data token"),
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_alignment_manual() {
+        let mut ctx = ParserContext {
+            data_type: Type::Byte,
+            ..Default::default()
+        };
+
+        assert!(store_numerical(&mut ctx, 123).is_ok());
+        ctx.data_type = Type::Align;
+        assert!(store_numerical(&mut ctx, 1).is_ok());
+        assert_eq!(&ctx.data, &[123, 0]);
+        assert!(store_numerical(&mut ctx, 2).is_ok());
+        assert_eq!(&ctx.data, &[123, 0, 0, 0]);
+        assert!(store_numerical(&mut ctx, 3).is_ok());
+        assert_eq!(&ctx.data, &[123, 0, 0, 0, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn test_alignment_empty_data() {
+        let mut ctx = ParserContext {
+            data_type: Type::Align,
+            ..Default::default()
+        };
+        assert!(store_numerical(&mut ctx, 2).is_ok());
+        assert_eq!(&ctx.data, &[]);
+    }
+
+    #[test]
+    fn test_alignment() {
+        let mut ctx = ParserContext::default();
+
+        for align in 0..=4 {
+            // Align the data
+            ctx.data_type = Type::Align;
+            assert!(store_numerical(&mut ctx, align).is_ok());
+
+            for offset in 0..(1 << align) {
+                // Store bytes to misalign the data
+                ctx.data_type = Type::Byte;
+                for _ in 0..offset {
+                    assert!(store_numerical(&mut ctx, 0xFF).is_ok());
+                }
+
+                // Align the data
+                ctx.data_type = Type::Align;
+                assert!(store_numerical(&mut ctx, align).is_ok());
+
+                // Make sure alignment is correct
+                assert_eq!(
+                    ctx.data.len() % (1 << align),
+                    0,
+                    "with align: {align}, offset: {offset}"
+                );
+            }
+        }
+    }
 }
