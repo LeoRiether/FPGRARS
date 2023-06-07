@@ -188,7 +188,16 @@ impl Simulator {
         self.init();
 
         loop {
-            match self.code[self.pc / 4] {
+            let instr = self.code.get(self.pc / 4).unwrap_or_else(|| {
+                eprintln!(
+                    "Tried to access instruction at pc {:x}, but code is only {:x} bytes long",
+                    self.pc,
+                    self.code.len() * 4
+                );
+                std::process::exit(1);
+            });
+
+            match *instr {
                 // Type R
                 Add(rd, rs1, rs2) => set! { rd = get!(rs1 i32) + get!(rs2 i32) },
                 Sub(rd, rs1, rs2) => set! { rd = get!(rs1 i32) - get!(rs2 i32) },
