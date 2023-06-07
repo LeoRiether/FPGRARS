@@ -55,10 +55,23 @@ struct MidiPlayerData {
 
 /// A MidiPlayer connects to a MidiOutputConnection and plays notes.
 /// `play_note()` blocks the thread for the duration of the note.
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct MidiPlayer(Option<Arc<Mutex<MidiPlayerData>>>);
 
 impl MidiPlayer {
+    pub fn new(port: Option<usize>) -> Self {
+        match Self::get_connection(port) {
+            Ok(c) => Self(Some(Arc::new(Mutex::new(MidiPlayerData {
+                conn: c,
+                channels: [0; 128],
+            })))),
+            Err(e) => {
+                eprintln!("Warning: {}", e);
+                Self(None)
+            }
+        }
+    }
+
     fn get_connection(port: Option<usize>) -> Result<MidiOutputConnection, ConnectionError> {
         let midi_out = match MidiOutput::new("FPGRARS_MIDI_Out") {
             Ok(x) => x,
@@ -87,19 +100,6 @@ impl MidiPlayer {
         match midi_out.connect(port, "FPGRARS_MIDI_conn") {
             Ok(conn) => Ok(conn),
             Err(_) => Err(ConnectionError::CouldntConnect),
-        }
-    }
-
-    pub fn new(port: Option<usize>) -> Self {
-        match Self::get_connection(port) {
-            Ok(c) => Self(Some(Arc::new(Mutex::new(MidiPlayerData {
-                conn: c,
-                channels: [0; 128],
-            })))),
-            Err(e) => {
-                eprintln!("Warning: {}", e);
-                Self(None)
-            }
         }
     }
 

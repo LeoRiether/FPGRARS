@@ -26,6 +26,7 @@ pub use preprocessor::Preprocess;
 /// will use to execute the instructions
 pub struct Parsed {
     pub code: Vec<Instruction>,
+    pub code_ctx: Vec<token::Context>,
     pub data: Vec<u8>,
 }
 
@@ -55,8 +56,13 @@ pub enum LabelUseType {
 
 #[derive(Debug, Default)]
 pub struct ParserContext {
+    /// Text segment
     pub code: Vec<Instruction>,
+    /// Context for each instruction, for debugging purposes
+    pub code_ctx: Vec<token::Context>,
+    /// Data segment
     pub data: Vec<u8>,
+    /// Current data::Type, like .word, .byte, ...
     pub data_type: data::Type,
     pub segment: Segment,
     pub labels: HashMap<Label, usize>,
@@ -187,6 +193,7 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
 
     Ok(Parsed {
         code: ctx.code,
+        code_ctx: ctx.code_ctx,
         data: ctx.data,
     })
 }

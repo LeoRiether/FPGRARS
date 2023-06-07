@@ -10,7 +10,7 @@ use std::time;
 use crate::parser;
 use crate::renderer::{FRAME_0, FRAME_1, HEIGHT, WIDTH};
 
-mod memory;
+pub mod memory;
 use memory::*;
 
 mod into_register;
@@ -43,10 +43,11 @@ pub struct Simulator {
 
     pub memory: Memory,
     pub code: Vec<crate::instruction::Instruction>,
+    pub code_ctx: Vec<crate::parser::token::Context>,
 }
 
-impl Simulator {
-    pub fn new(midi_port: Option<usize>) -> Self {
+impl Default for Simulator {
+    fn default() -> Self {
         Self {
             registers: [0; 32],
             floats: [0.0; 32],
@@ -54,10 +55,44 @@ impl Simulator {
             pc: 0,
             started_at: time::Instant::now(), // Will be set again in run()
             open_files: files::FileHolder::new(),
-            midi_player: midi::MidiPlayer::new(midi_port),
-            memory: Memory::new(),
+            midi_player: midi::MidiPlayer::default(),
+            memory: Memory::default(),
             code: Vec::new(),
+            code_ctx: Vec::new(),
         }
+    }
+}
+
+impl Simulator {
+    pub fn from_file(path: &str) -> Result<Self, parser::error::Error> {
+        let mut sim = Self::default();
+
+        let parser::Parsed {
+            code,
+            code_ctx,
+            data,
+        } = parser::parse(path, DATA_SIZE)?;
+        sim.code = code;
+        sim.code_ctx = code_ctx;
+        sim.memory.data = data;
+
+        if crate::ARGS.print_instructions {
+            eprintln!("{}", "Instructions: ---------------".bright_blue());
+            sim.code.iter().for_each(|i| eprintln!("{:?}", i));
+            eprintln!("{}", "-----------------------------".bright_blue());
+        }
+
+        Ok(sim)
+    }
+
+    pub fn with_midi_port(mut self, midi_port: Option<usize>) -> Self {
+        self.midi_player = midi::MidiPlayer::new(midi_port);
+        self
+    }
+
+    pub fn with_memory(mut self, memory: Memory) -> Self {
+        self.memory = memory;
+        self
     }
 
     fn get_reg<T: FromRegister>(&self, i: u8) -> T {
@@ -77,20 +112,6 @@ impl Simulator {
         } else {
             self.status[i as usize]
         }
-    }
-
-    pub fn load_from_file(mut self, path: &str) -> Result<Self, parser::error::Error> {
-        let parser::Parsed { code, data } = parser::parse(path, DATA_SIZE)?;
-        self.code = code;
-        self.memory.data = data;
-
-        if crate::ARGS.print_instructions {
-            eprintln!("{}", "Instructions: ---------------".bright_blue());
-            self.code.iter().for_each(|i| eprintln!("{:?}", i));
-            eprintln!("{}", "-----------------------------".bright_blue());
-        }
-
-        Ok(self)
     }
 
     fn init(&mut self) {
@@ -198,7 +219,16 @@ impl Simulator {
                         Nothing => {}
                     }
                 }
-                Ebreak => unimplemented!("ebreak has not yet been implemented in FPGRARS!"),
+                Ebreak => {
+                    let ctx = &self.code_ctx[self.pc / 4];
+                    eprintln!(
+                        "   {} has not yet been implemented in FPGRARS!\n{}",
+                        "ebreak".on_bright_magenta(),
+                        ctx
+                    );
+                    std::process::exit(1);
+                }
+
                 Addi(rd, rs1, imm) => set! { rd = get!(rs1 i32) + (imm as i32) },
                 Slli(rd, rs1, imm) => set! { rd = get!(rs1 u32) << (imm & 0x1f) },
                 Slti(rd, rs1, imm) => set! { rd = from_bool(get!(rs1 i32) < (imm as i32)) },

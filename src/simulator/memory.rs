@@ -39,6 +39,7 @@ fn copy_with_transparency(buf: &mut [u8], mut x: u32, n: usize) {
     }
 }
 
+#[derive(Default)]
 pub struct Memory {
     pub mmio: Arc<Mutex<Vec<u8>>>,
     pub data: Vec<u8>,

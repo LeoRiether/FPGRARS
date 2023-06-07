@@ -23,6 +23,7 @@ pub mod util;
 
 use lazy_static::lazy_static;
 use owo_colors::OwoColorize;
+use simulator::Simulator;
 use std::error::Error;
 use std::thread;
 
@@ -31,20 +32,20 @@ lazy_static! {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let file = &ARGS.file;
-    let sim = simulator::Simulator::new(ARGS.port);
-    let mmio = sim.memory.mmio.clone();
+    let memory = simulator::memory::Memory::new();
+    let mmio = memory.mmio.clone();
 
     let sim_thread = thread::Builder::new()
         .name("FPGRARS Simulator".into())
         .spawn(move || {
-            let mut sim = match sim.load_from_file(file) {
+            let mut sim = match Simulator::from_file(&ARGS.file) {
                 Ok(x) => x,
                 Err(e) => {
                     eprintln!("   {}: {}\n", "[error]".bright_red().bold(), e);
                     std::process::exit(1);
                 }
             };
+            sim = sim.with_memory(memory).with_midi_port(ARGS.port);
 
             let start_time = std::time::Instant::now();
             sim.run();

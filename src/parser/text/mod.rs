@@ -88,6 +88,12 @@ where
         }
     }
 
+    /// Pushes an instruction into the code vector and its corresponding context.
+    fn push_instr(&mut self, instr: Instruction) {
+        self.parser.code.push(instr);
+        self.parser.code_ctx.push(self.instr_ctx.clone());
+    }
+
     fn register(&mut self) -> Result<u8, Error> {
         let token = inner_bail!(self.tokens.next());
         let regs = &self.parser.regnames.regs;
@@ -221,7 +227,7 @@ where
 
         match instr {
             Some(instr) => {
-                self.parser.code.push(instr);
+                self.push_instr(instr);
                 Ok(true)
             }
             None => Ok(false),
@@ -270,8 +276,8 @@ where
                         // gets transformed to:
                         // la rd label
                         // lw rd, 0(rd)
-                        self.parser.code.push(Li(rd, imm));
-                        self.parser.code.push($instruction(rd, 0, rd));
+                        self.push_instr(Li(rd, imm));
+                        self.push_instr($instruction(rd, 0, rd));
                         return Ok(true);
                     }
                 }
@@ -301,7 +307,7 @@ where
             "nop" => Addi(0, 0, 0),
             _ => return Ok(false),
         };
-        self.parser.code.push(instr);
+        self.push_instr(instr);
         Ok(true)
     }
 
@@ -329,7 +335,7 @@ where
             _ => return Ok(false),
         };
 
-        self.parser.code.push(instr);
+        self.push_instr(instr);
         Ok(true)
     }
 
@@ -382,7 +388,7 @@ where
             _ => return Ok(false),
         };
 
-        self.parser.code.push(instr);
+        self.push_instr(instr);
         Ok(true)
     }
 
@@ -420,7 +426,7 @@ where
             _ => return Ok(false),
         };
 
-        self.parser.code.push(instr);
+        self.push_instr(instr);
         Ok(true)
     }
 
@@ -481,7 +487,7 @@ where
             _ => return Ok(false),
         };
 
-        self.parser.code.push(Instruction::Float(instr));
+        self.push_instr(Instruction::Float(instr));
         Ok(true)
     }
 }
