@@ -1,4 +1,6 @@
 .include "MACROSv21.s"
+.eqv NUMLINHAS          720
+.eqv NUMCOLUNAS         1280
 
 .data
 window_dimensions: .word 1280 720

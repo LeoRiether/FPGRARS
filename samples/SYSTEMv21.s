@@ -1565,8 +1565,7 @@ BRESENHAM: 	li	a6, VGAADDRESSINI0           	# Memoria VGA 0
 	   	beq	a5, zero, pulaBRES
 	   	li 	a6, VGAADDRESSINI1              # Memoria VGA 1
 	   	
-pulaBRES: 	#li 	a7, 320 # [[here]]
-        lw a7 window_dimensions
+pulaBRES: 	li 	a7, NUMCOLUNAS
 	  	sub 	t0, a3, a1
 	  	bge 	t0, zero, PULAABRES
 	  	sub 	t0, zero, t0
