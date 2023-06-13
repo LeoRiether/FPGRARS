@@ -99,6 +99,7 @@ impl Simulator {
 
     fn set_reg<T: IntoRegister>(&mut self, i: u8, x: T) {
         // This could be made branchless by setting reg[i] = i == 0 ? 0 : x, but I'm not sure it's worth it
+        // TODO: benchmark this vs self.registers[0] = 0 at the start of the loop
         if i != 0 {
             self.registers[i as usize] = x.into();
         }
@@ -110,21 +111,6 @@ impl Simulator {
         } else {
             self.status[i as usize]
         }
-    }
-
-    fn init(&mut self) {
-        // Create necessary status registers
-        self.status
-            .resize(parser::register_names::status().len(), 0);
-
-        // Set stack pointer
-        self.set_reg(2, self.memory.data.len() as u32 - 4);
-
-        // Set global pointer
-        self.set_reg(3, 0x10008000);
-
-        self.started_at = time::Instant::now();
-        self.status[parser::register_names::MISA_INDEX as usize] = 0x40001128;
     }
 
     pub fn print_state(&self) {
@@ -154,6 +140,21 @@ impl Simulator {
             }
         }
         eprintln!();
+    }
+
+    fn init(&mut self) {
+        // Create necessary status registers
+        self.status
+            .resize(parser::register_names::status().len(), 0);
+
+        // Set stack pointer
+        self.set_reg(2, self.memory.data.len() as u32 - 4);
+
+        // Set global pointer
+        self.set_reg(3, 0x10008000);
+
+        self.started_at = time::Instant::now();
+        self.status[parser::register_names::MISA_INDEX as usize] = 0x40001128;
     }
 
     pub fn run(&mut self) {
