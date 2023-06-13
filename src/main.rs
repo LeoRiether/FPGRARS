@@ -54,7 +54,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         })?;
 
     if !ARGS.no_video {
-        renderer::init(mmio);
+        let state = renderer::State::new(mmio, ARGS.width, ARGS.height, ARGS.scale);
+        renderer::init(state);
     }
 
     sim_thread.join().unwrap();

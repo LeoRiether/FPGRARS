@@ -6,7 +6,7 @@
 //!
 
 use crate::parser;
-use crate::renderer::{FRAME_0, FRAME_1, HEIGHT, WIDTH};
+use crate::renderer::{FRAME_0, FRAME_1, FRAME_SIZE};
 use std::time;
 
 pub mod memory;
@@ -599,7 +599,7 @@ impl Simulator {
 
                 let mut mmio = self.memory.mmio.lock();
                 let frame = if frame_select == 0 { FRAME_0 } else { FRAME_1 };
-                for x in &mut mmio[frame..frame + WIDTH * HEIGHT] {
+                for x in &mut mmio[frame..frame + FRAME_SIZE] {
                     *x = color;
                 }
             }

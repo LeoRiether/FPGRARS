@@ -9,9 +9,9 @@ pub const MMIO_START: usize = 0xff00_0000;
 
 pub const HEAP_START: usize = 0x1004_0000;
 
-use crate::renderer::{FRAME_0, FRAME_1, HEIGHT, KDMMIO_CONTROL, KDMMIO_DATA, WIDTH};
+use crate::renderer::{FRAME_0, FRAME_1, KDMMIO_CONTROL, KDMMIO_DATA, FRAME_SIZE};
 pub const VIDEO_START: usize = MMIO_START + FRAME_0;
-pub const VIDEO_END: usize = MMIO_START + FRAME_1 + WIDTH * HEIGHT;
+pub const VIDEO_END: usize = MMIO_START + FRAME_1 + FRAME_SIZE;
 
 const TRANSPARENT_BYTE: u8 = 0xC7;
 const TRANSPARENT_WORD: u32 = 0xC7C7C7C7;
@@ -177,7 +177,7 @@ impl Memory {
         if !in_video.is_empty() {
             let mut mmio = self.mmio.lock();
 
-            const MAX_LEN: usize = WIDTH * HEIGHT + 128; // most of the time `len` will be smaller
+            const MAX_LEN: usize = FRAME_SIZE + 128; // most of the time `len` will be smaller
             let mut buf = vec![0; MAX_LEN.min(len)];
 
             let mut pos = in_video.start;

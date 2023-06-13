@@ -7,11 +7,10 @@ use pixel_canvas::{
 };
 use std::sync::Arc;
 
-pub const WIDTH: usize = 320;
-pub const HEIGHT: usize = 240;
 pub const FRAME_SELECT: usize = 0x20_0604;
 pub const FRAME_0: usize = 0;
 pub const FRAME_1: usize = 0x10_0000;
+pub const FRAME_SIZE: usize = FRAME_1 - FRAME_0;
 
 /// Control bit for the Keyboard (Display?) MMIO.
 /// `mmio[KDMMIO_CONTROL] == 1` means that a new key has been put in `mmio[KDMMIO_DATA]`, like a
@@ -50,16 +49,25 @@ fn remove_key_from_map(mmio: &mut [u8], key: u8) {
     mmio[KEYMAP + byte as usize] &= !(1 << bit);
 }
 
-struct InputState {
+#[derive(Debug, Clone)]
+pub struct State {
     mmio: Arc<Mutex<Vec<u8>>>,
+    width: usize,
+    height: usize,
+    pixel_scale: usize,
 }
 
-impl InputState {
-    fn new(mmio: Arc<Mutex<Vec<u8>>>) -> Self {
-        Self { mmio }
+impl State {
+    pub fn new(mmio: Arc<Mutex<Vec<u8>>>, width: usize, height: usize, pixel_scale: usize) -> Self {
+        Self {
+            mmio,
+            width,
+            height,
+            pixel_scale,
+        }
     }
 
-    fn handle_input(_info: &CanvasInfo, state: &mut InputState, event: &Event<()>) -> bool {
+    fn handle_input(_info: &CanvasInfo, state: &mut State, event: &Event<()>) -> bool {
         match event {
             // Match a received character
             Event::WindowEvent {
@@ -152,23 +160,29 @@ where
 
 /// Opens a pixel-canvas window and draws from a given memory buffer.
 /// The color provider is generally either
-fn init_with_provider(mmio: Arc<Mutex<Vec<u8>>>, color_prov: impl ColorProvider + 'static) {
-    let canvas = Canvas::new(2 * WIDTH, 2 * HEIGHT)
-        .title("FPGRARS")
-        .state(InputState::new(mmio.clone()))
-        .input(InputState::handle_input);
+fn init_with_provider(initial_state: State, color_prov: impl ColorProvider + 'static) {
+    let canvas = Canvas::new(
+        initial_state.pixel_scale * initial_state.width,
+        initial_state.pixel_scale * initial_state.height,
+    )
+    .title("FPGRARS")
+    .state(initial_state)
+    .input(State::handle_input);
 
     #[cfg(feature = "show_ms")]
     let canvas = canvas.show_ms(true);
 
-    canvas.render(move |_state, image| {
-        let mmio = mmio.lock();
+    canvas.render(move |state, image| {
+        let mmio = state.mmio.lock();
 
         let frame = mmio[FRAME_SELECT];
         let start = if frame == 0 { FRAME_0 } else { FRAME_1 };
 
-        // Draw each MMIO pixel as a 2x2 square
-        for (y, row) in image.chunks_mut(2 * WIDTH).enumerate() {
+        // Draw each MMIO pixel as a SCALExSCALE square
+        for (y, row) in image
+            .chunks_mut(state.pixel_scale * state.width)
+            .enumerate()
+        {
             for (x, pixel) in row.iter_mut().enumerate() {
                 *pixel = color_prov.get(&mmio[start..], y, x);
             }
@@ -178,7 +192,7 @@ fn init_with_provider(mmio: Arc<Mutex<Vec<u8>>>, color_prov: impl ColorProvider 
 
 /// Init the 8-bit (BBGGGRRR) format bitmap display
 #[cfg(feature = "unb")]
-pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
+pub fn init(state: State) {
     let color_to_rgb = |x: u8| {
         let r = x & 0b111;
         let g = (x >> 3) & 0b111;
@@ -190,9 +204,13 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
         }
     };
 
+    let pixel_scale = state.pixel_scale;
+    let width = state.width;
+    let height = state.height;
+
     let color_provider = move |mmio: &[u8], y: usize, x: usize| {
-        let (x, y) = (x / 2, HEIGHT - 1 - y / 2);
-        let index = y * WIDTH + x;
+        let (x, y) = (x / pixel_scale, height - 1 - y / pixel_scale);
+        let index = y * width + x;
 
         let x = if cfg!(debug_assertions) {
             *mmio
@@ -205,18 +223,25 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
         color_to_rgb(x)
     };
 
-    init_with_provider(mmio, color_provider);
+    init_with_provider(state, color_provider);
 }
 
 /// Init the 24-bit (R8G8B8) format bitmap display
 /// Note: this format is word-aligned, which means every color takes up
 /// 32 bits in memory, but only 24 are actually used
 #[cfg(not(feature = "unb"))]
-pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
-    let color_provider = |mmio: &[u8], y: usize, x: usize| {
+pub fn init(state: State) {
+    let pixel_scale = state.pixel_scale;
+    let width = state.width;
+    let height = state.height;
+
+    let color_provider = move |mmio: &[u8], y: usize, x: usize| {
         let bytes_per_pixel = 4;
-        let (x, y) = (x / 2, HEIGHT - 1 - y / 2);
-        let index = (y * WIDTH + x) * bytes_per_pixel;
+        let (x, y) = (
+            x / pixel_scale,
+            height - 1 - y / pixel_scale,
+        );
+        let index = (y * width + x) * bytes_per_pixel;
 
         let get = |i| {
             if cfg!(debug_assertions) {
@@ -232,5 +257,5 @@ pub fn init(mmio: Arc<Mutex<Vec<u8>>>) {
         Color { r, g, b }
     };
 
-    init_with_provider(mmio, color_provider);
+    init_with_provider(state, color_provider);
 }

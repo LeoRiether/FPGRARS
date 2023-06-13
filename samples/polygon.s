@@ -1,7 +1,9 @@
 .include "MACROSv21.s"
 
 .data
-raio: .word 110
+window_dimensions: .word 1280 720
+
+radius: .word 0 # will be replaced by window_dimensions[1] * 4 / 9 in `main`
 lados: .word 5
 
 tau: .float 6.284
@@ -13,10 +15,16 @@ V: .space 404 # máximo de 50 vértices
 .text
 
 main:
-    la t0 raio
-	lw a0 0(t0)
-    # -----
+    # radius = window_dimensions[1] * 4 / 9
+    la t0 window_dimensions
+    lw t0 4(t0)  # t0 = window_dimensions[1]
+    slli t0 t0 2 # t0 *= 4
+    li t1 9
+    div t0 t0 t1 # t0 /= 9
+    la t1 radius
+    sw t0 0(t1)
 
+    lw a0 radius
 	li s0 0 # frame
 	li s1 0 # angulo
 
@@ -30,7 +38,7 @@ main.loop:
 	jal check_input
 
 	# Circunferencia:
-	la t0 raio
+	la t0 radius
 	lw a0 0(t0)
 	li a1 0
 	li a2 36 # polígono de 36 lados = circunferencia
@@ -40,8 +48,8 @@ main.loop:
 	jal desenha
 
 	# Poligono:
-	la t0 raio
-	lw a0 0(t0) # raio
+	la t0 radius
+	lw a0 0(t0) # radius
 	mv a1 s1 # angulo
 	la t0 lados
 	lw a2 0(t0)
@@ -71,7 +79,7 @@ main.exit:
 	li a7 10
 	ecall
 
-# a0 = raio
+# a0 = radius
 # a1 = angulo
 # a2 = numero de lados
 vertices:
@@ -84,7 +92,7 @@ vertices:
 	fsw fs2 20(sp)
 	fsw fs3 24(sp)
 
-	fcvt.s.w fs0 a0 # fs0 = raio
+	fcvt.s.w fs0 a0 # fs0 = radius
 	neg a1 a1
 	fcvt.s.w fs1 a1 # fs1 = angulo
 	la t0 to_radians
@@ -114,7 +122,7 @@ vertices.loop:
 	li a0 0
 	jal sin # cos
 
-	# Multiplica pelo raio
+    # Multiply by the radius
 	fmul.s fs3 fs3 fs0
 	fmul.s fa0 fa0 fs0
 
@@ -123,8 +131,13 @@ vertices.loop:
 	fcvt.w.s t1 fs3
 
 	# Translada para o centro
-	addi t0 t0 160
-	addi t1 t1 120
+    la t2 window_dimensions
+    lw t3 0(t2)
+    srli t3 t3 1
+	add t0 t0 t3
+    lw t3 4(t2)
+    srli t3 t3 1
+	add t1 t1 t3
 
 	# Salva em V
 	sw t0 0(s1)

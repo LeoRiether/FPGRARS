@@ -3,11 +3,20 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
 pub struct Args {
-    #[arg(short, long)]
-    pub port: Option<usize>,
-
     #[arg(long)]
     pub no_video: bool,
+
+    #[arg(short, long, default_value = "320")]
+    pub width: usize,
+
+    #[arg(short, long, default_value = "240")]
+    pub height: usize,
+
+    #[arg(short, long, default_value = "2")]
+    pub scale: usize,
+
+    #[arg(short, long)]
+    pub port: Option<usize>,
 
     /// Prints the instructions in the FPGRARS format
     #[arg(long)]
