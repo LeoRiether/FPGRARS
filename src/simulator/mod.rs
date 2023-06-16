@@ -5,21 +5,19 @@
 //! and you can find how they're simulated at [Simulator::run](struct.Simulator.html#method.run)
 //!
 
+mod executor;
+mod files;
+mod into_register;
+pub mod memory;
+mod midi;
+mod util;
+
 use crate::parser;
 use crate::renderer::{FRAME_0, FRAME_1, FRAME_SIZE};
-use std::time;
-
-pub mod memory;
-use memory::*;
-
-mod into_register;
 use into_register::*;
+use memory::*;
 use owo_colors::OwoColorize;
-
-mod files;
-mod midi;
-
-mod util;
+use std::{mem, time};
 
 /// Returned by the [ecall](struct.Simulator.html#method.ecall) procedure
 enum EcallSignal {
@@ -36,12 +34,13 @@ pub struct Simulator {
     status: Vec<u32>, // I'm not sure myself how many status registers I'll use
     pc: usize,
     started_at: time::Instant,
+    exiting: bool,
 
     open_files: files::FileHolder,
     midi_player: midi::MidiPlayer,
 
     pub memory: Memory,
-    pub code: Vec<crate::instruction::Instruction>,
+    pub code: Vec<executor::Executor>,
     pub code_ctx: Vec<crate::parser::token::Context>,
 }
 
@@ -53,6 +52,7 @@ impl Default for Simulator {
             status: Vec::new(),
             pc: 0,
             started_at: time::Instant::now(), // Will be set again in run()
+            exiting: false,
             open_files: files::FileHolder::new(),
             midi_player: midi::MidiPlayer::default(),
             memory: Memory::new(),
@@ -70,13 +70,13 @@ impl Simulator {
             data,
         } = parser::parse(path, DATA_SIZE)?;
 
-        self.code = code;
+        self.code = executor::compile_all(&code);
         self.code_ctx = code_ctx;
         self.memory.data = data;
 
         if crate::ARGS.print_instructions {
             eprintln!("{}", "Instructions: ---------------".bright_blue());
-            self.code.iter().for_each(|i| eprintln!("{:?}", i));
+            code.iter().for_each(|i| eprintln!("{:?}", i));
             eprintln!("{}", "-----------------------------".bright_blue());
         }
 
@@ -93,13 +93,13 @@ impl Simulator {
         self
     }
 
+    #[inline]
     fn get_reg<T: FromRegister>(&self, i: u8) -> T {
         FromRegister::from(self.registers[i as usize])
     }
 
+    #[inline]
     fn set_reg<T: IntoRegister>(&mut self, i: u8, x: T) {
-        // This could be made branchless by setting reg[i] = i == 0 ? 0 : x, but I'm not sure it's worth it
-        // TODO: benchmark this vs self.registers[0] = 0 at the start of the loop
         if i != 0 {
             self.registers[i as usize] = x.into();
         }
@@ -158,77 +158,12 @@ impl Simulator {
     }
 
     pub fn run(&mut self) {
-        use crate::instruction::FloatInstruction as F;
-        use crate::instruction::Instruction::*;
-
-        let from_bool = |b| if b { 1 } else { 0 };
-
-        macro_rules! branch {
-            (if $cond:expr => $label:expr) => {
-                if $cond {
-                    self.pc = $label;
-                    continue;
-                }
-            };
-        }
-
-        macro_rules! get {
-            ($reg:ident $type:ty) => {
-                self.get_reg::<$type>($reg)
-            };
-        }
-
-        macro_rules! set {
-            ($rd:ident = $val:expr) => {
-                self.set_reg($rd, $val)
-            };
-        }
-
         self.init();
 
-        loop {
-            let instr = self.code.get(self.pc / 4).unwrap_or_else(|| {
-                eprintln!(
-                    "Tried to access instruction at pc {:x}, but code is only {:x} bytes long",
-                    self.pc,
-                    self.code.len() * 4
-                );
-                std::process::exit(1);
-            });
+        // Copy code to local variable so we can access it without borrowing self
+        let code = mem::take(&mut self.code);
 
-            match *instr {
-                // Type R
-                Add(rd, rs1, rs2) => set! { rd = get!(rs1 i32) + get!(rs2 i32) },
-
-                // Type I
-                Ecall => {
-                    use EcallSignal::*;
-                    match self.ecall() {
-                        Exit => {
-                            break;
-                        }
-                        Continue => {
-                            continue;
-                        }
-                        Nothing => {}
-                    }
-                }
-
-                Addi(rd, rs1, imm) => set! { rd = get!(rs1 i32) + (imm as i32) },
-
-                // Type SB + jumps
-                Bne(rs1, rs2, label) => branch!(
-                    if get!(rs1 i32) != get!(rs2 i32) => label
-                ),
-
-                // Pseudoinstructions
-                Li(rd, imm) => self.set_reg(rd, imm),
-
-                _ => unreachable!(),
-            }
-
-            self.pc += 4;
-        }
+        executor::next(self, &code);
 
         if crate::ARGS.print_state {
             self.print_state();
