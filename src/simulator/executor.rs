@@ -40,16 +40,28 @@ pub fn compile_all(i: &[Instruction]) -> Vec<Executor> {
     i.iter().map(compile).collect()
 }
 
+macro_rules! compile_match {
+    ($i:expr; $($rule:tt),*) => {
+        match
+    }
+}
+
+macro_rules! compile_r {
+    ($rd:ident = $rs1:ident $op:tt $rs2:ident) => {
+        Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            sim.set_reg($rd, sim.reg::<i32>($rs1) $op sim.reg::<i32>($rs2));
+            sim.pc += 4;
+            next(sim, code);
+        })
+    }
+}
+
 /// Compiles a parsed instruction into an executor  
 pub fn compile(i: &Instruction) -> Executor {
     use Instruction::*;
 
     match *i {
-        Add(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
-            sim.set_reg(rd, sim.get_reg::<i32>(rs1) + sim.get_reg::<i32>(rs2));
-            sim.pc += 4;
-            next(sim, code);
-        }),
+        Add(rd, rs1, rs2) => compile_r! { rd = rs1 + rs2 },
 
         // Type I
         Ecall => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
@@ -65,14 +77,14 @@ pub fn compile(i: &Instruction) -> Executor {
         }),
 
         Addi(rd, rs1, imm) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
-            sim.set_reg(rd, sim.get_reg::<i32>(rs1) + imm as i32);
+            sim.set_reg(rd, sim.reg::<i32>(rs1) + imm as i32);
             sim.pc += 4;
             next(sim, code);
         }),
 
         // Type SB + jumps
         Bne(rs1, rs2, label) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
-            if sim.get_reg::<i32>(rs1) != sim.get_reg::<i32>(rs2) {
+            if sim.reg::<i32>(rs1) != sim.reg::<i32>(rs2) {
                 sim.pc = label;
             } else {
                 sim.pc += 4;

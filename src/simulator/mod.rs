@@ -34,7 +34,6 @@ pub struct Simulator {
     status: Vec<u32>, // I'm not sure myself how many status registers I'll use
     pc: usize,
     started_at: time::Instant,
-    exiting: bool,
 
     open_files: files::FileHolder,
     midi_player: midi::MidiPlayer,
@@ -52,7 +51,6 @@ impl Default for Simulator {
             status: Vec::new(),
             pc: 0,
             started_at: time::Instant::now(), // Will be set again in run()
-            exiting: false,
             open_files: files::FileHolder::new(),
             midi_player: midi::MidiPlayer::default(),
             memory: Memory::new(),
@@ -94,7 +92,7 @@ impl Simulator {
     }
 
     #[inline]
-    fn get_reg<T: FromRegister>(&self, i: u8) -> T {
+    fn reg<T: FromRegister>(&self, i: u8) -> T {
         FromRegister::from(self.registers[i as usize])
     }
 
@@ -174,7 +172,7 @@ impl Simulator {
         use crate::parser::register_names::*;
         use rand::{thread_rng, Rng};
 
-        let a7 = self.get_reg::<u32>(17);
+        let a7 = self.reg::<u32>(17);
 
         if files::handle_ecall(
             a7,
@@ -196,7 +194,7 @@ impl Simulator {
             },
             1 => {
                 // print int
-                print!("{}", self.get_reg::<i32>(10));
+                print!("{}", self.reg::<i32>(10));
             }
             2 => {
                 // print float
@@ -204,7 +202,7 @@ impl Simulator {
             }
             4 => {
                 // print string
-                let start = self.get_reg::<u32>(10) as usize; // a0
+                let start = self.reg::<u32>(10) as usize; // a0
                 (start..)
                     .map(|i| self.memory.get_byte(i) as char)
                     .take_while(|&c| c != '\0')
@@ -226,7 +224,7 @@ impl Simulator {
             9 => {
                 // sbrk
                 // Like RARS, negative increments are not allowed
-                let bytes = self.get_reg::<i32>(10); // a0
+                let bytes = self.reg::<i32>(10); // a0
 
                 if bytes < 0 {
                     panic!("`sbrk` does not allow negative increments");
@@ -245,7 +243,7 @@ impl Simulator {
 
             11 => {
                 // print char
-                print!("{}", self.get_reg::<u32>(10) as u8 as char);
+                print!("{}", self.reg::<u32>(10) as u8 as char);
             }
 
             30 => {
@@ -259,18 +257,18 @@ impl Simulator {
 
             32 => {
                 // sleep ms
-                let t = self.get_reg::<u32>(10);
+                let t = self.reg::<u32>(10);
                 std::thread::sleep(time::Duration::from_millis(t as u64));
             }
 
             34 => {
                 // print hex int
-                print!("{:#X}", self.get_reg::<u32>(10));
+                print!("{:#X}", self.reg::<u32>(10));
             }
 
             36 => {
                 // print unsigned int
-                print!("{}", self.get_reg::<u32>(10));
+                print!("{}", self.reg::<u32>(10));
             }
 
             // RNG stuff
@@ -283,7 +281,7 @@ impl Simulator {
             }
             42 => {
                 // rand int in [0, a1)
-                let upper = self.get_reg::<u32>(11);
+                let upper = self.reg::<u32>(11);
                 self.set_reg(10, thread_rng().gen_range(0..upper));
             }
             43 => {
@@ -293,8 +291,8 @@ impl Simulator {
 
             48 | 148 => {
                 // clear screen
-                let color = self.get_reg::<u8>(10); // a0
-                let frame_select = self.get_reg::<u32>(11); // a1
+                let color = self.reg::<u8>(10); // a0
+                let frame_select = self.reg::<u32>(11); // a1
 
                 let mut mmio = self.memory.mmio.lock();
                 let frame = if frame_select == 0 { FRAME_0 } else { FRAME_1 };
