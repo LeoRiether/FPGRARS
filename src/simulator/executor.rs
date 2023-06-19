@@ -1,6 +1,6 @@
 //! Deals with how instructions are executed
 
-use super::Simulator;
+use super::{into_register::IntoRegister, Simulator};
 use crate::{instruction::Instruction, simulator::EcallSignal};
 
 type ExecutorFn = dyn Fn(&mut Simulator, &[Executor]);
@@ -35,6 +35,25 @@ pub fn next(sim: &mut Simulator, code: &[Executor]) {
     executor.call(sim, code);
 }
 
+/// Creates an executor that executes an instruction of type R.
+/// PERF: if `op: F` where `F: Fn`, this is apparently inlined correctly, so performance is not
+/// affected. However, if `op: fn(u32, u32) -> R`, performance is significantly worse! Like,
+/// 50%-60% worse. This might be because generics are monomorphized, and each lambda is a different
+/// Fn type.
+/// TODO: Automatic benchmarks.
+#[inline(always)]
+fn exec_type_r<R, F>(rd: u8, rs1: u8, rs2: u8, op: F) -> Executor
+where
+    R: IntoRegister,
+    F: Fn(u32, u32) -> R + 'static,
+{
+    Executor::new(move |sim, code| {
+        sim.set_reg(rd, op(sim.reg(rs1), sim.reg(rs2)));
+        sim.pc += 4;
+        next(sim, code);
+    })
+}
+
 /// Compiles all instructions in a slice
 pub fn compile_all(i: &[Instruction]) -> Vec<Executor> {
     i.iter().map(compile).collect()
@@ -44,59 +63,34 @@ pub fn compile_all(i: &[Instruction]) -> Vec<Executor> {
 pub fn compile(i: &Instruction) -> Executor {
     use Instruction::*;
 
-    let from_bool = |x| if x { 1 } else { 0 };
+    fn from_bool(x: bool) -> u32 {
+        if x {
+            1
+        } else {
+            0
+        }
+    }
 
     match *i {
-        Add(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
-            sim.set_reg(rd, sim.reg::<i32>(rs1) + sim.reg::<i32>(rs2));
-            sim.pc += 4;
-            next(sim, code);
-        }),
-        Sub(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
-            sim.set_reg(rd, sim.reg::<i32>(rs1) - sim.reg::<i32>(rs2));
-            sim.pc += 4;
-            next(sim, code);
-        }),
-        Sll(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
-            sim.set_reg(rd, sim.reg::<i32>(rs1) << (sim.reg::<i32>(rs2) & 0x1f));
-            sim.pc += 4;
-            next(sim, code);
-        }),
-        Slt(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
-            sim.set_reg(rd, from_bool(sim.reg::<i32>(rs1) < sim.reg::<i32>(rs2)));
-            sim.pc += 4;
-            next(sim, code);
-        }),
-        Sltu(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
-            sim.set_reg(rd, from_bool(sim.reg::<u32>(rs1) < sim.reg::<u32>(rs2)));
-            sim.pc += 4;
-            next(sim, code);
-        }),
-        Xor(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
-            sim.set_reg(rd, sim.reg::<u32>(rs1) ^ sim.reg::<u32>(rs2));
-            sim.pc += 4;
-            next(sim, code);
-        }),
-        Srl(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
-            sim.set_reg(rd, sim.reg::<u32>(rs1) >> (sim.reg::<u32>(rs2) & 0x1f));
-            sim.pc += 4;
-            next(sim, code);
-        }),
-        Sra(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
-            sim.set_reg(rd, sim.reg::<i32>(rs1) >> (sim.reg::<i32>(rs2) & 0x1f));
-            sim.pc += 4;
-            next(sim, code);
-        }),
-        // Or(rd, rs1, rs2) => set! { rd = get!(rs1 u32) | get!(rs2 u32) },
-        // And(rd, rs1, rs2) => set! { rd = get!(rs1 u32) & get!(rs2 u32) },
-        // Mul(rd, rs1, rs2) => set! { rd = get!(rs1 i32) * get!(rs2 i32) },
-        // Div(rd, rs1, rs2) => set! { rd = get!(rs1 i32) / get!(rs2 i32) },
-        // Divu(rd, rs1, rs2) => set! { rd = get!(rs1 u32) / get!(rs2 u32) },
-        // Rem(rd, rs1, rs2) => set! { rd = get!(rs1 i32) % get!(rs2 i32) },
-        // Remu(rd, rs1, rs2) => set! { rd = get!(rs1 u32) % get!(rs2 u32) },
+        // Type R
+        Add(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a.wrapping_add(b)),
+        Sub(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a.wrapping_sub(b)),
+        Sll(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a << (b & 0x1f)),
+        Slt(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| from_bool((a as i32) < (b as i32))),
+        Sltu(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| from_bool(a < b)),
+        Xor(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a ^ b),
+        Srl(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a >> (b & 0x1f)),
+        Sra(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| (a as i32) >> ((b as i32) & 0x1f)),
+        Or(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a | b),
+        And(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a & b),
+        Mul(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a.wrapping_mul(b)),
+        Div(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a.wrapping_div(b)),
+        Divu(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a / b),
+        Rem(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a.wrapping_rem(b)),
+        Remu(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a % b),
 
         // Type I
-        Ecall => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+        Ecall => Executor::new(move |sim, code| {
             use EcallSignal::*;
             match sim.ecall() {
                 Exit => {} // don't execute the next instruction
@@ -108,19 +102,19 @@ pub fn compile(i: &Instruction) -> Executor {
             }
         }),
 
-        Addi(rd, rs1, imm) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+        Addi(rd, rs1, imm) => Executor::new(move |sim, code| {
             sim.set_reg(rd, sim.reg::<i32>(rs1) + imm as i32);
             sim.pc += 4;
             next(sim, code);
         }),
-        Slli(rd, rs1, imm) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+        Slli(rd, rs1, imm) => Executor::new(move |sim, code| {
             sim.set_reg(rd, sim.reg::<i32>(rs1) << (imm & 0x1f));
             sim.pc += 4;
             next(sim, code);
         }),
 
         // Type S
-        Sw(rs2, imm, rs1) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+        Sw(rs2, imm, rs1) => Executor::new(move |sim, code| {
             sim.memory.set_word(
                 (sim.reg::<u32>(rs1).wrapping_add(imm)) as usize,
                 sim.reg::<u32>(rs2),
@@ -130,7 +124,7 @@ pub fn compile(i: &Instruction) -> Executor {
         }),
 
         // Type SB + jumps
-        Bne(rs1, rs2, label) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+        Bne(rs1, rs2, label) => Executor::new(move |sim, code| {
             if sim.reg::<i32>(rs1) != sim.reg::<i32>(rs2) {
                 sim.pc = label;
             } else {
@@ -138,7 +132,7 @@ pub fn compile(i: &Instruction) -> Executor {
             }
             next(sim, code);
         }),
-        Blt(rs1, rs2, label) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+        Blt(rs1, rs2, label) => Executor::new(move |sim, code| {
             if sim.reg::<i32>(rs1) < sim.reg::<i32>(rs2) {
                 sim.pc = label;
             } else {
@@ -146,7 +140,7 @@ pub fn compile(i: &Instruction) -> Executor {
             }
             next(sim, code);
         }),
-        Bge(rs1, rs2, label) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+        Bge(rs1, rs2, label) => Executor::new(move |sim, code| {
             if sim.reg::<i32>(rs1) >= sim.reg::<i32>(rs2) {
                 sim.pc = label;
             } else {
@@ -155,7 +149,7 @@ pub fn compile(i: &Instruction) -> Executor {
             next(sim, code);
         }),
 
-        Jalr(rd, rs1, imm) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+        Jalr(rd, rs1, imm) => Executor::new(move |sim, code| {
             // This produces a weird result for `jalr s0 s0 0`. s0 is set to pc+4 before the jump occurs
             // so it works as a nop. Maybe this is correct, maybe it's not, but I'll copy the behavior seen in
             // RARS to be consistent.
@@ -163,14 +157,14 @@ pub fn compile(i: &Instruction) -> Executor {
             sim.pc = (sim.reg::<i32>(rs1) + (imm as i32)) as usize & !1;
             next(sim, code);
         }),
-        Jal(rd, label) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+        Jal(rd, label) => Executor::new(move |sim, code| {
             sim.set_reg(rd, (sim.pc + 4) as u32);
             sim.pc = label;
             next(sim, code);
         }),
 
         // Type I -- Loads
-        Lw(rd, imm, rs1) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+        Lw(rd, imm, rs1) => Executor::new(move |sim, code| {
             let data = sim
                 .memory
                 .get_word((sim.reg::<i32>(rs1) + imm as i32) as usize);
@@ -180,13 +174,13 @@ pub fn compile(i: &Instruction) -> Executor {
         }),
 
         // Pseudoinstructions
-        Li(rd, imm) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+        Li(rd, imm) => Executor::new(move |sim, code| {
             sim.set_reg(rd, imm as i32);
             sim.pc += 4;
             next(sim, code);
         }),
 
-        Mv(rd, rs1) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+        Mv(rd, rs1) => Executor::new(move |sim, code| {
             sim.set_reg(rd, sim.reg::<u32>(rs1));
             sim.pc += 4;
             next(sim, code);
