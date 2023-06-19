@@ -23,6 +23,8 @@ pub enum Type {
     /// Aligns the next data item along a specified byte boundary:
     /// 0 = byte, 1 = half, 2 = word, 3 = double.
     Align,
+    /// Reserves space for `n` bytes
+    Space,
     /// Null-terminated string
     Asciz,
     /// String that is not null-terminated
@@ -40,7 +42,8 @@ impl FromStr for Type {
             "word" => Ok(Word),
             "byte" => Ok(Byte),
             "half" => Ok(Half),
-            "align" | "space" => Ok(Align),
+            "align" => Ok(Align),
+            "space" => Ok(Space),
             "asciz" | "string" => Ok(Asciz),
             "ascii" => Ok(Ascii),
             "float" => Ok(Float),
@@ -83,6 +86,7 @@ fn store_numerical(ctx: &mut ParserContext, value: u32) -> Result<(), Error> {
             ctx.data.resize(pos + 4, 0);
             LittleEndian::write_f32(&mut ctx.data[pos..], f32::from_bits(value));
         }
+        Space => ctx.data.resize(ctx.data.len() + value as usize, 0),
         Align => align(&mut ctx.data, value),
     }
 

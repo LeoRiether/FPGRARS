@@ -11,5 +11,6 @@ pub fn unlabel(data: &mut [u8], i: usize, dt: super::Type, value: u32) {
         Type::Word => LittleEndian::write_u32(&mut data[i..], value),
         Type::Float => LittleEndian::write_f32(&mut data[i..], f32::from_bits(value)),
         Type::Align => panic!("'.align LABEL' is not supported!"),
+        Type::Space => panic!("'.space LABEL' is not supported!"),
     }
 }
