@@ -23,7 +23,7 @@ impl Executor {
 /// Execute the next instruction
 #[inline(always)]
 pub fn next(sim: &mut Simulator, code: &[Executor]) {
-    let executor = code.get(sim.pc / 4).unwrap_or_else(|| {
+    let executor = code.get(sim.pc >> 2).unwrap_or_else(|| {
         eprintln!(
             "Tried to access instruction at pc {:x}, but code is only {:x} bytes long",
             sim.pc,
@@ -38,12 +38,6 @@ pub fn next(sim: &mut Simulator, code: &[Executor]) {
 /// Compiles all instructions in a slice
 pub fn compile_all(i: &[Instruction]) -> Vec<Executor> {
     i.iter().map(compile).collect()
-}
-
-macro_rules! compile_match {
-    ($i:expr; $($rule:tt),*) => {
-        match
-    }
 }
 
 macro_rules! compile_r {
@@ -91,6 +85,24 @@ pub fn compile(i: &Instruction) -> Executor {
             }
             next(sim, code);
         }),
+        Bge(rs1, rs2, label) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            if sim.reg::<i32>(rs1) >= sim.reg::<i32>(rs2) {
+                sim.pc = label;
+            } else {
+                sim.pc += 4;
+            }
+            next(sim, code);
+        }),
+
+        // Type I -- Loads
+        Lw(rd, imm, rs1) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            let data = sim
+                .memory
+                .get_word((sim.reg::<i32>(rs1) + imm as i32) as usize);
+            sim.set_reg(rd, data);
+            sim.pc += 4;
+            next(sim, code);
+        }),
 
         // Pseudoinstructions
         Li(rd, imm) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
@@ -99,6 +111,12 @@ pub fn compile(i: &Instruction) -> Executor {
             next(sim, code);
         }),
 
-        _ => todo!(),
+        Mv(rd, rs1) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            sim.set_reg(rd, sim.reg::<u32>(rs1));
+            sim.pc += 4;
+            next(sim, code);
+        }),
+
+        _ => todo!("Instruction {:?}", *i),
     }
 }
