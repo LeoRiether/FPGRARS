@@ -40,22 +40,60 @@ pub fn compile_all(i: &[Instruction]) -> Vec<Executor> {
     i.iter().map(compile).collect()
 }
 
-macro_rules! compile_r {
-    ($rd:ident = $rs1:ident $op:tt $rs2:ident) => {
-        Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
-            sim.set_reg($rd, sim.reg::<i32>($rs1) $op sim.reg::<i32>($rs2));
-            sim.pc += 4;
-            next(sim, code);
-        })
-    }
-}
-
 /// Compiles a parsed instruction into an executor  
 pub fn compile(i: &Instruction) -> Executor {
     use Instruction::*;
 
+    let from_bool = |x| if x { 1 } else { 0 };
+
     match *i {
-        Add(rd, rs1, rs2) => compile_r! { rd = rs1 + rs2 },
+        Add(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            sim.set_reg(rd, sim.reg::<i32>(rs1) + sim.reg::<i32>(rs2));
+            sim.pc += 4;
+            next(sim, code);
+        }),
+        Sub(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            sim.set_reg(rd, sim.reg::<i32>(rs1) - sim.reg::<i32>(rs2));
+            sim.pc += 4;
+            next(sim, code);
+        }),
+        Sll(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            sim.set_reg(rd, sim.reg::<i32>(rs1) << (sim.reg::<i32>(rs2) & 0x1f));
+            sim.pc += 4;
+            next(sim, code);
+        }),
+        Slt(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            sim.set_reg(rd, from_bool(sim.reg::<i32>(rs1) < sim.reg::<i32>(rs2)));
+            sim.pc += 4;
+            next(sim, code);
+        }),
+        Sltu(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            sim.set_reg(rd, from_bool(sim.reg::<u32>(rs1) < sim.reg::<u32>(rs2)));
+            sim.pc += 4;
+            next(sim, code);
+        }),
+        Xor(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            sim.set_reg(rd, sim.reg::<u32>(rs1) ^ sim.reg::<u32>(rs2));
+            sim.pc += 4;
+            next(sim, code);
+        }),
+        Srl(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            sim.set_reg(rd, sim.reg::<u32>(rs1) >> (sim.reg::<u32>(rs2) & 0x1f));
+            sim.pc += 4;
+            next(sim, code);
+        }),
+        Sra(rd, rs1, rs2) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            sim.set_reg(rd, sim.reg::<i32>(rs1) >> (sim.reg::<i32>(rs2) & 0x1f));
+            sim.pc += 4;
+            next(sim, code);
+        }),
+        // Or(rd, rs1, rs2) => set! { rd = get!(rs1 u32) | get!(rs2 u32) },
+        // And(rd, rs1, rs2) => set! { rd = get!(rs1 u32) & get!(rs2 u32) },
+        // Mul(rd, rs1, rs2) => set! { rd = get!(rs1 i32) * get!(rs2 i32) },
+        // Div(rd, rs1, rs2) => set! { rd = get!(rs1 i32) / get!(rs2 i32) },
+        // Divu(rd, rs1, rs2) => set! { rd = get!(rs1 u32) / get!(rs2 u32) },
+        // Rem(rd, rs1, rs2) => set! { rd = get!(rs1 i32) % get!(rs2 i32) },
+        // Remu(rd, rs1, rs2) => set! { rd = get!(rs1 u32) % get!(rs2 u32) },
 
         // Type I
         Ecall => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
@@ -75,10 +113,33 @@ pub fn compile(i: &Instruction) -> Executor {
             sim.pc += 4;
             next(sim, code);
         }),
+        Slli(rd, rs1, imm) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            sim.set_reg(rd, sim.reg::<i32>(rs1) << (imm & 0x1f));
+            sim.pc += 4;
+            next(sim, code);
+        }),
+
+        // Type S
+        Sw(rs2, imm, rs1) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            sim.memory.set_word(
+                (sim.reg::<u32>(rs1).wrapping_add(imm)) as usize,
+                sim.reg::<u32>(rs2),
+            );
+            sim.pc += 4;
+            next(sim, code);
+        }),
 
         // Type SB + jumps
         Bne(rs1, rs2, label) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
             if sim.reg::<i32>(rs1) != sim.reg::<i32>(rs2) {
+                sim.pc = label;
+            } else {
+                sim.pc += 4;
+            }
+            next(sim, code);
+        }),
+        Blt(rs1, rs2, label) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            if sim.reg::<i32>(rs1) < sim.reg::<i32>(rs2) {
                 sim.pc = label;
             } else {
                 sim.pc += 4;
@@ -91,6 +152,20 @@ pub fn compile(i: &Instruction) -> Executor {
             } else {
                 sim.pc += 4;
             }
+            next(sim, code);
+        }),
+
+        Jalr(rd, rs1, imm) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            // This produces a weird result for `jalr s0 s0 0`. s0 is set to pc+4 before the jump occurs
+            // so it works as a nop. Maybe this is correct, maybe it's not, but I'll copy the behavior seen in
+            // RARS to be consistent.
+            sim.set_reg(rd, (sim.pc + 4) as u32);
+            sim.pc = (sim.reg::<i32>(rs1) + (imm as i32)) as usize & !1;
+            next(sim, code);
+        }),
+        Jal(rd, label) => Executor::new(move |sim: &mut Simulator, code: &[Executor]| {
+            sim.set_reg(rd, (sim.pc + 4) as u32);
+            sim.pc = label;
             next(sim, code);
         }),
 

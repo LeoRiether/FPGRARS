@@ -49,15 +49,15 @@ N: .word 10000
     ecall
 
     # Print time elapsed
-    # li a0 '\n'
-    # li a7 11
-    # ecall
-    # mv a0 s7
-    # li a7 1 
-    # ecall
-    # li a0 '\n'
-    # li a7 11
-    # ecall
+    li a0 '\n'
+    li a7 11
+    ecall
+    mv a0 s7
+    li a7 1 
+    ecall
+    li a0 '\n'
+    li a7 11
+    ecall
 
 exit:
     li a7 10
