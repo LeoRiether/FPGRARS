@@ -30,7 +30,7 @@ N: .word 10000
     ecall
 
     # Save time
-    csrr s7 time
+    # csrr s7 time
 
     # Sort
     mv a0 sp
@@ -38,8 +38,8 @@ N: .word 10000
     jal sort
 
     # Save time 
-    csrr t0 time
-    sub s7 t0 s7 # s7 == time elapsed
+    # csrr t0 time
+    # sub s7 t0 s7 # s7 == time elapsed
 
     # Print whether it's sorted or not again (should print 1)
     mv a0 sp
@@ -49,15 +49,15 @@ N: .word 10000
     ecall
 
     # Print time elapsed
-    li a0 '\n'
-    li a7 11
-    ecall
-    mv a0 s7
-    li a7 1 
-    ecall
-    li a0 '\n'
-    li a7 11
-    ecall
+    # li a0 '\n'
+    # li a7 11
+    # ecall
+    # mv a0 s7
+    # li a7 1 
+    # ecall
+    # li a0 '\n'
+    # li a7 11
+    # ecall
 
 exit:
     li a7 10
