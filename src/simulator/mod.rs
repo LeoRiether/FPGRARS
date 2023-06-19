@@ -93,13 +93,13 @@ impl Simulator {
 
     #[inline]
     fn reg<T: FromRegister>(&self, i: u8) -> T {
-        FromRegister::from(self.registers[i as usize])
+        FromRegister::from(unsafe { *self.registers.get_unchecked(i as usize) })
     }
 
     #[inline]
     fn set_reg<T: IntoRegister>(&mut self, i: u8, x: T) {
         if i != 0 {
-            self.registers[i as usize] = x.into();
+            unsafe { *self.registers.get_unchecked_mut(i as usize) = x.into() };
         }
     }
 
