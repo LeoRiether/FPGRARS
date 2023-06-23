@@ -13,6 +13,8 @@ pub mod register_names;
 mod text;
 pub mod token;
 
+use std::iter::Peekable;
+
 use self::lexer::Lexer;
 use crate::{
     instruction::{FloatInstruction, Instruction},
@@ -28,6 +30,7 @@ pub struct Parsed {
     pub code: Vec<Instruction>,
     pub code_ctx: Vec<token::Context>,
     pub data: Vec<u8>,
+    pub globl: Option<usize>,
 }
 
 pub type ParseResult = Result<Parsed, Error>;
@@ -46,12 +49,14 @@ type Label = String;
 pub enum LabelUse {
     Code(usize, token::Context),
     Data(usize, data::Type, token::Context),
+    Globl(token::Context),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LabelUseType {
     Code,
     Data,
+    Globl,
 }
 
 #[derive(Debug, Default)]
@@ -72,9 +77,12 @@ pub struct ParserContext {
     /// fill the labels in.
     pub backlog: HashMap<Label, Vec<LabelUse>>,
     pub regnames: RegNames,
+    pub globl: Option<usize>,
 }
 
 impl ParserContext {
+    /// Returns the address of `label`. If the label hasn't been defined yet, we return zero and
+    /// add it to the backlog.
     pub fn use_label(&mut self, label: &str, use_type: LabelUseType, ctx: token::Context) -> u32 {
         match self.labels.get(label) {
             Some(&pos) => pos as u32,
@@ -82,6 +90,7 @@ impl ParserContext {
                 let entry = match use_type {
                     LabelUseType::Code => LabelUse::Code(self.code.len(), ctx),
                     LabelUseType::Data => LabelUse::Data(self.data.len(), self.data_type, ctx),
+                    LabelUseType::Globl => LabelUse::Globl(ctx),
                 };
                 self.backlog
                     .entry(label.to_string())
@@ -92,6 +101,8 @@ impl ParserContext {
         }
     }
 
+    /// When a label is defined, we should call this function to clear the backlog entries related
+    /// to it.
     pub fn define_label(&mut self, label: impl Into<Label>, value: usize) {
         let label = label.into();
         let backlog = self.backlog.remove(&label);
@@ -101,6 +112,9 @@ impl ParserContext {
             match use_ {
                 LabelUse::Code(i, _) => text::unlabel(&mut self.code, i, value),
                 LabelUse::Data(i, t, _) => data::unlabel(&mut self.data, i, t, value as u32),
+                LabelUse::Globl(_) => {
+                    self.globl = Some(value);
+                }
             }
         }
     }
@@ -127,6 +141,10 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
             }
             Directive(d) if d == "data" => {
                 ctx.segment = Segment::Data;
+                continue;
+            }
+            Directive(d) if d == "globl" || d == "global" => {
+                parse_globl(&mut tokens, &mut ctx, token.ctx)?;
                 continue;
             }
             _ => {}
@@ -176,6 +194,7 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
                 uses.iter().map(|u| match u {
                     LabelUse::Code(_, c) => c.clone(),
                     LabelUse::Data(_, _, c) => c.clone(),
+                    LabelUse::Globl(c) => c.clone(),
                 })
             })
             .collect();
@@ -195,5 +214,26 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
         code: ctx.code,
         code_ctx: ctx.code_ctx,
         data: ctx.data,
+        globl: ctx.globl,
     })
+}
+
+/// Parser a .globl directive
+fn parse_globl(
+    tokens: &mut Peekable<impl Iterator<Item = Result<token::Token, Error>>>,
+    parser: &mut ParserContext,
+    globl_ctx: token::Context,
+) -> Result<(), Error> {
+    let label = tokens
+        .next()
+        .ok_or_else(|| ParserError::UnexpectedToken(None).with_context(globl_ctx.clone()))??;
+
+    match label.data {
+        token::Data::Identifier(label) => {
+            let addr = parser.use_label(&label, LabelUseType::Globl, globl_ctx) as usize;
+            parser.globl = Some(addr);
+            Ok(())
+        }
+        _ => Err(ParserError::UnexpectedToken(Some(label.data)).with_context(label.ctx)),
+    }
 }

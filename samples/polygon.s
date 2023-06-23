@@ -1,6 +1,6 @@
 .include "MACROSv21.s"
-.eqv NUMLINHAS          720
-.eqv NUMCOLUNAS         1280
+.eqv NUMCOLUNAS         320
+.eqv NUMLINHAS          240
 
 .data
 window_dimensions: .word 1280 720
@@ -15,11 +15,9 @@ to_radians: .float 0.01745329251
 V: .space 404 # máximo de 50 vértices
 
 .text
-
 main:
-    # radius = window_dimensions[1] * 4 / 9
-    la t0 window_dimensions
-    lw t0 4(t0)  # t0 = window_dimensions[1]
+    # radius = NUMLINHAS * 4 / 9
+    li t0 NUMLINHAS
     slli t0 t0 2 # t0 *= 4
     li t1 9
     div t0 t0 t1 # t0 /= 9
@@ -133,13 +131,12 @@ vertices.loop:
 	fcvt.w.s t1 fs3
 
 	# Translada para o centro
-    la t2 window_dimensions
-    lw t3 0(t2)
-    srli t3 t3 1
-	add t0 t0 t3
-    lw t3 4(t2)
-    srli t3 t3 1
-	add t1 t1 t3
+    li t2 NUMCOLUNAS
+    srli t2 t2 1
+	add t0 t0 t2
+    li t2 NUMLINHAS
+    srli t2 t2 1
+	add t1 t1 t2
 
 	# Salva em V
 	sw t0 0(s1)

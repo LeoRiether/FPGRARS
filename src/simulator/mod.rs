@@ -66,11 +66,16 @@ impl Simulator {
             code,
             code_ctx,
             data,
+            globl,
         } = parser::parse(path, DATA_SIZE)?;
 
         self.code = executor::compile_all(&code);
         self.code_ctx = code_ctx;
         self.memory.data = data;
+
+        if let Some(globl) = globl {
+            self.pc = globl;
+        }
 
         if crate::ARGS.print_instructions {
             eprintln!("{}", "Instructions: ---------------".bright_blue());
