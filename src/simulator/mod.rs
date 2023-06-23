@@ -116,15 +116,15 @@ impl Simulator {
         }
     }
 
+    #[allow(clippy::needless_range_loop)]
     pub fn print_state(&self) {
+        use crate::parser::register_names::REGVEC;
+
         eprintln!("{}", "Registers:".bright_blue());
         for i in 0..32 {
-            eprint!(
-                "{}{:02}: {:08x} ",
-                "x".bright_blue(),
-                i.bright_blue(),
-                self.registers[i]
-            );
+            let regname = if i == 0 { "0" } else { REGVEC[i] };
+            let reg = format!("x{:02}/{:03}", i, regname);
+            eprint!("{}: {:08x} ", reg.bright_blue(), self.registers[i]);
             if i % 4 == 3 {
                 eprintln!();
             }

@@ -13,9 +13,9 @@ pub mod register_names;
 mod text;
 pub mod token;
 
-use std::iter::Peekable;
+use std::{iter::Peekable, mem};
 
-use self::lexer::Lexer;
+use self::{lexer::Lexer, token::Token};
 use crate::{
     instruction::{FloatInstruction, Instruction},
     parser::{error::Contextualize, register_names::RegNames},
@@ -69,6 +69,9 @@ pub struct ParserContext {
     pub data: Vec<u8>,
     /// Current data::Type, like .word, .byte, ...
     pub data_type: data::Type,
+    /// Labels that have been defined in .data, but we don't yet know the address of because of
+    /// alignment
+    pub data_label_backlog: Vec<Label>,
     pub segment: Segment,
     pub labels: HashMap<Label, usize>,
     /// This parser only makes one pass over the tokens. This means that some instructions will
@@ -118,6 +121,16 @@ impl ParserContext {
             }
         }
     }
+
+    /// Defines the address of labels in the data segment with the address self.data.len(). This
+    /// should be called after we are sure of the labels alignment
+    pub fn commit_data_label_backlog(&mut self) {
+        let addr = self.data.len();
+        let backlog = mem::take(&mut self.data_label_backlog);
+        for label in backlog {
+            self.define_label(label, addr);
+        }
+    }
 }
 
 /// Parses a RISC-V file into a `code` and `data` segments.
@@ -126,8 +139,14 @@ impl ParserContext {
 /// parser::parse("riscv.s", DATA_SIZE)?
 /// ```
 pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
-    let mut tokens = Lexer::new(entry_file)?.preprocess().peekable();
+    let tokens = Lexer::new(entry_file)?.preprocess().peekable();
+    parse_tokens(tokens, data_segment_size)
+}
 
+pub fn parse_tokens<I: Iterator<Item = Result<Token, Error>>>(
+    mut tokens: Peekable<I>,
+    data_segment_size: usize,
+) -> ParseResult {
     let mut ctx = ParserContext::default();
 
     use token::Data::*;
@@ -164,7 +183,7 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
                 }
             },
             Segment::Data => match token.data {
-                Label(label) => ctx.define_label(label, ctx.data.len()),
+                Label(label) => ctx.data_label_backlog.push(label),
                 Directive(d) if d.parse::<data::Type>().is_ok() => {
                     ctx.data_type = d.parse().unwrap();
                 }
@@ -183,6 +202,10 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
             },
         }
     }
+
+    // Commit labels that were defined without any data, in the end of the backlog, to the position
+    // of the end of the data segment
+    ctx.commit_data_label_backlog();
 
     // Check for undefined labels used
     if !ctx.backlog.is_empty() {

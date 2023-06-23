@@ -64,30 +64,40 @@ fn align(data: &mut Vec<u8>, alignment: u32) {
 /// Stores a numerical token with value `value` in the data vector.
 fn store_numerical(ctx: &mut ParserContext, value: u32) -> Result<(), Error> {
     use Type::*;
+
+    // Align the data to the correct boundary
+    match ctx.data_type {
+        Half => align(&mut ctx.data, 1),
+        Word | Float => align(&mut ctx.data, 2),
+        Align => align(&mut ctx.data, value),
+        Byte | Ascii | Asciz | Space => {}
+    }
+
+    // Commit the current data position to the label
+    ctx.commit_data_label_backlog();
+
+    // Push data into the data vector
     match ctx.data_type {
         Byte | Ascii | Asciz => {
             ctx.data.push(value as u8);
         }
         Half => {
-            align(&mut ctx.data, 1);
             let pos = ctx.data.len();
             ctx.data.resize(pos + 2, 0);
             LittleEndian::write_u16(&mut ctx.data[pos..], value as u16);
         }
         Word => {
-            align(&mut ctx.data, 2);
             let pos = ctx.data.len();
             ctx.data.resize(pos + 4, 0);
             LittleEndian::write_u32(&mut ctx.data[pos..], value);
         }
         Float => {
-            align(&mut ctx.data, 2);
             let pos = ctx.data.len();
             ctx.data.resize(pos + 4, 0);
             LittleEndian::write_f32(&mut ctx.data[pos..], f32::from_bits(value));
         }
         Space => ctx.data.resize(ctx.data.len() + value as usize, 0),
-        Align => align(&mut ctx.data, value),
+        Align => {}
     }
 
     Ok(())
@@ -105,6 +115,7 @@ pub fn push_data(token: Token, ctx: &mut ParserContext) -> Result<(), Error> {
         Float(f) => store_numerical(ctx, f.to_bits())?,
         CharLiteral(c) => store_numerical(ctx, c as u32)?,
         StringLiteral(s) => {
+            ctx.commit_data_label_backlog();
             if let Type::Asciz | Type::Ascii = ctx.data_type {
                 ctx.data.extend(s.as_bytes());
                 if let Type::Asciz = ctx.data_type {
@@ -125,7 +136,10 @@ pub fn push_data(token: Token, ctx: &mut ParserContext) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::token::Data;
+    use crate::{
+        parser::{lexer::Lexer, parse_tokens, token::Data, Parsed},
+        simulator::memory::DATA_SIZE,
+    };
 
     #[test]
     fn test_alignment_manual() {
@@ -205,5 +219,29 @@ mod tests {
         let token = Token::new(Data::StringLiteral("Hello world!".to_owned()));
         assert!(push_data(token, &mut ctx).is_ok());
         assert_eq!(&ctx.data, b"Hello world!\0");
+    }
+
+    #[test]
+    fn test_label_alignment() {
+        let input = ".data
+            .byte '1'
+            Word: .word 1234 # aligned to 2 bits
+            .byte '2'
+            Half: .half 1234 # aligned to 1 bit
+            .byte '3'
+            Align: .align 3  # aligned to 3 bits
+            End:
+
+            .text
+            la x0 Word
+            la x0 Half
+            la x0 Align
+            la x0 End";
+
+        let tokens = Lexer::from_content(String::from(input), "test_label_alignment").peekable();
+        let Parsed { code, .. } = parse_tokens(tokens, DATA_SIZE).unwrap();
+
+        use crate::instruction::Instruction::{Ecall, Li};
+        assert_eq!(&code, &[Li(0, 4), Li(0, 10), Li(0, 16), Li(0, 16), Li(17, 10), Ecall])
     }
 }
