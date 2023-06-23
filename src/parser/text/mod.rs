@@ -327,10 +327,44 @@ where
                 res
             }};
         }
+
+        macro_rules! store_madness {
+            ($instruction:ident) => {{
+                let rd = reg!();
+                if let Some(Ok(Token {
+                    data: Char('('), ..
+                })) = self.tokens.peek()
+                {
+                    // sw rd, (rs1)
+                    let rs1 = paren!(reg!());
+                    $instruction(rd, 0, rs1)
+                } else {
+                    let imm = imm!();
+                    if let Some(Ok(Token {
+                        data: Char('('), ..
+                    })) = self.tokens.peek()
+                    {
+                        // sw rd, imm(rs1)
+                        let rs1 = paren!(reg!());
+                        $instruction(rd, imm, rs1)
+                    } else {
+                        // sw rd, imm, temp
+                        // becomes:
+                        // la temp, imm
+                        // sw rd, 0(temp)
+                        let temp = reg!();
+                        self.push_instr(Li(temp, imm));
+                        self.push_instr($instruction(rd, 0, temp));
+                        return Ok(true);
+                    }
+                }
+            }};
+        }
+
         let instr = match self.instr {
-            "sb" => Sb(reg!(), imm!(), paren!(reg!())),
-            "sh" => Sh(reg!(), imm!(), paren!(reg!())),
-            "sw" => Sw(reg!(), imm!(), paren!(reg!())),
+            "sb" => store_madness!(Sb),
+            "sh" => store_madness!(Sh),
+            "sw" => store_madness!(Sw),
             "ret" => Jalr(0, 1, 0),
             _ => return Ok(false),
         };
@@ -576,5 +610,32 @@ mod tests {
             &parser.code,
             &[Sb(1, 0, 2), Sh(10, 0xFF, 30), Sw(0, 'a' as u32, 0),]
         )
+    }
+
+    #[test]
+    fn test_stores() {
+        let input = "sb x10, 45(x11)
+            sh x12, (x13)
+            sw x14, 1234, x15";
+
+        let mut tokens = Lexer::from_content(String::from(input), "type_s.s").peekable();
+        let mut parser = ParserContext::default();
+
+        for _ in 0..3 {
+            let instruction = tokens.next().unwrap().unwrap().data.to_string();
+            let res = parse_instruction(
+                &mut tokens,
+                &mut parser,
+                instruction,
+                token::Context::empty(),
+            );
+            assert!(res.is_ok());
+        }
+
+        use super::super::Instruction::*;
+        assert_eq!(
+            &parser.code,
+            &[Sb(10, 45, 11), Sh(12, 0, 13), Li(15, 1234), Sw(14, 0, 15)]
+        );
     }
 }
