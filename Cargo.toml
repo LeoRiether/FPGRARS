@@ -1,6 +1,6 @@
 [package]
 name = "fpgrars"
-version = "2.0.1"
+version = "2.1.0"
 authors = ["Leonardo Riether <leonardoalves8217@gmail.com>"]
 edition = "2021"
 description = "Fast Pretty Good RISC-V Assembly Rendering System"
