@@ -463,13 +463,3 @@ pub fn compile_float_instruction(i: &FloatInstruction) -> Executor {
         }),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_loads() {
-        todo!("Test lb, lbu, lh, lhu, lw. lb and lh should sign-extend, I think")
-    }
-}
