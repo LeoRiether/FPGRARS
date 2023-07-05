@@ -510,7 +510,7 @@ where
             }
             "fmv.s" => {
                 let (rd, rs1) = (freg!(), freg!());
-                F::SgnjNS(rd, rs1, rs1)
+                F::SgnjS(rd, rs1, rs1)
             }
             "fneg.s" => {
                 let (rd, rs1) = (freg!(), freg!());
