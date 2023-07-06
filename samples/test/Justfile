@@ -1,0 +1,10 @@
+run-all: Engine3D Mage-Embler celeste
+
+Engine3D:
+    cargo run -F unb --release -- ./Engine3D/test/3d_model.s
+
+Mage-Embler:
+    cargo run -F unb --release -- ./Mage-Embler/src/game.s
+
+celeste:
+    cd ./celeste/Main && cargo run -F unb --release -- main.s
