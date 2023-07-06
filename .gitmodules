@@ -1,3 +1,9 @@
 [submodule "samples/test/Engine3D"]
 	path = samples/test/Engine3D
 	url = https://github.com/RISCV-Games/Engine3D
+[submodule "samples/test/Mage-Embler"]
+	path = samples/test/Mage-Embler
+	url = https://github.com/RISCV-Games/Mage-Embler
+[submodule "samples/test/celeste"]
+	path = samples/test/celeste
+	url = https://github.com/Marcelojunqueiraf/celeste
