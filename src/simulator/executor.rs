@@ -142,17 +142,14 @@ pub fn compile(i: &Instruction) -> Executor {
                 }
             }
         }),
-        Ebreak => Executor::new(move |sim, code| {
-            sim.print_state();
-            sim.pc += 4;
-            next(sim, code);
-            // let ctx = &sim.code_ctx[sim.pc / 4];
-            // eprintln!(
-            //     "   {} has not yet been implemented in FPGRARS!\n{}",
-            //     "ebreak".on_bright_magenta(),
-            //     ctx
-            // );
-            // std::process::exit(1);
+        Ebreak => Executor::new(move |sim, _code| {
+            let ctx = &sim.code_ctx[sim.pc / 4];
+            eprintln!(
+                "   {} has not yet been implemented in FPGRARS!\n{}",
+                "ebreak".on_bright_magenta(),
+                ctx
+            );
+            std::process::exit(1);
         }),
 
         // Type I -- Immediate
