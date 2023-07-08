@@ -1,4 +1,0 @@
-.data
-
-.text
-    ebreak
