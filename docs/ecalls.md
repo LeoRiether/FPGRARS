@@ -8,7 +8,8 @@ Print string | 4 | a0 = address of the string | |
 Read int | 5 | | a0 = the read integer |
 Read float | 6 | | fa0 = the read float |
 Sbrk | 9 | a0 = bytes to allocate (>= 0) | a0 = address of the allocated chunk
-Exit | 10 | | |
+Exit | 10 | a0 = exit code | |
+Exit | 93 | a0 = exit code | |
 Stop execution | 110 | |
 Print char | 11 | a0 = the char | |
 Time | 30 | | a0 = low bits of milliseconds since unix epoch, a1 = high bits |
