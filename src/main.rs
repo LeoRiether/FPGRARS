@@ -48,9 +48,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
 
             let start_time = std::time::Instant::now();
-            sim.run();
+            let exit_code = sim.run();
             eprintln!("Finished in {}ms", start_time.elapsed().as_millis());
-            std::process::exit(0);
+            std::process::exit(exit_code);
         })?;
 
     if !ARGS.no_video {

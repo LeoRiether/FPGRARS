@@ -42,7 +42,11 @@ pcontrol:
 
 exit:
 
+    li a7 11
+    li a0 '\n'
+    ecall
 	li a7 10
+    li a0 0
 	ecall
 
 # Moves the last element of the array to the front until it gets to the right position

@@ -34,6 +34,7 @@ pub struct Simulator {
     status: Vec<u32>, // I'm not sure myself how many status registers I'll use
     pc: usize,
     started_at: time::Instant,
+    exit_code: i32,
 
     open_files: files::FileHolder,
     midi_player: midi::MidiPlayer,
@@ -41,7 +42,6 @@ pub struct Simulator {
     pub memory: Memory,
     pub code: Vec<executor::Executor>,
     pub code_ctx: Vec<crate::parser::token::Context>,
-    pub exit_code: u32,
 }
 
 impl Default for Simulator {
@@ -52,12 +52,12 @@ impl Default for Simulator {
             status: Vec::new(),
             pc: 0,
             started_at: time::Instant::now(), // Will be set again in run()
+            exit_code: 0,
             open_files: files::FileHolder::new(),
             midi_player: midi::MidiPlayer::default(),
             memory: Memory::new(),
             code: Vec::new(),
             code_ctx: Vec::new(),
-            exit_code: 0,
         }
     }
 }
@@ -162,7 +162,7 @@ impl Simulator {
         self.status[parser::register_names::MISA_INDEX as usize] = 0x40001128;
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> i32 {
         self.init();
 
         // Copy code to local variable so we can access it without borrowing self
@@ -173,6 +173,8 @@ impl Simulator {
         if crate::ARGS.print_state {
             self.print_state();
         }
+
+        self.exit_code
     }
 
     fn ecall(&mut self) -> EcallSignal {
@@ -196,7 +198,7 @@ impl Simulator {
 
         match a7 {
             10 | 93 => {
-                self.exit_code = self.reg::<u32>(10); // a0
+                self.exit_code = self.reg::<i32>(10); // a0
                 return EcallSignal::Exit;
             }
             1 => {
