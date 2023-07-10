@@ -193,7 +193,7 @@ impl Simulator {
         }
 
         match a7 {
-            10 => return EcallSignal::Exit,
+            10 | 93 => return EcallSignal::Exit,
             110 => loop {
                 std::thread::sleep(time::Duration::from_millis(500));
             },
