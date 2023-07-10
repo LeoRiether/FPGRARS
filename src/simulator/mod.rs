@@ -41,6 +41,7 @@ pub struct Simulator {
     pub memory: Memory,
     pub code: Vec<executor::Executor>,
     pub code_ctx: Vec<crate::parser::token::Context>,
+    pub exit_code: u32,
 }
 
 impl Default for Simulator {
@@ -56,6 +57,7 @@ impl Default for Simulator {
             memory: Memory::new(),
             code: Vec::new(),
             code_ctx: Vec::new(),
+            exit_code: 0,
         }
     }
 }
@@ -193,10 +195,10 @@ impl Simulator {
         }
 
         match a7 {
-            10 | 93 => return EcallSignal::Exit,
-            110 => loop {
-                std::thread::sleep(time::Duration::from_millis(500));
-            },
+            10 | 93 => {
+                self.exit_code = self.reg::<u32>(10); // a0
+                return EcallSignal::Exit;
+            }
             1 => {
                 // print int
                 print!("{}", self.reg::<i32>(10));
@@ -322,7 +324,15 @@ impl Simulator {
                 return EcallSignal::Continue;
             }
 
-            x => unimplemented!("Ecall {} is not implemented", x),
+            x => {
+                let ctx = &self.code_ctx[self.pc / 4];
+                eprintln!(
+                    "   Your code tried calling the ecall {}, which is not implemented in FPGRARS!\n{}",
+                    x.bright_blue(),
+                    ctx
+                );
+                std::process::exit(1);
+            }
         }
 
         EcallSignal::Nothing
