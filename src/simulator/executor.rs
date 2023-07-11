@@ -120,6 +120,16 @@ pub fn compile(i: &Instruction) -> Executor {
         Or(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a | b),
         And(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a & b),
         Mul(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a.wrapping_mul(b)),
+        Mulh(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| {
+            ((a as i32 as i64).wrapping_mul(b as i32 as i64) >> 32) as u32
+        }),
+        Mulhsu(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| {
+            // signed rs1 × unsigned rs2
+            ((a as i32 as i64).wrapping_mul(b as i64) >> 32) as u32
+        }),
+        Mulhu(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| {
+            ((a as u64).wrapping_mul(b as u64) >> 32) as u32
+        }),
         Div(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| {
             if b == 0 {
                 -1

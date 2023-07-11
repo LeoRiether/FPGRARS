@@ -41,8 +41,8 @@ pub fn unlabel(code: &mut [Instruction], i: usize, label: usize) {
         Li(rd, _) => Li(rd, label32),
 
         Add(..) | Sub(..) | Sll(..) | Slt(..) | Sltu(..) | Xor(..) | Srl(..) | Sra(..) | Or(..)
-        | And(..) | Mul(..) | Div(..) | Divu(..) | Rem(..) | Remu(..) | URet | Ecall | Ebreak
-        | CsrRw(..) | CsrRs(..) | CsrRc(..) | Mv(..) => {
+        | And(..) | Mul(..) | Mulh(..) | Mulhu(..) | Mulhsu(..) | Div(..) | Divu(..) | Rem(..)
+        | Remu(..) | URet | Ecall | Ebreak | CsrRw(..) | CsrRs(..) | CsrRc(..) | Mv(..) => {
             panic!("FPGRARS tried to unlabel an instruction that doesn't have a label! {instr:?}")
         }
     };

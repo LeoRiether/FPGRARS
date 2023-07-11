@@ -28,7 +28,8 @@ fn test_riscv() {
 
         if file.file_type().unwrap().is_file() {
             let path = file.path();
-            if path.extension().unwrap() == "s" {
+            let ext = path.extension().unwrap_or_default();
+            if ext == "s" {
                 run(&path);
             }
         }

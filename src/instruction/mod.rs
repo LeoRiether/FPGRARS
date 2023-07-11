@@ -49,7 +49,10 @@ pub enum Instruction {
     Sra(u8, u8, u8),
     Or(u8, u8, u8),
     And(u8, u8, u8),
-    Mul(u8, u8, u8), // TODO: mulh, mulhsu, mulhu
+    Mul(u8, u8, u8),
+    Mulh(u8, u8, u8),
+    Mulhsu(u8, u8, u8),
+    Mulhu(u8, u8, u8),
     Div(u8, u8, u8),
     Divu(u8, u8, u8),
     Rem(u8, u8, u8),
