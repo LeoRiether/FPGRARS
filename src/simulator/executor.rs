@@ -120,7 +120,13 @@ pub fn compile(i: &Instruction) -> Executor {
         Or(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a | b),
         And(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a & b),
         Mul(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a.wrapping_mul(b)),
-        Div(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a.wrapping_div(b)),
+        Div(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| {
+            if b == 0 {
+                -1
+            } else {
+                (a as i32).wrapping_div(b as i32)
+            }
+        }),
         Divu(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a / b),
         Rem(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a.wrapping_rem(b)),
         Remu(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a % b),
