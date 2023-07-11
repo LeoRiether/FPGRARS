@@ -315,6 +315,24 @@ pub fn compile(i: &Instruction) -> Executor {
             next(sim, code);
         }),
 
+        // Type U
+        Lui(rd, imm) => {
+            let imm = imm << 12;
+            Executor::new(move |sim, code| {
+                sim.set_reg(rd, imm);
+                sim.pc += 4;
+                next(sim, code);
+            })
+        }
+        AuiPc(rd, imm) => {
+            let imm = imm << 12;
+            Executor::new(move |sim, code| {
+                sim.set_reg(rd, sim.pc as u32 + imm);
+                sim.pc += 4;
+                next(sim, code);
+            })
+        }
+
         // Floats
         Float(ref finstr) => compile_float_instruction(finstr),
 

@@ -54,6 +54,7 @@ pub fn parse_instruction(
         || ipc.parse_type_i()?
         || ipc.parse_type_s()?
         || ipc.parse_type_b_and_jumps()?
+        || ipc.parse_type_u()?
         || ipc.parse_csr()?
         || ipc.parse_float()?;
     if !found {
@@ -305,9 +306,25 @@ where
             "andi" => Andi(reg!(), reg!(), imm!()),
             "xori" => Xori(reg!(), reg!(), imm!()),
             "seqz" => Sltiu(reg!(), reg!(), 1),
-            "lui" => Li(reg!(), imm!() << 12),
             "li" | "la" => Li(reg!(), imm!()),
             "nop" => Addi(0, 0, 0),
+            _ => return Ok(false),
+        };
+        self.push_instr(instr);
+        Ok(true)
+    }
+
+    fn parse_type_u(&mut self) -> Result<bool, Error> {
+        use super::Instruction::*;
+
+        #[rustfmt::skip]
+        macro_rules! reg { () => { self.register()? }; }
+        #[rustfmt::skip]
+        macro_rules! imm { () => { self.immediate()? }; }
+
+        let instr = match self.instr {
+            "lui" => Lui(reg!(), imm!()),
+            "auipc" => AuiPc(reg!(), imm!()),
             _ => return Ok(false),
         };
         self.push_instr(instr);

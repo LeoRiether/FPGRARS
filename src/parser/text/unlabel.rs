@@ -2,6 +2,7 @@ use std::mem::replace;
 
 use crate::instruction::{FloatInstruction, Instruction};
 
+/// Replaces an immediate by the value of a label.
 pub fn unlabel(code: &mut [Instruction], i: usize, label: usize) {
     use Instruction::*;
 
@@ -39,6 +40,8 @@ pub fn unlabel(code: &mut [Instruction], i: usize, label: usize) {
         CsrRci(rd, fcsr, _) => CsrRci(rd, fcsr, label32),
         Float(f) => Float(unlabel_float(f, label)),
         Li(rd, _) => Li(rd, label32),
+        Lui(rd, _) => Lui(rd, label32),
+        AuiPc(rd, _) => AuiPc(rd, label32),
 
         Add(..) | Sub(..) | Sll(..) | Slt(..) | Sltu(..) | Xor(..) | Srl(..) | Sra(..) | Or(..)
         | And(..) | Mul(..) | Mulh(..) | Mulhu(..) | Mulhsu(..) | Div(..) | Divu(..) | Rem(..)

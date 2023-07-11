@@ -108,6 +108,11 @@ pub enum Instruction {
     CsrRsi(u8, u8, u32),
     CsrRci(u8, u8, u32),
 
+    // Type U
+    /// rd, imm
+    Lui(u8, u32),
+    AuiPc(u8, u32),
+
     // Floating point
     Float(FloatInstruction),
 
