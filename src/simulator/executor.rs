@@ -137,9 +137,17 @@ pub fn compile(i: &Instruction) -> Executor {
                 (a as i32).wrapping_div(b as i32)
             }
         }),
-        Divu(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a / b),
-        Rem(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a.wrapping_rem(b)),
-        Remu(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| a % b),
+        Divu(rd, rs1, rs2) => {
+            exec_type_r(rd, rs1, rs2, |a, b| if b == 0 { u32::MAX } else { a / b })
+        }
+        Rem(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| {
+            if b == 0 {
+                a as i32
+            } else {
+                (a as i32).wrapping_rem(b as i32)
+            }
+        }),
+        Remu(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| if b == 0 { a } else { a % b }),
         URet => Executor::new(move |sim, code| {
             use crate::parser::register_names::UEPC_INDEX;
             sim.pc = sim.status[UEPC_INDEX as usize] as usize;

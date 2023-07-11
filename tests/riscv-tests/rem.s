@@ -41,8 +41,6 @@
  li gp, 5
  bne x30, x29, fail
 
-
-
   test_6:
  li x1, 0x80000000
  li x2, 1
@@ -59,8 +57,6 @@
  li x29, 0
  li gp, 7
  bne x30, x29, fail
-
-
 
   test_8:
  li x1, 0x80000000
