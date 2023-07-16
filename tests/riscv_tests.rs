@@ -2,7 +2,7 @@ use std::{path::Path, process::Command};
 
 fn run(path: &impl AsRef<Path>) {
     let fpgrars = Command::new("cargo")
-        .args(["run", "--release", "--"])
+        .args(["run", "--release", "--", "--no-video"])
         .arg(path.as_ref())
         .status();
 
