@@ -48,6 +48,15 @@ fn from_bool(x: bool) -> u32 {
     }
 }
 
+fn out_of_bounds(sim: &Simulator, addr: usize) -> ! {
+    let ctx = &sim.code_ctx[sim.pc >> 2];
+    eprintln!(
+        "Out of bounds access to the memory at pc {:x}\nTried to access position {:x}\n{}",
+        sim.pc, addr, ctx
+    );
+    std::process::exit(1);
+}
+
 /// Creates an executor that executes an instruction of type R.
 /// PERF: if `op: F` where `F: Fn`, this is apparently inlined correctly, so performance is not
 /// affected. However, if `op: fn(u32, u32) -> R`, performance is significantly worse! Like,
@@ -194,35 +203,40 @@ pub fn compile(i: &Instruction) -> Executor {
         // Type I -- Loads
         Lb(rd, imm, rs1) => Executor::new(move |sim, code| {
             let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
-            let data = sim.memory.get_byte(addr) as i8 as u32; // sign-extends
+            let oob = || out_of_bounds(sim, addr);
+            let data = sim.memory.get_byte(addr).or_else(oob) as i8 as u32; // sign-extends
             sim.set_reg(rd, data);
             sim.pc += 4;
             next(sim, code);
         }),
         Lbu(rd, imm, rs1) => Executor::new(move |sim, code| {
             let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
-            let data = sim.memory.get_byte(addr) as u32;
+            let oob = || out_of_bounds(sim, addr);
+            let data = sim.memory.get_byte(addr).or_else(oob) as u32;
             sim.set_reg(rd, data);
             sim.pc += 4;
             next(sim, code);
         }),
         Lh(rd, imm, rs1) => Executor::new(move |sim, code| {
             let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
-            let data = sim.memory.get_half(addr) as i16 as u32; // sign-extends
+            let oob = || out_of_bounds(sim, addr);
+            let data = sim.memory.get_half(addr).or_else(oob) as i16 as u32; // sign-extends
             sim.set_reg(rd, data);
             sim.pc += 4;
             next(sim, code);
         }),
         Lhu(rd, imm, rs1) => Executor::new(move |sim, code| {
             let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
-            let data = sim.memory.get_half(addr) as u32;
+            let oob = || out_of_bounds(sim, addr);
+            let data = sim.memory.get_half(addr).or_else(oob) as u32;
             sim.set_reg(rd, data);
             sim.pc += 4;
             next(sim, code);
         }),
         Lw(rd, imm, rs1) => Executor::new(move |sim, code| {
             let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
-            let data = sim.memory.get_word(addr);
+            let oob = || out_of_bounds(sim, addr);
+            let data = sim.memory.get_word(addr).or_else(oob);
             sim.set_reg(rd, data);
             sim.pc += 4;
             next(sim, code);
@@ -230,26 +244,26 @@ pub fn compile(i: &Instruction) -> Executor {
 
         // Type S
         Sb(rs2, imm, rs1) => Executor::new(move |sim, code| {
-            sim.memory.set_byte(
-                (sim.reg::<u32>(rs1).wrapping_add(imm)) as usize,
-                sim.reg::<u8>(rs2),
-            );
+            let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
+            sim.memory
+                .set_byte(addr, sim.reg::<u8>(rs2))
+                .or_else(|| out_of_bounds(sim, addr));
             sim.pc += 4;
             next(sim, code);
         }),
         Sh(rs2, imm, rs1) => Executor::new(move |sim, code| {
-            sim.memory.set_half(
-                (sim.reg::<u32>(rs1).wrapping_add(imm)) as usize,
-                sim.reg::<u16>(rs2),
-            );
+            let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
+            sim.memory
+                .set_half(addr, sim.reg::<u16>(rs2))
+                .or_else(|| out_of_bounds(sim, addr));
             sim.pc += 4;
             next(sim, code);
         }),
         Sw(rs2, imm, rs1) => Executor::new(move |sim, code| {
-            sim.memory.set_word(
-                (sim.reg::<u32>(rs1).wrapping_add(imm)) as usize,
-                sim.reg::<u32>(rs2),
-            );
+            let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
+            sim.memory
+                .set_word(addr, sim.reg::<u32>(rs2))
+                .or_else(|| out_of_bounds(sim, addr));
             sim.pc += 4;
             next(sim, code);
         }),
@@ -488,7 +502,8 @@ pub fn compile_float_instruction(i: &FloatInstruction) -> Executor {
         Lw(rd, imm, rs1) => Executor::new(move |sim, code| {
             let rd = rd as usize;
             let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
-            let data = sim.memory.get_float(addr);
+            let oob = || out_of_bounds(sim, addr);
+            let data = sim.memory.get_float(addr).or_else(oob);
             sim.floats[rd] = data;
             sim.pc += 4;
             next(sim, code);
@@ -496,7 +511,9 @@ pub fn compile_float_instruction(i: &FloatInstruction) -> Executor {
         Sw(rs2, imm, rs1) => Executor::new(move |sim, code| {
             let x = sim.floats[rs2 as usize];
             let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
-            sim.memory.set_float(addr, x);
+            sim.memory
+                .set_float(addr, x)
+                .or_else(|| out_of_bounds(sim, addr));
             sim.pc += 4;
             next(sim, code);
         }),

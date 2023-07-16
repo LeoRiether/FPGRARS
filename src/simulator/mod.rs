@@ -213,7 +213,10 @@ impl Simulator {
                 // print string
                 let start = self.reg::<u32>(10) as usize; // a0
                 (start..)
-                    .map(|i| self.memory.get_byte(i) as char)
+                    .map(|i| self.memory
+                         .get_byte(i)
+                         .or_else(|| panic!("Out of bounds access at address <unknown> because the dev still hasn't implemented this part, sorry"))
+                         as char)
                     .take_while(|&c| c != '\0')
                     .for_each(|c| print!("{}", c));
             }
