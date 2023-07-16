@@ -228,6 +228,7 @@ pub fn parse_tokens<I: Iterator<Item = Result<Token, Error>>>(
     // If the program ever drops off bottom, we make an "exit" ecall and terminate execution
     ctx.code.extend(vec![
         Instruction::Li(17, 10), // li a7 10
+        Instruction::Li(10, 0),  // li a0 0
         Instruction::Ecall,
     ]);
 
