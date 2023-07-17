@@ -61,6 +61,7 @@ N: .word 10000
 
 exit:
     li a7 10
+    li a0 0
     ecall
 
 # a0 = begin
