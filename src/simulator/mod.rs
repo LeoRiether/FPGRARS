@@ -79,7 +79,7 @@ impl Simulator {
             self.pc = globl;
         }
 
-        if crate::ARGS.print_instructions {
+        if crate::CONFIG.print_instructions {
             eprintln!("{}", "Instructions: ---------------".bright_blue());
             code.iter().for_each(|i| eprintln!("{:?}", i));
             eprintln!("{}", "-----------------------------".bright_blue());
@@ -170,7 +170,7 @@ impl Simulator {
 
         executor::next(self, &code);
 
-        if crate::ARGS.print_state {
+        if crate::CONFIG.print_state {
             self.print_state();
         }
 

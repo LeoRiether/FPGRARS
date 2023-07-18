@@ -13,7 +13,7 @@
 //! FPGRARS doesn't care, but RARS complains.
 //!
 
-mod args;
+mod config;
 mod instruction;
 mod parser;
 mod renderer;
@@ -21,15 +21,12 @@ mod simulator;
 pub mod utf8_lossy_lines;
 pub mod util;
 
-use lazy_static::lazy_static;
 use owo_colors::OwoColorize;
 use simulator::Simulator;
 use std::error::Error;
 use std::thread;
 
-lazy_static! {
-    pub static ref ARGS: args::Args = args::get_args();
-}
+use crate::config::CONFIG;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let memory = simulator::memory::Memory::new();
@@ -40,9 +37,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .spawn(move || {
             let mut sim = Simulator::default()
                 .with_memory(memory)
-                .with_midi_port(ARGS.port);
+                .with_midi_port(CONFIG.port);
 
-            if let Err(e) = sim.load_file(&ARGS.file) {
+            if let Err(e) = sim.load_file(&CONFIG.file) {
                 eprintln!("   {}: {}\n", "[error]".bright_red().bold(), e);
                 std::process::exit(1);
             };
@@ -53,8 +50,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             std::process::exit(exit_code);
         })?;
 
-    if !ARGS.no_video {
-        let state = renderer::State::new(mmio, ARGS.width, ARGS.height, ARGS.scale);
+    if !CONFIG.no_video {
+        let state = renderer::State::new(mmio, CONFIG.width, CONFIG.height, CONFIG.scale);
         renderer::init(state);
     }
 
