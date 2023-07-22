@@ -13,7 +13,7 @@ lazy_static! {
 pub struct OptionalConfig {
     /// Hides the bitmap display
     #[arg(long)]
-    pub no_video: Option<bool>,
+    pub no_video: bool,
 
     /// The width of the bitmap display. Defaults to 320px
     #[arg(short, long)]
@@ -33,11 +33,11 @@ pub struct OptionalConfig {
 
     /// Prints the instructions in the FPGRARS format
     #[arg(long)]
-    pub print_instructions: Option<bool>,
+    pub print_instructions: bool,
 
     /// Prints the final state of the program after execution
     #[arg(long)]
-    pub print_state: Option<bool>,
+    pub print_state: bool,
 
     /// The RISC-V file to execute
     pub file: Option<String>,
@@ -57,13 +57,13 @@ impl OptionalConfig {
 
     pub fn merge(self, rhs: Self) -> Self {
         Self {
-            no_video: self.no_video.or(rhs.no_video),
+            no_video: self.no_video || rhs.no_video,
             width: self.width.or(rhs.width),
             height: self.height.or(rhs.height),
             scale: self.scale.or(rhs.scale),
             port: self.port.or(rhs.port),
-            print_instructions: self.print_instructions.or(rhs.print_instructions),
-            print_state: self.print_state.or(rhs.print_state),
+            print_instructions: self.print_instructions || rhs.print_instructions,
+            print_state: self.print_state || rhs.print_state,
             file: self.file.or(rhs.file),
         }
     }
@@ -84,13 +84,13 @@ pub struct Config {
 impl From<OptionalConfig> for Config {
     fn from(config: OptionalConfig) -> Self {
         Self {
-            no_video: config.no_video.unwrap_or(false),
+            no_video: config.no_video,
             width: config.width.unwrap_or(320),
             height: config.height.unwrap_or(240),
             scale: config.scale.unwrap_or(2),
             port: config.port,
-            print_instructions: config.print_instructions.unwrap_or(false),
-            print_state: config.print_state.unwrap_or(false),
+            print_instructions: config.print_instructions,
+            print_state: config.print_state,
             file: config.file.unwrap_or_else(|| {
                 eprintln!("No file specified");
                 std::process::exit(1);
