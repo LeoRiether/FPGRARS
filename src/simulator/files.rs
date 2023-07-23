@@ -130,10 +130,7 @@ pub fn handle_ecall(
             // Open file
             let (a0, flags) = (registers[10] as usize, registers[11]);
             let filepath: String = (a0..)
-                .map(|i| memory
-                     .get_byte(i)
-                     .or_else(|| panic!("Out of bounds access at address <unknown> because the dev still hasn't implemented this part, sorry"))
-                     as char)
+                .map(|i| memory.get_byte(i) as char)
                 .take_while(|&c| c != '\0')
                 .collect();
 

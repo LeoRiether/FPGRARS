@@ -9,7 +9,7 @@ pub const MMIO_START: usize = 0xff00_0000;
 
 pub const HEAP_START: usize = 0x1004_0000;
 
-use crate::renderer::{FRAME_0, FRAME_1, FRAME_SIZE, KDMMIO_CONTROL, KDMMIO_DATA};
+use crate::renderer::{FRAME_0, FRAME_1, KDMMIO_CONTROL, KDMMIO_DATA, FRAME_SIZE};
 pub const VIDEO_START: usize = MMIO_START + FRAME_0;
 pub const VIDEO_END: usize = MMIO_START + FRAME_1 + FRAME_SIZE;
 
@@ -36,34 +36,6 @@ fn copy_with_transparency(buf: &mut [u8], mut x: u32, n: usize) {
             *data = byte;
         }
         x >>= 8;
-    }
-}
-
-#[derive(Debug)]
-pub enum MemoryResult<T> {
-    Ok(T),
-    OutOfBounds,
-}
-
-impl<T> MemoryResult<T> {
-    pub fn map<R>(self, f: impl FnOnce(T) -> R) -> MemoryResult<R> {
-        match self {
-            MemoryResult::Ok(x) => MemoryResult::Ok(f(x)),
-            MemoryResult::OutOfBounds => MemoryResult::OutOfBounds,
-        }
-    }
-
-    pub fn or_else(self, f: impl FnOnce() -> T) -> T {
-        match self {
-            MemoryResult::Ok(x) => x,
-            MemoryResult::OutOfBounds => f(),
-        }
-    }
-}
-
-impl<T> From<Option<T>> for MemoryResult<T> {
-    fn from(x: Option<T>) -> Self {
-        x.map_or(Self::OutOfBounds, Self::Ok)
     }
 }
 
@@ -139,69 +111,45 @@ impl Memory {
         }
     }
 
-    pub fn get_byte(&self, i: usize) -> MemoryResult<u8> {
-        self.get_with(i, |v| v.get(0).copied().into())
+    pub fn get_byte(&self, i: usize) -> u8 {
+        self.get_with(i, |v| v[0])
     }
 
-    pub fn set_byte(&mut self, i: usize, x: u8) -> MemoryResult<()> {
+    pub fn set_byte(&mut self, i: usize, x: u8) {
         if self.set_with_transparency(i, x as u32, 1) {
-            return MemoryResult::Ok(());
+            return;
         }
-        self.set_with(i, x, |v, x| v.get_mut(0).map(|v| *v = x).into())
+        self.set_with(i, x, |v, x| v[0] = x);
     }
 
-    pub fn get_half(&self, i: usize) -> MemoryResult<u16> {
-        self.get_with(i, |v| {
-            if v.len() >= 2 {
-                MemoryResult::Ok(LittleEndian::read_u16(v))
-            } else {
-                MemoryResult::OutOfBounds
-            }
-        })
+    pub fn get_half(&self, i: usize) -> u16 {
+        self.get_with(i, LittleEndian::read_u16)
     }
 
-    pub fn set_half(&mut self, i: usize, x: u16) -> MemoryResult<()> {
+    pub fn set_half(&mut self, i: usize, x: u16) {
         if self.set_with_transparency(i, x as u32, 2) {
-            return MemoryResult::Ok(());
+            return;
         }
-        self.set_with(i, x, |v, x| {
-            if v.len() >= 2 {
-                MemoryResult::Ok(LittleEndian::write_u16(v, x))
-            } else {
-                MemoryResult::OutOfBounds
-            }
-        })
+        self.set_with(i, x, LittleEndian::write_u16);
     }
 
-    pub fn get_word(&self, i: usize) -> MemoryResult<u32> {
-        self.get_with(i, |v| {
-            if v.len() >= 4 {
-                MemoryResult::Ok(LittleEndian::read_u32(v))
-            } else {
-                MemoryResult::OutOfBounds
-            }
-        })
+    pub fn get_word(&self, i: usize) -> u32 {
+        self.get_with(i, LittleEndian::read_u32)
     }
 
-    pub fn set_word(&mut self, i: usize, x: u32) -> MemoryResult<()> {
+    pub fn set_word(&mut self, i: usize, x: u32) {
         if self.set_with_transparency(i, x, 4) {
-            return MemoryResult::Ok(());
+            return;
         }
-        self.set_with(i, x, |v, x| {
-            if v.len() >= 4 {
-                MemoryResult::Ok(LittleEndian::write_u32(v, x))
-            } else {
-                MemoryResult::OutOfBounds
-            }
-        })
+        self.set_with(i, x, LittleEndian::write_u32);
     }
 
-    pub fn get_float(&self, i: usize) -> MemoryResult<f32> {
-        self.get_word(i).map(|x| f32::from_bits(x))
+    pub fn get_float(&self, i: usize) -> f32 {
+        self.get_with(i, LittleEndian::read_f32)
     }
 
-    pub fn set_float(&mut self, i: usize, x: f32) -> MemoryResult<()> {
-        self.set_word(i, x.to_bits())
+    pub fn set_float(&mut self, i: usize, x: f32) {
+        self.set_word(i, x.to_bits());
     }
 
     /// Tries to read `len` bytes from the reader and write them to `memory[start..start+len]`
