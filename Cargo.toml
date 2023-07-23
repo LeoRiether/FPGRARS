@@ -5,6 +5,8 @@ authors = ["Leonardo Riether <leonardoalves8217@gmail.com>"]
 edition = "2021"
 description = "Fast Pretty Good RISC-V Assembly Rendering System"
 license = "MIT"
+exclude = ["site/", "tests/riscv-tests/", "samples/"]
+
 
 [features]
 show_ms = [] # show ms per frame in the window title
