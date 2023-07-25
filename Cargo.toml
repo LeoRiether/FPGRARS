@@ -6,6 +6,7 @@ edition = "2021"
 description = "Fast Pretty Good RISC-V Assembly Rendering System"
 license = "MIT"
 exclude = ["site/", "tests/riscv-tests/", "samples/"]
+repository = "https://github.com/LeoRiether/FPGRARS/"
 
 
 [features]
