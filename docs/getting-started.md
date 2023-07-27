@@ -26,7 +26,7 @@ running `cargo install fpgrars`.
 
 Create a `riscv.s` file and put the following content in it:
 
-```assembly
+```assembly title="riscv.s"
 .data
 # Define the label "hello" to as the address to the very start
 # of the "Hello World!\n" string 
@@ -48,6 +48,8 @@ hello: .string "Hello World!\n"
 
 You can now run the program with the command `./fpgrars riscv.s` and you should see a "Hello World"
 appear on your terminal!
+
+!["Hello World" appears on screen after running FPGRARS](./img/hello_world.jpg)
 
 Note that `./fpgrars` should have the full name of the executable file. On Windows, it's probably
 something like `./fpgrars-x86_64-pc-windows-msvc--original.exe`, on Linux,
