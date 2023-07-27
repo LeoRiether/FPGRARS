@@ -31,14 +31,14 @@ Options:
 For example, if you want to run FPGRARS without the bitmap display and print
 the state of the registers when the program exits, you can use the command 
 
-```
+```bash
 fpgrars --no-video --print-state file.s
 ```
 
 As another example, if you want the bitmap display to be 1280 x 720 and display
 each pixel as a 1x1 square (an actual pixel), you should run
 
-```
+```bash
 fpgrars -w 1280 -h 720 -s 1
 ```
 
@@ -59,7 +59,7 @@ working directory is structured like this:
 
 and `fpgrars.toml` contains the following:
 
-```toml
+```toml title="fpgrars.toml"
 width = 1280
 height = 720
 scale = 1
@@ -69,8 +69,7 @@ Then, running `fpgrars src/main.s` is the same as `fpgrars --width 1280 --height
 
 You could also specify a default file to run, for example:
 
-```toml
-# fpgrars.toml
+```toml title="fpgrars.toml"
 file = "src/main.s"
 ```
 
