@@ -411,7 +411,7 @@ executable in a folder that's in your <code>PATH</code> environment variable (co
 running <code>cargo install fpgrars</code>.</p>
 <h2 id="hello-world">Hello World!</h2>
 <p>Create a <code>riscv.s</code> file and put the following content in it:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>.data
+<div class="language-text highlight"><span class="filename">riscv.s</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>.data
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a># Define the label &quot;hello&quot; to as the address to the very start
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a># of the &quot;Hello World!\n&quot; string 
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>hello: .string &quot;Hello World!\n&quot;
@@ -431,6 +431,7 @@ running <code>cargo install fpgrars</code>.</p>
 </span></code></pre></div>
 <p>You can now run the program with the command <code>./fpgrars riscv.s</code> and you should see a "Hello World"
 appear on your terminal!</p>
+<p><img alt="&quot;Hello World&quot; appears on screen after running FPGRARS" src="../img/hello_world.jpg" /></p>
 <p>Note that <code>./fpgrars</code> should have the full name of the executable file. On Windows, it's probably
 something like <code>./fpgrars-x86_64-pc-windows-msvc--original.exe</code>, on Linux,
 <code>./fpgrars-x86_64-unknown-linux-gnu--original</code>. Of course, you can rename it
