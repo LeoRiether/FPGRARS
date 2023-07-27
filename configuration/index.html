@@ -8,20 +8,20 @@
       
       
       
-        <link rel="canonical" href="https://leoriether.github.io/fpgrars/ecalls/">
+        <link rel="canonical" href="https://leoriether.github.io/fpgrars/configuration/">
       
       
-        <link rel="prev" href="../configuration/">
+        <link rel="prev" href="..">
       
       
-        <link rel="next" href="../midi/">
+        <link rel="next" href="../ecalls/">
       
       <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.15">
     
     
       
-        <title>Supported Ecalls - FPGRARS</title>
+        <title>Configuration - FPGRARS</title>
       
     
     
@@ -71,7 +71,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#supported-ecalls" class="md-skip">
+        <a href="#configuration" class="md-skip">
           Skip to content
         </a>
       
@@ -106,7 +106,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Supported Ecalls
+              Configuration
             
           </span>
         </div>
@@ -207,21 +207,6 @@
 
   
   
-  
-    <li class="md-nav__item">
-      <a href="../configuration/" class="md-nav__link">
-        Configuration
-      </a>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
     
   
   
@@ -233,10 +218,63 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Configuration
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
-        Supported Ecalls
+        Configuration
       </a>
       
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#command-line-arguments" class="md-nav__link">
+    Command-line arguments
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-file-fpgrarstoml" class="md-nav__link">
+    Configuration file (fpgrars.toml)
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ecalls/" class="md-nav__link">
+        Supported Ecalls
+      </a>
     </li>
   
 
@@ -276,6 +314,28 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#command-line-arguments" class="md-nav__link">
+    Command-line arguments
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-file-fpgrarstoml" class="md-nav__link">
+    Configuration file (fpgrars.toml)
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -289,175 +349,62 @@
                   
 
 
-<h1 id="supported-ecalls">Supported Ecalls</h1>
-<table>
-<thead>
-<tr>
-<th>Description</th>
-<th>a7</th>
-<th>Input</th>
-<th>Output</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Print integer</td>
-<td>1</td>
-<td>a0 = integer to print</td>
-<td></td>
-</tr>
-<tr>
-<td>Print float</td>
-<td>2</td>
-<td>fa0 = float to print</td>
-<td></td>
-</tr>
-<tr>
-<td>Print string</td>
-<td>4</td>
-<td>a0 = address of the string</td>
-<td></td>
-</tr>
-<tr>
-<td>Read int</td>
-<td>5</td>
-<td></td>
-<td>a0 = the read integer</td>
-</tr>
-<tr>
-<td>Read float</td>
-<td>6</td>
-<td></td>
-<td>fa0 = the read float</td>
-</tr>
-<tr>
-<td>Sbrk</td>
-<td>9</td>
-<td>a0 = bytes to allocate (&gt;= 0)</td>
-<td>a0 = address of the allocated chunk</td>
-</tr>
-<tr>
-<td>Exit</td>
-<td>10</td>
-<td>a0 = exit code</td>
-<td></td>
-</tr>
-<tr>
-<td>Exit</td>
-<td>93</td>
-<td>a0 = exit code</td>
-<td></td>
-</tr>
-<tr>
-<td>Stop execution</td>
-<td>110</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Print char</td>
-<td>11</td>
-<td>a0 = the char</td>
-<td></td>
-</tr>
-<tr>
-<td>Time</td>
-<td>30</td>
-<td></td>
-<td>a0 = low bits of milliseconds since unix epoch, a1 = high bits</td>
-</tr>
-<tr>
-<td>Midi out</td>
-<td>31</td>
-<td>a0 = pitch (note), a1 = duration in ms, a2 = instrument (in range 0-127), a3 = volume (also 0-127)</td>
-<td>Async sound</td>
-</tr>
-<tr>
-<td>Sleep ms</td>
-<td>32</td>
-<td>a0 = number of milliseconds to sleep</td>
-<td></td>
-</tr>
-<tr>
-<td>Midi out sync</td>
-<td>33</td>
-<td>a0 = pitch (note), a1 = duration in ms, a2 = instrument (in range 0-127), a3 = volume (also 0-127)</td>
-<td>Synchronous sound</td>
-</tr>
-<tr>
-<td>Print hex integer</td>
-<td>34</td>
-<td>a0 = integer to print</td>
-<td></td>
-</tr>
-<tr>
-<td>Print unsigned integer</td>
-<td>36</td>
-<td>a0 = unsigned integer to print</td>
-<td></td>
-</tr>
-<tr>
-<td>Rand seed</td>
-<td>40</td>
-<td>does nothing for now</td>
-<td></td>
-</tr>
-<tr>
-<td>Rand int</td>
-<td>41</td>
-<td></td>
-<td>a0 = random integer</td>
-</tr>
-<tr>
-<td>Rand int range</td>
-<td>42</td>
-<td>a0 is discarded, a1 = upper bound</td>
-<td>a0 = random integer in [0, a1)</td>
-</tr>
-<tr>
-<td>Rand float</td>
-<td>43</td>
-<td></td>
-<td>fa0 = random float in [0, 1)</td>
-</tr>
-<tr>
-<td>Clear screen</td>
-<td>48 or 148</td>
-<td>a0 = color, a1 = frame</td>
-<td></td>
-</tr>
-<tr>
-<td>Open file</td>
-<td>1024</td>
-<td>a0 = address of the null-terminated string for the path, a1 = 0 (read mode), 1 (write mode) or 9 (append mode)</td>
-<td>a0 = the file descriptor or -1 if error</td>
-</tr>
-<tr>
-<td>Close file</td>
-<td>57</td>
-<td>a0 = a file descriptor</td>
-<td></td>
-</tr>
-<tr>
-<td>Seek</td>
-<td>62</td>
-<td>a0 = a file descriptor, a1 = the offset to seek, a2 = 0 (seek from the start of the file), 1 (from the current position) or 2 (from the end)</td>
-<td>a0 = the selected position from the start of the file</td>
-</tr>
-<tr>
-<td>Read</td>
-<td>63</td>
-<td>a0 = a file descriptor, a1 = address of the buffer, a2 = maximum length to read</td>
-<td>a0 = number of bytes read or -1 if error</td>
-</tr>
-<tr>
-<td>Write</td>
-<td>64</td>
-<td>a0 = a file descriptor, a1 = address of the buffer, a2 = length to write</td>
-<td>a0 = number of bytes written of -1 if error</td>
-</tr>
-</tbody>
-</table>
+<h1 id="configuration">Configuration</h1>
+<p>There are two ways to configure FPGRARS: by passing command-line arguments or
+by using an <code>fpgrars.toml</code> file.</p>
+<h2 id="command-line-arguments">Command-line arguments</h2>
+<p>When you run fpgrars --help, you will see the available arguments for your specific version of FPGRARS, like it's shown below. Do note that the version on this website might not always be up to date. </p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>&gt; fpgrars --help
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>Fast Pretty Good RISC-V Assembly Rendering System
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>Usage: fpgrars [OPTIONS] [FILE]
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>Arguments:
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  [FILE]  The RISC-V file to execute
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>Options:
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>      --no-video            Hides the bitmap display
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  -w, --width &lt;WIDTH&gt;       The width of the bitmap display. Defaults to 320px
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  -h, --height &lt;HEIGHT&gt;     The height of the bitmap display. Defaults to 240px
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  -s, --scale &lt;SCALE&gt;       Each pixel is scaled by this factor. Defaults to 2 (each pixel becomes a 2x2 square)
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  -p, --port &lt;PORT&gt;         The MIDI port to use for audio
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>      --print-instructions  Prints the instructions in the FPGRARS format
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>      --print-state         Prints the final state of the program after execution
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>  -h, --help                Print help
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>  -V, --version             Print version
+</span></code></pre></div>
+<p>For example, if you want to run FPGRARS without the bitmap display and print
+the state of the registers when the program exits, you can use the command </p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>fpgrars --no-video --print-state file.s
+</span></code></pre></div>
+<p>As another example, if you want the bitmap display to be 1280 x 720 and display
+each pixel as a 1x1 square (an actual pixel), you should run</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>fpgrars -w 1280 -h 720 -s 1
+</span></code></pre></div>
+<p>In this case, you probably want to run FPGRARS with this configuration every
+time your project is executed. The next section outlines a way to do this.</p>
+<h2 id="configuration-file-fpgrarstoml">Configuration file (fpgrars.toml)</h2>
+<p>If FPGRARS detects an <code>fpgrars.toml</code> in the current working directory, it will
+use the configuration defined there by default. For example, suppose the
+working directory is structured like this:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>|- fpgrars.toml
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>|- src
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>|  |- main.s
+</span></code></pre></div>
+<p>and <code>fpgrars.toml</code> contains the following:</p>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1280</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">height</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">720</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">scale</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+</span></code></pre></div>
+<p>Then, running <code>fpgrars src/main.s</code> is the same as <code>fpgrars --width 1280 --height 720 --scale 1</code>.</p>
+<p>You could also specify a default file to run, for example:</p>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># fpgrars.toml</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;src/main.s&quot;</span>
+</span></code></pre></div>
+<p>Then, running <code>fpgrars</code> is the same as <code>fpgrars src/main.s</code>.</p>
+<p>It's worth noting that you can still pass command-line arguments in addition to
+using <code>fpgrars.toml</code>, in which case any options you pass by command-line will
+take priority over the ones defined in the config file.</p>
 
 
 
