@@ -27,16 +27,38 @@ impl Executor {
 
 /// Execute the next instruction
 #[inline(always)]
-pub fn next(sim: &mut Simulator, code: &[Executor]) {
-    let executor = code.get(sim.pc >> 2).unwrap_or_else(|| {
+pub fn next(sim: &mut Simulator, code: &[Executor], new_pc: usize) {
+    if let Some(position) = sim.memory.out_of_bounds_access {
+        let byte_msg = if position as i32 >= 0 {
+            format!("{}", position.bright_blue())
+        } else {
+            format!(
+                "{} (the same as {} if signed)",
+                position.bright_blue(),
+                (position as i32).bright_blue()
+            )
+        };
         eprintln!(
-            "Tried to access instruction at pc {:x}, but code is only {:x} bytes long",
-            sim.pc,
-            sim.code.len() * 4
+            "{} Out of bounds memory access at byte {}!\n{}: when executing instruction\n{}",
+            "   [error]".bright_red(),
+            byte_msg,
+            "   Note".bright_yellow(),
+            sim.code_ctx[sim.pc]
+        );
+        std::process::exit(1);
+    }
+
+    let executor = code.get(new_pc >> 2).unwrap_or_else(|| {
+        eprintln!(
+            "Tried to access instruction at pc {:x}, but code is only {:x} bytes long.\nLast instruction executed: {}",
+            new_pc,
+            sim.code.len() * 4,
+            sim.code_ctx[sim.pc],
         );
         std::process::exit(1);
     });
 
+    sim.pc = new_pc;
     executor.call(sim, code);
 }
 
@@ -62,8 +84,7 @@ where
 {
     Executor::new(move |sim, code| {
         sim.set_reg(rd, op(sim.reg(rs1), sim.reg(rs2)));
-        sim.pc += 4;
-        next(sim, code);
+        next(sim, code, sim.pc + 4);
     })
 }
 
@@ -77,8 +98,7 @@ where
 {
     Executor::new(move |sim, code| {
         sim.set_reg(rd, op(sim.reg(rs1), imm));
-        sim.pc += 4;
-        next(sim, code);
+        next(sim, code, sim.pc + 4);
     })
 }
 
@@ -89,12 +109,12 @@ where
     F: Fn(u32, u32) -> bool + 'static,
 {
     Executor::new(move |sim, code| {
-        if op(sim.reg(rs1), sim.reg(rs2)) {
-            sim.pc = label;
+        let new_pc = if op(sim.reg(rs1), sim.reg(rs2)) {
+            label
         } else {
-            sim.pc += 4;
-        }
-        next(sim, code);
+            sim.pc + 4
+        };
+        next(sim, code, new_pc);
     })
 }
 
@@ -150,8 +170,7 @@ pub fn compile(i: &Instruction) -> Executor {
         Remu(rd, rs1, rs2) => exec_type_r(rd, rs1, rs2, |a, b| if b == 0 { a } else { a % b }),
         URet => Executor::new(move |sim, code| {
             use crate::parser::register_names::UEPC_INDEX;
-            sim.pc = sim.status[UEPC_INDEX as usize] as usize;
-            next(sim, code);
+            next(sim, code, sim.status[UEPC_INDEX as usize] as usize);
         }),
 
         // Type I
@@ -159,11 +178,8 @@ pub fn compile(i: &Instruction) -> Executor {
             use EcallSignal::*;
             match sim.ecall() {
                 Exit => {} // don't execute the next instruction
-                Continue => next(sim, code),
-                Nothing => {
-                    sim.pc += 4;
-                    next(sim, code);
-                }
+                Continue => next(sim, code, sim.pc),
+                Nothing => next(sim, code, sim.pc + 4),
             }
         }),
         Ebreak => Executor::new(move |sim, _code| {
@@ -196,36 +212,31 @@ pub fn compile(i: &Instruction) -> Executor {
             let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
             let data = sim.memory.get_byte(addr) as i8 as u32; // sign-extends
             sim.set_reg(rd, data);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Lbu(rd, imm, rs1) => Executor::new(move |sim, code| {
             let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
             let data = sim.memory.get_byte(addr) as u32;
             sim.set_reg(rd, data);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Lh(rd, imm, rs1) => Executor::new(move |sim, code| {
             let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
             let data = sim.memory.get_half(addr) as i16 as u32; // sign-extends
             sim.set_reg(rd, data);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Lhu(rd, imm, rs1) => Executor::new(move |sim, code| {
             let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
             let data = sim.memory.get_half(addr) as u32;
             sim.set_reg(rd, data);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Lw(rd, imm, rs1) => Executor::new(move |sim, code| {
             let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
             let data = sim.memory.get_word(addr);
             sim.set_reg(rd, data);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
 
         // Type S
@@ -234,24 +245,21 @@ pub fn compile(i: &Instruction) -> Executor {
                 (sim.reg::<u32>(rs1).wrapping_add(imm)) as usize,
                 sim.reg::<u8>(rs2),
             );
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Sh(rs2, imm, rs1) => Executor::new(move |sim, code| {
             sim.memory.set_half(
                 (sim.reg::<u32>(rs1).wrapping_add(imm)) as usize,
                 sim.reg::<u16>(rs2),
             );
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Sw(rs2, imm, rs1) => Executor::new(move |sim, code| {
             sim.memory.set_word(
                 (sim.reg::<u32>(rs1).wrapping_add(imm)) as usize,
                 sim.reg::<u32>(rs2),
             );
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
 
         // Type B
@@ -268,51 +276,44 @@ pub fn compile(i: &Instruction) -> Executor {
             // so it works as a nop. Maybe this is correct, maybe it's not, but I'll copy the behavior seen in
             // RARS to be consistent.
             sim.set_reg(rd, (sim.pc + 4) as u32);
-            sim.pc = (sim.reg::<i32>(rs1) + (imm as i32)) as usize & !1;
-            next(sim, code);
+            let new_pc = (sim.reg::<i32>(rs1) + (imm as i32)) as usize & !1;
+            next(sim, code, new_pc);
         }),
         Jal(rd, label) => Executor::new(move |sim, code| {
             sim.set_reg(rd, (sim.pc + 4) as u32);
-            sim.pc = label;
-            next(sim, code);
+            next(sim, code, label);
         }),
 
         // CSR
         CsrRw(rd, fcsr, rs1) => Executor::new(move |sim, code| {
             sim.set_reg(rd, sim.get_status(fcsr));
             sim.status[fcsr as usize] = sim.reg::<u32>(rs1);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         CsrRwi(rd, fcsr, imm) => Executor::new(move |sim, code| {
             sim.set_reg(rd, sim.get_status(fcsr));
             sim.status[fcsr as usize] = imm;
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         CsrRs(rd, fcsr, rs1) => Executor::new(move |sim, code| {
             sim.set_reg(rd, sim.get_status(fcsr));
             sim.status[fcsr as usize] |= sim.reg::<u32>(rs1);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         CsrRsi(rd, fcsr, imm) => Executor::new(move |sim, code| {
             sim.set_reg(rd, sim.get_status(fcsr));
             sim.status[fcsr as usize] |= imm;
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         CsrRc(rd, fcsr, rs1) => Executor::new(move |sim, code| {
             sim.set_reg(rd, sim.get_status(fcsr));
             sim.status[fcsr as usize] &= !sim.reg::<u32>(rs1);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         CsrRci(rd, fcsr, imm) => Executor::new(move |sim, code| {
             sim.set_reg(rd, sim.get_status(fcsr));
             sim.status[fcsr as usize] &= !imm;
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
 
         // Type U
@@ -320,16 +321,14 @@ pub fn compile(i: &Instruction) -> Executor {
             let imm = imm << 12;
             Executor::new(move |sim, code| {
                 sim.set_reg(rd, imm);
-                sim.pc += 4;
-                next(sim, code);
+                next(sim, code, sim.pc + 4);
             })
         }
         AuiPc(rd, imm) => {
             let imm = imm << 12;
             Executor::new(move |sim, code| {
                 sim.set_reg(rd, sim.pc as u32 + imm);
-                sim.pc += 4;
-                next(sim, code);
+                next(sim, code, sim.pc + 4);
             })
         }
 
@@ -339,14 +338,12 @@ pub fn compile(i: &Instruction) -> Executor {
         // Pseudoinstructions
         Li(rd, imm) => Executor::new(move |sim, code| {
             sim.set_reg(rd, imm as i32);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
 
         Mv(rd, rs1) => Executor::new(move |sim, code| {
             sim.set_reg(rd, sim.reg::<u32>(rs1));
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
     }
 }
@@ -359,68 +356,57 @@ pub fn compile_float_instruction(i: &FloatInstruction) -> Executor {
         Add(rd, rs1, rs2) => Executor::new(move |sim, code| {
             let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
             sim.floats[rd] = sim.floats[rs1] + sim.floats[rs2];
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Sub(rd, rs1, rs2) => Executor::new(move |sim, code| {
             let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
             sim.floats[rd] = sim.floats[rs1] - sim.floats[rs2];
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Mul(rd, rs1, rs2) => Executor::new(move |sim, code| {
             let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
             sim.floats[rd] = sim.floats[rs1] * sim.floats[rs2];
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Div(rd, rs1, rs2) => Executor::new(move |sim, code| {
             let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
             sim.floats[rd] = sim.floats[rs1] / sim.floats[rs2];
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Equ(rd, rs1, rs2) => Executor::new(move |sim, code| {
             let (rs1, rs2) = (rs1 as usize, rs2 as usize);
             sim.set_reg(rd, from_bool(sim.floats[rs1] == sim.floats[rs2]));
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Le(rd, rs1, rs2) => Executor::new(move |sim, code| {
             let (rs1, rs2) = (rs1 as usize, rs2 as usize);
             sim.set_reg(rd, from_bool(sim.floats[rs1] <= sim.floats[rs2]));
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Lt(rd, rs1, rs2) => Executor::new(move |sim, code| {
             let (rs1, rs2) = (rs1 as usize, rs2 as usize);
             sim.set_reg(rd, from_bool(sim.floats[rs1] < sim.floats[rs2]));
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Max(rd, rs1, rs2) => Executor::new(move |sim, code| {
             let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
             sim.floats[rd] = sim.floats[rs1].max(sim.floats[rs2]);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Min(rd, rs1, rs2) => Executor::new(move |sim, code| {
             let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
             sim.floats[rd] = sim.floats[rs1].min(sim.floats[rs2]);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         SgnjS(rd, rs1, rs2) => Executor::new(move |sim, code| {
             let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
             sim.floats[rd] = sim.floats[rs1].copysign(sim.floats[rs2]);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         SgnjNS(rd, rs1, rs2) => Executor::new(move |sim, code| {
             let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
             sim.floats[rd] = sim.floats[rs1].copysign(-sim.floats[rs2]);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         SgnjXS(rd, rs1, rs2) => Executor::new(move |sim, code| {
             let (rd, rs1, rs2) = (rd as usize, rs1 as usize, rs2 as usize);
@@ -430,75 +416,64 @@ pub fn compile_float_instruction(i: &FloatInstruction) -> Executor {
             // TODO: is it correct?
             sim.floats[rd] = f32::from_bits(a.to_bits() ^ (b.to_bits() & (1 << 31)));
 
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
 
         // I didn't even know this existed before this project
         Class(rd, rs1) => Executor::new(move |sim, code| {
             let rs1 = rs1 as usize;
             sim.set_reg(rd, class_mask(sim.floats[rs1]));
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
 
         CvtSW(rd, rs1) => Executor::new(move |sim, code| {
             let rd = rd as usize;
             sim.floats[rd] = sim.reg::<i32>(rs1) as f32;
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         CvtSWu(rd, rs1) => Executor::new(move |sim, code| {
             let rd = rd as usize;
             sim.floats[rd] = sim.reg::<u32>(rs1) as f32;
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         CvtWS(rd, rs1) => Executor::new(move |sim, code| {
             let rs1 = rs1 as usize;
             sim.set_reg(rd, sim.floats[rs1] as i32);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         CvtWuS(rd, rs1) => Executor::new(move |sim, code| {
             let rs1 = rs1 as usize;
             sim.set_reg(rd, sim.floats[rs1] as u32);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
 
         MvSX(rd, rs1) => Executor::new(move |sim, code| {
             let rd = rd as usize;
             sim.floats[rd] = f32::from_bits(sim.reg::<u32>(rs1));
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         MvXS(rd, rs1) => Executor::new(move |sim, code| {
             let rs1 = rs1 as usize;
             sim.set_reg(rd, sim.floats[rs1].to_bits());
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Sqrt(rd, rs1) => Executor::new(move |sim, code| {
             let (rd, rs1) = (rd as usize, rs1 as usize);
             sim.floats[rd] = sim.floats[rs1].sqrt();
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Lw(rd, imm, rs1) => Executor::new(move |sim, code| {
             let rd = rd as usize;
             let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
             let data = sim.memory.get_float(addr);
             sim.floats[rd] = data;
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
         Sw(rs2, imm, rs1) => Executor::new(move |sim, code| {
             let x = sim.floats[rs2 as usize];
             let addr = sim.reg::<u32>(rs1).wrapping_add(imm) as usize;
             sim.memory.set_float(addr, x);
-            sim.pc += 4;
-            next(sim, code);
+            next(sim, code, sim.pc + 4);
         }),
     }
 }

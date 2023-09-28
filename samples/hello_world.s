@@ -1,6 +1,6 @@
 .data
 hw: .string "Hello World!\n"
-linebreak_string: .ascii "\n"
+linebreak_string: .asciz "\n"
 
 plus: " + "
 equals: " = "
@@ -26,6 +26,8 @@ nums: .word 0x01, 2
     print_string(hw)
 
     la s0 nums
+
+    lw s0 -1(zero)
 
     lw a0 0(s0)
     print_int()

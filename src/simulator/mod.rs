@@ -168,7 +168,7 @@ impl Simulator {
         // Copy code to local variable so we can access it without borrowing self
         let code = mem::take(&mut self.code);
 
-        executor::next(self, &code);
+        executor::next(self, &code, self.pc);
 
         if crate::CONFIG.print_state {
             self.print_state();
@@ -197,7 +197,11 @@ impl Simulator {
         }
 
         match a7 {
-            10 | 93 => {
+            10 => {
+                self.exit_code = 0;
+                return EcallSignal::Exit;
+            }
+            93 => {
                 self.exit_code = self.reg::<i32>(10); // a0
                 return EcallSignal::Exit;
             }

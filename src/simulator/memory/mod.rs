@@ -3,41 +3,11 @@ use parking_lot::Mutex;
 use std::io::Read;
 use std::sync::Arc;
 
-pub const DATA_SIZE: usize = 0x0040_0000; // TODO: this, but I think it's about this much
-pub const MMIO_SIZE: usize = 0x0022_0000;
-pub const MMIO_START: usize = 0xff00_0000;
+pub mod consts;
+pub use consts::*;
 
-pub const HEAP_START: usize = 0x1004_0000;
-
-use crate::renderer::{FRAME_0, FRAME_1, KDMMIO_CONTROL, KDMMIO_DATA, FRAME_SIZE};
-pub const VIDEO_START: usize = MMIO_START + FRAME_0;
-pub const VIDEO_END: usize = MMIO_START + FRAME_1 + FRAME_SIZE;
-
-const TRANSPARENT_BYTE: u8 = 0xC7;
-const TRANSPARENT_WORD: u32 = 0xC7C7C7C7;
-
-/// From https://graphics.stanford.edu/~seander/bithacks.html#ZeroInWord
-/// I have no idea whether these u32 should be u32s or u64s because UL means nothing
-#[inline]
-fn has_zero_byte(v: u32) -> bool {
-    (((v).wrapping_sub(0x01010101u32)) & !(v) & 0x80808080u32) != 0
-}
-
-#[inline]
-fn has_transparent_byte(v: u32) -> bool {
-    has_zero_byte(v ^ TRANSPARENT_WORD)
-}
-
-/// Copies `n` bytes from `x` to the buffer, but ignores transparent bytes
-fn copy_with_transparency(buf: &mut [u8], mut x: u32, n: usize) {
-    for data in &mut buf[0..n] {
-        let byte = x as u8;
-        if byte != TRANSPARENT_BYTE {
-            *data = byte;
-        }
-        x >>= 8;
-    }
-}
+mod util;
+use util::{copy_with_transparency, has_transparent_byte};
 
 #[derive(Default)]
 pub struct Memory {
@@ -46,6 +16,12 @@ pub struct Memory {
 
     /// Memory allocated by `sbrk`
     pub dynamic: Vec<u8>,
+
+    /// Flag that indicates if an out-of-bounds access was attempted, and where. This is used by
+    /// the executor to display better error messages when this happens. Not a very elegant
+    /// solution, but returning some kind of MemoryAccessResult<T> from [`Memory::get_with`] has a
+    /// high performance penalty.
+    pub out_of_bounds_access: Option<usize>,
 }
 
 impl Memory {
@@ -54,6 +30,7 @@ impl Memory {
             mmio: Arc::new(Mutex::new(vec![0; MMIO_SIZE])),
             data: vec![0; DATA_SIZE],
             dynamic: vec![],
+            out_of_bounds_access: None,
         }
     }
 
@@ -71,10 +48,15 @@ impl Memory {
     }
 
     /// Reads a value from the `i`-th byte of the memory
-    pub fn get_with<T, F>(&self, i: usize, read: F) -> T
+    pub fn get_with<T: Default, F>(&mut self, i: usize, read: F) -> T
     where
         F: FnOnce(&[u8]) -> T,
     {
+        if self.out_of_bounds(i) {
+            self.out_of_bounds_access = Some(i);
+            return T::default();
+        }
+
         if i >= MMIO_START {
             // MMIO
             let mut mmio = self.mmio.lock();
@@ -92,12 +74,17 @@ impl Memory {
     }
 
     /// Writes the value `x` to the `i`-th byte of the memory, with some writing function `write`.
-    /// Note: make sure `write` doesn't write 0xC7 (transparent) to video memory. In most cases,
+    /// NOTE: make sure `write` doesn't write 0xC7 (transparent) to video memory. In most cases,
     /// you should be using `set_byte`, `set_half` or `set_word` instead.
-    fn set_with<T, F, R>(&mut self, i: usize, x: T, write: F) -> R
+    fn set_with<T, F, R: Default>(&mut self, i: usize, x: T, write: F) -> R
     where
         F: FnOnce(&mut [u8], T) -> R,
     {
+        if self.out_of_bounds(i) {
+            self.out_of_bounds_access = Some(i);
+            return R::default();
+        }
+
         if i >= MMIO_START {
             // MMIO
             let mut mmio = self.mmio.lock();
@@ -111,7 +98,7 @@ impl Memory {
         }
     }
 
-    pub fn get_byte(&self, i: usize) -> u8 {
+    pub fn get_byte(&mut self, i: usize) -> u8 {
         self.get_with(i, |v| v[0])
     }
 
@@ -122,7 +109,7 @@ impl Memory {
         self.set_with(i, x, |v, x| v[0] = x);
     }
 
-    pub fn get_half(&self, i: usize) -> u16 {
+    pub fn get_half(&mut self, i: usize) -> u16 {
         self.get_with(i, LittleEndian::read_u16)
     }
 
@@ -133,7 +120,7 @@ impl Memory {
         self.set_with(i, x, LittleEndian::write_u16);
     }
 
-    pub fn get_word(&self, i: usize) -> u32 {
+    pub fn get_word(&mut self, i: usize) -> u32 {
         self.get_with(i, LittleEndian::read_u32)
     }
 
@@ -144,7 +131,7 @@ impl Memory {
         self.set_with(i, x, LittleEndian::write_u32);
     }
 
-    pub fn get_float(&self, i: usize) -> f32 {
+    pub fn get_float(&mut self, i: usize) -> f32 {
         self.get_with(i, LittleEndian::read_f32)
     }
 
@@ -224,19 +211,16 @@ impl Memory {
 
         Some(bytes_read)
     }
-}
 
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_has_zero_byte() {
-        assert!(has_zero_byte(0xff00ff00));
-        assert!(!has_zero_byte(0x10203040));
-        assert!(has_zero_byte(0x0011ff22));
-        assert!(!has_zero_byte(0x12345678));
-        assert!(has_zero_byte(0x12005678));
-        assert!(has_zero_byte(0x11223300));
+    /// Is `pos` out of memory bounds?
+    fn out_of_bounds(&self, pos: usize) -> bool {
+        if pos >= MMIO_START {
+            let mmio = self.mmio.lock();
+            pos - MMIO_START >= mmio.len()
+        } else if pos >= HEAP_START {
+            pos - HEAP_START >= self.dynamic.len()
+        } else {
+            pos >= self.data.len()
+        }
     }
 }
