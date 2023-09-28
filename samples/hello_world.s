@@ -27,8 +27,6 @@ nums: .word 0x01, 2
 
     la s0 nums
 
-    lw s0 -1(zero)
-
     lw a0 0(s0)
     print_int()
 
