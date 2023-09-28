@@ -43,7 +43,7 @@ pub fn next(sim: &mut Simulator, code: &[Executor], new_pc: usize) {
             "   [error]".bright_red(),
             byte_msg,
             "   Note".bright_yellow(),
-            sim.code_ctx[sim.pc]
+            sim.code_ctx[sim.pc >> 2]
         );
         std::process::exit(1);
     }
@@ -53,7 +53,7 @@ pub fn next(sim: &mut Simulator, code: &[Executor], new_pc: usize) {
             "Tried to access instruction at pc {:x}, but code is only {:x} bytes long.\nLast instruction executed: {}",
             new_pc,
             sim.code.len() * 4,
-            sim.code_ctx[sim.pc],
+            sim.code_ctx[sim.pc >> 2],
         );
         std::process::exit(1);
     });
