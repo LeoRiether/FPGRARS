@@ -35,6 +35,15 @@ bench-spike-add:
         --prepare 'cd ../spike/ && just build add' \
         'spike --isa=RV32IMAC /home/leonardo/Workspace/TG/RISCV/riscv32-unknown-elf/bin/pk ../spike/add'
 
+bench-spike-and-old-add:
+    hyperfine --warmup 3 \
+        --prepare 'just build-unb' \
+        './target/release/fpgrars --no-video samples/bench/add.s' \
+        --prepare '' \
+        './fpgrars-old --no-video samples/bench/add.s' \
+        --prepare 'cd ../spike/ && just build add' \
+        'spike --isa=RV32IMAC /home/leonardo/Workspace/TG/RISCV/riscv32-unknown-elf/bin/pk ../spike/add'
+
 bench-spike-mem:
     hyperfine --warmup 3 \
         --prepare 'just build-unb' \
