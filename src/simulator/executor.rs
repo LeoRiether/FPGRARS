@@ -25,38 +25,46 @@ impl Executor {
     }
 }
 
-/// Execute the next instruction
-#[inline(always)]
-pub fn next(sim: &mut Simulator, code: &[Executor], new_pc: usize) {
-    if let Some(position) = sim.memory.out_of_bounds_access {
-        let byte_msg = if position as i32 >= 0 {
-            format!("{}", position.bright_blue())
-        } else {
-            format!(
-                "{} (the same as {} if signed)",
-                position.bright_blue(),
-                (position as i32).bright_blue()
-            )
-        };
-        eprintln!(
-            "{} Out of bounds memory access at byte {}!\n{}: when executing instruction\n{}",
-            "   [error]".bright_red(),
-            byte_msg,
-            "   Note".bright_yellow(),
-            sim.code_ctx[sim.pc >> 2]
-        );
-        std::process::exit(1);
-    }
+fn display_memory_out_of_bounds_error(sim: &Simulator, position: usize) -> ! {
+    let byte_msg = if position as i32 >= 0 {
+        format!("{}", position.bright_blue())
+    } else {
+        format!(
+            "{} (the same as {} if signed)",
+            position.bright_blue(),
+            (position as i32).bright_blue()
+        )
+    };
+    eprintln!(
+        "{} Out of bounds memory access at byte {}!\n{}: when executing instruction\n{}",
+        "   [error]".bright_red(),
+        byte_msg,
+        "   Note".bright_yellow(),
+        sim.code_ctx[sim.pc >> 2]
+    );
+    std::process::exit(1);
+}
 
-    let executor = code.get(new_pc >> 2).unwrap_or_else(|| {
-        eprintln!(
+fn display_instruction_out_of_bounds_error(sim: &Simulator, new_pc: usize) -> ! {
+    eprintln!(
             "Tried to access instruction at pc {:x}, but code is only {:x} bytes long.\nLast instruction executed: {}",
             new_pc,
             sim.code.len() * 4,
             sim.code_ctx[sim.pc >> 2],
         );
-        std::process::exit(1);
-    });
+    std::process::exit(1);
+}
+
+/// Execute the next instruction
+#[inline(always)]
+pub fn next(sim: &mut Simulator, code: &[Executor], new_pc: usize) {
+    if let Some(position) = sim.memory.out_of_bounds_access {
+        display_memory_out_of_bounds_error(sim, position);
+    }
+
+    let executor = code
+        .get(new_pc >> 2)
+        .unwrap_or_else(|| display_instruction_out_of_bounds_error(sim, new_pc));
 
     sim.pc = new_pc;
     executor.call(sim, code);
