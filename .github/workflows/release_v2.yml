@@ -24,7 +24,7 @@ jobs:
             output: target/x86_64-unknown-linux-gnu/release/fpgrars
             finalOutput: target/x86_64-unknown-linux-gnu/release/fpgrars-x86_64-unknown-linux-gnu
             finalOutputExt: ""
-            os: ubuntu-latest
+            os: ubuntu-20.04
           - target: x86_64-apple-darwin
             output: target/x86_64-apple-darwin/release/fpgrars
             finalOutput: target/x86_64-apple-darwin/release/fpgrars-x86_64-apple-darwin
@@ -39,7 +39,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install ALSA (for MIDI support)
-        if: matrix.case.os == 'ubuntu-latest'
+        if: matrix.case.os == 'ubuntu-20.04'
         run: sudo apt-get install libasound2-dev
       - name: Build
         uses: houseabsolute/actions-rust-cross@v0
