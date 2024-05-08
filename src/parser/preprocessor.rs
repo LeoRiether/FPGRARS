@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::{inner_bail, parser::error::Contextualize};
+use crate::parser::error::Contextualize;
 use hashbrown::{HashMap, HashSet};
 use lazy_static::lazy_static;
 use owo_colors::OwoColorize;
@@ -138,7 +138,8 @@ impl Preprocessor {
     fn consume_include(&mut self, include_ctx: token::Context) -> Result<(), Error> {
         use super::token::Data::StringLiteral;
 
-        let include_path = match inner_bail!(self.next_token()).map(|t| t.data) {
+        let token = self.next_token().transpose()?;
+        let include_path = match token.map(|t| t.data) {
             Some(StringLiteral(s)) => s,
 
             other => {
@@ -171,7 +172,7 @@ impl Preprocessor {
         use super::token::Data::{Char, Directive, Identifier, Label, MacroArg};
 
         // Read macro name
-        let token = inner_bail!(self.next_token());
+        let token = self.next_token().transpose()?;
         let name = match token.as_ref().map(|t| &t.data) {
             Some(Identifier(d)) => d,
 
@@ -189,7 +190,7 @@ impl Preprocessor {
         };
 
         // Read macro args
-        let mut peek = inner_bail!(self.next_token());
+        let mut peek = self.next_token().transpose()?;
         if let Some(Char('(')) = peek.as_ref().map(|t| &t.data) {
             let token = peek.take().unwrap();
             self.consume_macro_decl_args(&mut r#macro, token.ctx)?;
@@ -199,7 +200,7 @@ impl Preprocessor {
         loop {
             let token = match peek.take() {
                 Some(token) => Some(token),
-                None => inner_bail!(self.next_token()),
+                None => self.next_token().transpose()?,
             };
 
             match token {
@@ -265,7 +266,7 @@ impl Preprocessor {
     ) -> Result<Vec<Token>, Error> {
         let mut tokens = Vec::new();
         loop {
-            let token = inner_bail!(self.next_token());
+            let token = self.next_token().transpose()?;
             match token {
                 Some(t) if t.data == data => break Ok(tokens),
                 Some(t) => tokens.push(t),
@@ -358,8 +359,8 @@ impl Preprocessor {
         use token::Data::Identifier;
 
         let (name, value) = (self.next_token(), self.next_token());
-        let name = inner_bail!(name).map(|t| t.data);
-        let value = inner_bail!(value);
+        let name = name.transpose()?.map(|t| t.data);
+        let value = value.transpose()?;
 
         match (name, value) {
             (Some(Identifier(name)), Some(value)) => {

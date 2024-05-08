@@ -12,7 +12,7 @@ pub mod memory;
 mod midi;
 mod util;
 
-use crate::parser;
+use crate::{config, parser};
 use crate::renderer::{FRAME_0, FRAME_1, FRAME_SIZE};
 use into_register::*;
 use memory::*;
@@ -79,7 +79,7 @@ impl Simulator {
             self.pc = globl;
         }
 
-        if crate::CONFIG.print_instructions {
+        if config::CONFIG.print_instructions {
             eprintln!("{}", "Instructions: ---------------".bright_blue());
             code.iter().for_each(|i| eprintln!("{:?}", i));
             eprintln!("{}", "-----------------------------".bright_blue());
@@ -170,7 +170,7 @@ impl Simulator {
 
         executor::next(self, &code, self.pc);
 
-        if crate::CONFIG.print_state {
+        if config::CONFIG.print_state {
             self.print_state();
         }
 

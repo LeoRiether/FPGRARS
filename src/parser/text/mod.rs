@@ -9,7 +9,7 @@ use super::{
     token::{self, Token},
     ParserContext,
 };
-use crate::{inner_bail, instruction::Instruction, parser::LabelUseType};
+use crate::{instruction::Instruction, parser::LabelUseType};
 use lazy_static::lazy_static;
 use owo_colors::OwoColorize;
 
@@ -96,7 +96,7 @@ where
     }
 
     fn register(&mut self) -> Result<u8, Error> {
-        let token = inner_bail!(self.tokens.next());
+        let token = self.tokens.next().transpose()?;
         let regs = &self.parser.regnames.regs;
 
         use token::Data::Identifier;
@@ -112,7 +112,7 @@ where
     }
 
     fn status_register(&mut self) -> Result<u8, Error> {
-        let token = inner_bail!(self.tokens.next());
+        let token = self.tokens.next().transpose()?;
         let status = &self.parser.regnames.status;
 
         use token::Data::Identifier;
@@ -130,7 +130,7 @@ where
     }
 
     fn float_register(&mut self) -> Result<u8, Error> {
-        let token = inner_bail!(self.tokens.next());
+        let token = self.tokens.next().transpose()?;
         let floats = &self.parser.regnames.floats;
 
         use token::Data::Identifier;
@@ -148,7 +148,7 @@ where
     }
 
     fn immediate(&mut self) -> Result<u32, Error> {
-        let token = inner_bail!(self.tokens.next());
+        let token = self.tokens.next().transpose()?;
         self.immediate_from(token)
     }
 
@@ -180,7 +180,7 @@ where
     }
 
     fn the_token(&mut self, data: token::Data) -> Result<token::Data, Error> {
-        let token = inner_bail!(self.tokens.next());
+        let token = self.tokens.next().transpose()?;
 
         match token.as_ref().map(|t| &t.data) {
             Some(d) if &data == d => Ok(data),

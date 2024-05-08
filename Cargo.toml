@@ -43,6 +43,8 @@ thiserror = "1.0.40"
 owo-colors = "3.5.0"
 serde = { version = "1.0.171", features = ["derive"] }
 toml = "0.7.6"
+criterion = "0.5.1"
+ahash = "0.8.11"
 
 [dependencies.clap]
 version = "4.3"

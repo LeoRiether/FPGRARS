@@ -35,15 +35,6 @@ bench-spike-add:
         --prepare 'cd ../spike/ && just build add' \
         'spike --isa=RV32IMAC /home/leonardo/Workspace/TG/RISCV/riscv32-unknown-elf/bin/pk ../spike/add'
 
-bench-spike-and-old-add:
-    hyperfine --warmup 3 \
-        --prepare 'just build-unb' \
-        './target/release/fpgrars --no-video samples/bench/add.s' \
-        --prepare '' \
-        './fpgrars-old --no-video samples/bench/add.s' \
-        --prepare 'cd ../spike/ && just build add' \
-        'spike --isa=RV32IMAC /home/leonardo/Workspace/TG/RISCV/riscv32-unknown-elf/bin/pk ../spike/add'
-
 bench-spike-mem:
     hyperfine --warmup 3 \
         --prepare 'just build-unb' \
@@ -59,3 +50,13 @@ bench-spike-sort:
         '/home/leonardo/Desktop/bench/fpgrars-v2 --no-video samples/bench/sort.s' \
         --prepare 'cd ../spike/ && just build sort' \
         'spike --isa=RV32IMAC /home/leonardo/Workspace/TG/RISCV/riscv32-unknown-elf/bin/pk ../spike/sort'
+
+bench-versions-add:
+    hyperfine --warmup 3 \
+        --prepare 'just build-unb' \
+        './target/release/fpgrars --no-video samples/bench/add.s' \
+        --prepare '' \
+        './fpgrars-v2.3 --no-video samples/bench/add.s' \
+        --prepare '' \
+        './fpgrars-v2.4 --no-video samples/bench/add.s' \
+
