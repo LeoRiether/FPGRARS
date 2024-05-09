@@ -5,7 +5,7 @@
 #######################################################
 
 .data
-times: .word 1000
+times: .word 300
 color: .byte 0xf8 0x07
 
 .align 1
@@ -45,10 +45,10 @@ exit:
     csrr a0 time
     sub a0 a0 s2
     li a7 1
-    ecall
+    # ecall
     li a0 '\n'
     li a7 11
-    ecall
+    # ecall
 
     li a7 10
     ecall

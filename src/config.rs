@@ -1,16 +1,13 @@
 use clap::Parser;
-use lazy_static::lazy_static;
 use serde::Deserialize;
-
-lazy_static! {
-    pub static ref CONFIG: Config = OptionalConfig::get_toml()
-        .merge(OptionalConfig::get_args())
-        .into();
-}
 
 #[derive(Parser, Deserialize, Debug, Default)]
 #[command(author, version, about)]
+#[clap(disable_help_flag = true)]
 pub struct OptionalConfig {
+    #[clap(long, action = clap::ArgAction::HelpLong)]
+    help: Option<bool>,
+
     /// Hides the bitmap display
     #[arg(long)]
     pub no_video: bool,
@@ -57,6 +54,7 @@ impl OptionalConfig {
 
     pub fn merge(self, rhs: Self) -> Self {
         Self {
+            help: self.help.or(rhs.help),
             no_video: self.no_video || rhs.no_video,
             width: self.width.or(rhs.width),
             height: self.height.or(rhs.height),
@@ -69,7 +67,7 @@ impl OptionalConfig {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Config {
     pub no_video: bool,
     pub width: usize,
@@ -96,5 +94,13 @@ impl From<OptionalConfig> for Config {
                 std::process::exit(1);
             }),
         }
+    }
+}
+
+impl Config {
+    pub fn get() -> Self {
+        OptionalConfig::get_toml()
+            .merge(OptionalConfig::get_args())
+            .into()
     }
 }

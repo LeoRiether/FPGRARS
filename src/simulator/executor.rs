@@ -83,7 +83,6 @@ fn from_bool(x: bool) -> u32 {
 /// affected. However, if `op: fn(u32, u32) -> R`, performance is significantly worse! Like,
 /// 50%-60% worse. This might be because generics are monomorphized, and each lambda is a different
 /// Fn type.
-/// TODO: Automatic benchmarks.
 #[inline(always)]
 fn exec_type_r<R, F>(rd: u8, rs1: u8, rs2: u8, op: F) -> Executor
 where

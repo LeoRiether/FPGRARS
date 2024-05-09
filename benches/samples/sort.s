@@ -6,7 +6,7 @@
 #############################################################
 
 .data
-N: .word 10000
+N: .word 5000
 
 .text
     # Allocates the array in the stack with N integers
@@ -27,7 +27,7 @@ N: .word 10000
     mv a1 s0
     jal check_sorted
     li a7 1
-    ecall
+    # ecall
 
     # Save time
     # csrr s7 time
@@ -46,18 +46,18 @@ N: .word 10000
     mv a1 s0
     jal check_sorted
     li a7 1
-    ecall
+    # ecall
 
     # Print time elapsed
     li a0 '\n'
     li a7 11
-    ecall
+    # ecall
     mv a0 s7
     li a7 1 
-    ecall
+    # ecall
     li a0 '\n'
     li a7 11
-    ecall
+    # ecall
 
 exit:
     li a7 10

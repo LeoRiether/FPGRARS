@@ -12,11 +12,14 @@ pub mod memory;
 mod midi;
 mod util;
 
-use crate::{config, parser};
+use crate::config::Config;
+use crate::instruction::Instruction;
 use crate::renderer::{FRAME_0, FRAME_1, FRAME_SIZE};
+use crate::parser;
 use into_register::*;
 use memory::*;
 use owo_colors::OwoColorize;
+use std::hint::black_box;
 use std::{mem, time};
 
 /// Returned by the [ecall](struct.Simulator.html#method.ecall) procedure
@@ -29,6 +32,8 @@ enum EcallSignal {
 /// Simulates a RISC-V CPU. Generally initialized by calling [load_from_file](struct.Simulator.html#method.load_from_file)
 /// and ran by calling [run](struct.Simulator.html#method.run).
 pub struct Simulator {
+    config: Config,
+
     registers: [u32; 32],
     floats: [f32; 32],
     status: Vec<u32>, // I'm not sure myself how many status registers I'll use
@@ -41,12 +46,13 @@ pub struct Simulator {
 
     pub memory: Memory,
     pub code: Vec<executor::Executor>,
-    pub code_ctx: Vec<crate::parser::token::Context>,
+    pub code_ctx: Vec<parser::token::Context>,
 }
 
 impl Default for Simulator {
     fn default() -> Self {
         Self {
+            config: Config::default(),
             registers: [0; 32],
             floats: [0.0; 32],
             status: Vec::new(),
@@ -64,12 +70,18 @@ impl Default for Simulator {
 
 impl Simulator {
     pub fn load_file(&mut self, path: &str) -> Result<(), parser::error::Error> {
+        let parsed = parser::parse(path, DATA_SIZE)?;
+        self.load_parsed_output(parsed);
+        Ok(())
+    }
+
+    fn load_parsed_output(&mut self, parsed: parser::Parsed) {
         let parser::Parsed {
             code,
             code_ctx,
             data,
             globl,
-        } = parser::parse(path, DATA_SIZE)?;
+        } = parsed;
 
         self.code = executor::compile_all(&code);
         self.code_ctx = code_ctx;
@@ -79,12 +91,20 @@ impl Simulator {
             self.pc = globl;
         }
 
-        if config::CONFIG.print_instructions {
+        if self.config.print_instructions {
             eprintln!("{}", "Instructions: ---------------".bright_blue());
             code.iter().for_each(|i| eprintln!("{:?}", i));
             eprintln!("{}", "-----------------------------".bright_blue());
         }
+    }
 
+    // BUG: this shouldn't be here
+    pub fn nothing(&mut self) -> Result<(), parser::error::Error> {
+        self.code = executor::compile_all(black_box(&[
+            Instruction::Li(17, 10), // li a7 10
+            Instruction::Li(10, 0),  // li a0 0
+            Instruction::Ecall,
+        ]));
         Ok(())
     }
 
@@ -95,6 +115,11 @@ impl Simulator {
 
     pub fn with_memory(mut self, memory: Memory) -> Self {
         self.memory = memory;
+        self
+    }
+
+    pub fn with_config(mut self, config: Config) -> Self {
+        self.config = config;
         self
     }
 
@@ -120,7 +145,7 @@ impl Simulator {
 
     #[allow(clippy::needless_range_loop)]
     pub fn print_state(&self) {
-        use crate::parser::register_names::REGVEC;
+        use parser::register_names::REGVEC;
 
         eprintln!("{}", "Registers:".bright_blue());
         for i in 0..32 {
@@ -164,13 +189,16 @@ impl Simulator {
 
     pub fn run(&mut self) -> i32 {
         self.init();
+        if self.code.is_empty() {
+            return 0;
+        }
 
         // Copy code to local variable so we can access it without borrowing self
         let code = mem::take(&mut self.code);
 
         executor::next(self, &code, self.pc);
 
-        if config::CONFIG.print_state {
+        if self.config.print_state {
             self.print_state();
         }
 
@@ -178,7 +206,7 @@ impl Simulator {
     }
 
     fn ecall(&mut self) -> EcallSignal {
-        use crate::parser::register_names::*;
+        use parser::register_names::*;
         use rand::{thread_rng, Rng};
 
         let a7 = self.reg::<u32>(17);

@@ -5,9 +5,16 @@ authors = ["Leonardo Riether <leonardoalves8217@gmail.com>"]
 edition = "2021"
 description = "Fast Pretty Good RISC-V Assembly Rendering System"
 license = "MIT"
-exclude = ["site/", "tests/riscv-tests/", "samples/"]
+exclude = ["site/", "tests/riscv-tests/"]
 repository = "https://github.com/LeoRiether/FPGRARS/"
 
+[lib]
+bench = false
+
+[[bin]]
+name = "fpgrars"
+path = "src/main.rs"
+bench = false
 
 [features]
 show_ms = [] # show ms per frame in the window title
@@ -43,10 +50,16 @@ thiserror = "1.0.40"
 owo-colors = "3.5.0"
 serde = { version = "1.0.171", features = ["derive"] }
 toml = "0.7.6"
-criterion = "0.5.1"
 ahash = "0.8.11"
 
 [dependencies.clap]
-version = "4.3"
+version = "4.5"
 features = ["suggestions", "color", "wrap_help", "cargo", "derive"]
+
+[dev-dependencies]
+criterion = { version = "0.3", features = ["html_reports"] }
+
+[[bench]]
+name = "simulator"
+harness = false
 

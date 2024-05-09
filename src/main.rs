@@ -2,9 +2,10 @@ use owo_colors::OwoColorize;
 use fpgrars::simulator::Simulator;
 use std::error::Error;
 use std::thread;
-use fpgrars::config::CONFIG;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let config = fpgrars::config::Config::get();
+
     let memory = fpgrars::simulator::memory::Memory::new();
     let mmio = memory.mmio.clone();
 
@@ -13,9 +14,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .spawn(move || {
             let mut sim = Simulator::default()
                 .with_memory(memory)
-                .with_midi_port(CONFIG.port);
+                .with_midi_port(config.port);
 
-            if let Err(e) = sim.load_file(&CONFIG.file) {
+            if let Err(e) = sim.load_file(&config.file) {
                 eprintln!("   {}: {}\n", "[error]".bright_red().bold(), e);
                 std::process::exit(1);
             };
@@ -26,8 +27,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             std::process::exit(exit_code);
         })?;
 
-    if !CONFIG.no_video {
-        let state = fpgrars::renderer::State::new(mmio, CONFIG.width, CONFIG.height, CONFIG.scale);
+    if !config.no_video {
+        let state = fpgrars::renderer::State::new(mmio, config.width, config.height, config.scale);
         fpgrars::renderer::init(state);
     }
 
