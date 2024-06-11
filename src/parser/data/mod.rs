@@ -242,6 +242,17 @@ mod tests {
         let Parsed { code, .. } = parse_tokens(tokens, DATA_SIZE).unwrap();
 
         use crate::instruction::Instruction::{Ecall, Li};
-        assert_eq!(&code, &[Li(0, 4), Li(0, 10), Li(0, 16), Li(0, 16), Li(17, 10), Li(10, 0), Ecall])
+        assert_eq!(
+            &code,
+            &[
+                Li(0, 4),
+                Li(0, 10),
+                Li(0, 16),
+                Li(0, 16),
+                Li(17, 10),
+                Li(10, 0),
+                Ecall
+            ]
+        )
     }
 }

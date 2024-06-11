@@ -13,13 +13,11 @@ mod midi;
 mod util;
 
 use crate::config::Config;
-use crate::instruction::Instruction;
-use crate::renderer::{FRAME_0, FRAME_1, FRAME_SIZE};
 use crate::parser;
+use crate::renderer::{FRAME_0, FRAME_1, FRAME_SIZE};
 use into_register::*;
 use memory::*;
 use owo_colors::OwoColorize;
-use std::hint::black_box;
 use std::{mem, time};
 
 /// Returned by the [ecall](struct.Simulator.html#method.ecall) procedure
@@ -96,16 +94,6 @@ impl Simulator {
             code.iter().for_each(|i| eprintln!("{:?}", i));
             eprintln!("{}", "-----------------------------".bright_blue());
         }
-    }
-
-    // BUG: this shouldn't be here
-    pub fn nothing(&mut self) -> Result<(), parser::error::Error> {
-        self.code = executor::compile_all(black_box(&[
-            Instruction::Li(17, 10), // li a7 10
-            Instruction::Li(10, 0),  // li a0 0
-            Instruction::Ecall,
-        ]));
-        Ok(())
     }
 
     pub fn with_midi_port(mut self, midi_port: Option<usize>) -> Self {

@@ -237,10 +237,7 @@ pub fn init(state: State) {
 
     let color_provider = move |mmio: &[u8], y: usize, x: usize| {
         let bytes_per_pixel = 4;
-        let (x, y) = (
-            x / pixel_scale,
-            height - 1 - y / pixel_scale,
-        );
+        let (x, y) = (x / pixel_scale, height - 1 - y / pixel_scale);
         let index = (y * width + x) * bytes_per_pixel;
 
         let get = |i| {

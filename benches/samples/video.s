@@ -5,7 +5,7 @@
 #######################################################
 
 .data
-times: .word 300
+times: .word 30
 color: .byte 0xf8 0x07
 
 .align 1

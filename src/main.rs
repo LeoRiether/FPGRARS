@@ -1,5 +1,5 @@
-use owo_colors::OwoColorize;
 use fpgrars::simulator::Simulator;
+use owo_colors::OwoColorize;
 use std::error::Error;
 use std::thread;
 

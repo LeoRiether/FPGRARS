@@ -136,7 +136,7 @@ impl ParserContext {
 /// Parses a RISC-V file into a `code` and `data` segments.
 /// The `data_segment_size` parameter is the final size of the data segment, in bytes.
 /// ```
-/// parser::parse("riscv.s", DATA_SIZE)?
+/// fpgrars::parser::parse("riscv.s", 0x1000).is_ok();
 /// ```
 pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
     let tokens = Lexer::new(entry_file)?.preprocess().peekable();

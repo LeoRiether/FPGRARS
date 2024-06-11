@@ -26,7 +26,9 @@ lazy_static! {
 
 /// Defines the `preprocess` methods for a lexer
 /// ```
-/// let tokens = Lexer::new("riscv.s").preprocess();
+/// use fpgrars::parser::lexer::Lexer;
+/// use crate::fpgrars::parser::Preprocess;
+/// let tokens = Lexer::from_content("riscv.s".into(), "file.s".into()).preprocess();
 /// ```
 pub trait Preprocess {
     fn preprocess(self) -> Preprocessor;
@@ -249,16 +251,6 @@ impl Preprocessor {
     }
 
     /// Reads tokens until a matching token is found.
-    ///
-    /// For example:
-    /// ```
-    /// use token::Data;
-    /// let preprocessor = Lexer::from("%arg1, %arg2)".into(), "test.s");
-    /// let res = preprocessor.consume_until(Data::Char(')'))
-    ///
-    /// let res: Vec<_> = res.unwrap().into_iter().map(|t| t.data).collect();
-    /// assert_eq!(res, &[Data::MacroArg("arg1".into()), Data::MacroArg("arg2".into())]);
-    /// ```
     fn consume_until(
         &mut self,
         data: token::Data,

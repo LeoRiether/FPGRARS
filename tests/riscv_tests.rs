@@ -19,6 +19,11 @@ fn run(path: &impl AsRef<Path>) {
 
 #[test]
 fn test_riscv() {
+    let fast = std::env::var("FAST");
+    if matches!(fast.as_deref(), Ok("1") | Ok("true") | Ok("t")) {
+        return;
+    }
+
     let dir = Path::new("tests/riscv-tests");
     assert!(dir.is_dir(), "riscv-tests directory not found!");
 

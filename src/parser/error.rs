@@ -1,6 +1,6 @@
 use super::{
     data,
-    token::{self, ManyContexts, context::NormalizePathExt},
+    token::{self, context::NormalizePathExt, ManyContexts},
 };
 use core::fmt;
 use owo_colors::OwoColorize;
