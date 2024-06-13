@@ -104,24 +104,26 @@ impl Lexer {
     }
 
     // WARN: assumes the '\' has already been consumed
-    fn next_escape_sequence(&mut self) -> char {
+    fn next_escape_sequence(&mut self) -> Result<char, Error> {
         match self.consume() {
-            Some('n') => '\n',
-            Some('t') => '\t',
-            Some('r') => '\r',
-            Some('\\') => '\\',
-            Some('"') => '"',
-            _ => todo!("Return an Error::InvalidEscapeSequence"),
+            Some('n') => Ok('\n'),
+            Some('t') => Ok('\t'),
+            Some('r') => Ok('\r'),
+            Some('\\') => Ok('\\'),
+            Some('"') => Ok('"'),
+            Some(c) => Err(LexerError::UnexpectedEscapeSequence(c).into()),
+            None => Err(LexerError::ExpectedEscapeSequence.into()),
         }
     }
 
     fn next_string_literal(&mut self) -> Result<Token, Error> {
         let mut string = String::new();
         expect!(Some('"') = self.consume());
-        while self.peek() != Some('"') {
+        // Consume chars while there are some to consume, but they're not the end of the string yet
+        while self.peek().is_some() && self.peek() != Some('"') {
             let mut c = self.consume().unwrap();
             if c == '\\' {
-                c = self.next_escape_sequence();
+                c = self.next_escape_sequence()?;
             }
             string.push(c);
         }
@@ -132,16 +134,19 @@ impl Lexer {
 
     fn next_char_literal(&mut self) -> Result<Token, Error> {
         expect!(Some('\'') = self.consume());
-        let mut c = self.consume().unwrap();
+        let mut c = match self.consume() {
+            Some(c) => c,
+            None => return Err(LexerError::ExpectedChar.into()),
+        };
         if c == '\\' {
-            c = self.next_escape_sequence();
+            c = self.next_escape_sequence()?;
         }
         expect!(Some('\'') = self.consume());
 
         Ok(Token::new(Data::CharLiteral(c)))
     }
 
-    fn next_number(&mut self) -> Token {
+    fn next_number(&mut self) -> Result<Token, Error> {
         let cursor = self.cursor;
         let mut i = 0;
         while let Some('-' | '.' | '0'..='9' | 'x' | 'o' | 'a'..='f' | 'A'..='F') = self.peek() {
@@ -170,20 +175,20 @@ impl Lexer {
         };
 
         if res.is_err() {
-            let fres = slice.parse::<f32>();
-            if let Ok(mut x) = fres {
-                if negative {
-                    x = -x;
-                }
-                return Token::new(Data::Float(x));
+            let mut fres = slice
+                .parse::<f32>()
+                .map_err(|_| LexerError::InvalidNumber(slice.to_string()))?;
+            if negative {
+                fres = -fres;
             }
+            return Ok(Token::new(Data::Float(fres)));
         }
 
         let mut x = res.unwrap() as i32;
         if negative {
             x = -x;
         }
-        Token::new(Data::Integer(x))
+        Ok(Token::new(Data::Integer(x)))
     }
 }
 
@@ -237,7 +242,7 @@ impl Iterator for Lexer {
                 Some(Ok(Token::new(Data::Char(next_char)).with_ctx(ctx)))
             }
 
-            '-' | '0'..='9' => Some(Ok(self.next_number().with_ctx(ctx))),
+            '-' | '0'..='9' => Some(self.next_number().with_ctx(ctx)),
 
             allowed_identifier!(start) => {
                 let identifier = self.next_identifier();
@@ -255,7 +260,7 @@ impl Iterator for Lexer {
                 }
             }
 
-            _ => panic!("Unimplemented character: {}", next_char),
+            other => Some(Err(LexerError::UnknownChar(other).into())),
         }
     }
 }

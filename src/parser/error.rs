@@ -65,6 +65,21 @@ pub enum LexerError {
 
     #[error("Expected '{}', but found '{}'", expected.bright_blue(), found.bright_yellow())]
     UnexpectedChar { expected: char, found: char },
+
+    #[error("Unknown char '{0}'")]
+    UnknownChar(char),
+
+    #[error("Unexpected espace sequence '\\{0}'")]
+    UnexpectedEscapeSequence(char),
+
+    #[error("Expected escape sequence after '\\', found nothing")]
+    ExpectedEscapeSequence,
+
+    #[error("Expected character, found nothing")]
+    ExpectedChar,
+
+    #[error("Invalid number '{0}'")]
+    InvalidNumber(String),
 }
 
 #[derive(Debug, thiserror::Error)]

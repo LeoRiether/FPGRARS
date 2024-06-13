@@ -143,6 +143,11 @@ pub fn parse(entry_file: &str, data_segment_size: usize) -> ParseResult {
     parse_tokens(tokens, data_segment_size)
 }
 
+pub fn parse_str(content: String, data_segment_size: usize) -> ParseResult {
+    let tokens = Lexer::from_content(content, "<no file>").preprocess().peekable();
+    parse_tokens(tokens, data_segment_size)
+}
+
 pub fn parse_tokens<I: Iterator<Item = Result<Token, Error>>>(
     mut tokens: Peekable<I>,
     data_segment_size: usize,
@@ -259,5 +264,18 @@ fn parse_globl(
             Ok(())
         }
         _ => Err(ParserError::UnexpectedToken(Some(label.data)).with_context(label.ctx)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn parse_doesnt_crash(s in "\\PC*") {
+            let _ = parse_str(s, 0x100);
+        }
     }
 }
