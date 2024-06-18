@@ -18,7 +18,7 @@ use crate::renderer::{FRAME_0, FRAME_1, FRAME_SIZE};
 use into_register::*;
 use memory::*;
 use owo_colors::OwoColorize;
-use std::{mem, time};
+use std::time;
 
 /// Returned by the [ecall](struct.Simulator.html#method.ecall) procedure
 enum EcallSignal {
@@ -181,10 +181,7 @@ impl Simulator {
             return 0;
         }
 
-        // Copy code to local variable so we can access it without borrowing self
-        let code = mem::take(&mut self.code);
-
-        executor::next(self, &code, self.pc);
+        executor::run(self);
 
         if self.config.print_state {
             self.print_state();
