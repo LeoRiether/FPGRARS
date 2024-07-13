@@ -5,7 +5,7 @@
 //! and you can find how they're simulated at [Simulator::run](struct.Simulator.html#method.run)
 //!
 
-mod executor;
+pub mod executor;
 mod files;
 mod into_register;
 pub mod memory;
@@ -193,6 +193,10 @@ impl Simulator {
         self.exit_code
     }
 
+    /// PERF: #[inline(always)] here prevents the calling [`executor::Executor`] to do tail call
+    /// optimization, which makes the `ecall` instruction to be a real function call, which will
+    /// overflow the stack eventually :)
+    #[inline(never)]
     fn ecall(&mut self) -> EcallSignal {
         use parser::register_names::*;
         use rand::{thread_rng, Rng};
@@ -213,6 +217,9 @@ impl Simulator {
         }
 
         match a7 {
+            0 => {
+                // noop
+            }
             10 => {
                 self.exit_code = 0;
                 return EcallSignal::Exit;

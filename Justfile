@@ -23,14 +23,14 @@ build-copy:
 
 bench case v1 v2 *args:
     hyperfine --warmup 5 {{args}} \
-        '{{v1}} --no-video benches/samples/{{case}}.s' \
-        '{{v2}} --no-video benches/samples/{{case}}.s' \
+        './{{v1}} --no-video benches/samples/{{case}}.s' \
+        './{{v2}} --no-video benches/samples/{{case}}.s' \
 
 bench-3 case v1 v2 v3 *args:
     hyperfine --warmup 5 {{args}} \
-        '{{v1}} --no-video benches/samples/{{case}}.s' \
-        '{{v2}} --no-video benches/samples/{{case}}.s' \
-        '{{v3}} --no-video benches/samples/{{case}}.s' \
+        './{{v1}} --no-video benches/samples/{{case}}.s' \
+        './{{v2}} --no-video benches/samples/{{case}}.s' \
+        './{{v3}} --no-video benches/samples/{{case}}.s' \
 
 _bench-deprecated:
     hyperfine --warmup 5 \
@@ -77,4 +77,6 @@ _bench-versions-add:
         --prepare '' \
         './fpgrars-v2.4 --no-video benches/samples/add.s' \
 
-
+lib := 'fpgrars::simulator::executor'
+asm *args:
+    cargo asm -p fpgrars --rust --lib {{lib}} {{args}}

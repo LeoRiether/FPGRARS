@@ -19,10 +19,6 @@ impl Executor {
     pub fn new<F: Fn(&mut Simulator, &[Executor]) + 'static>(f: F) -> Self {
         Self(Box::new(f))
     }
-
-    pub fn call(&self, sim: &mut Simulator, next: &[Executor]) {
-        (self.0)(sim, next);
-    }
 }
 
 fn display_memory_out_of_bounds_error(sim: &Simulator, position: usize) -> ! {
@@ -56,18 +52,16 @@ fn display_instruction_out_of_bounds_error(sim: &Simulator, new_pc: usize) -> ! 
 }
 
 /// Execute the next instruction
+// TODO: remove `new_pc` argument and check if performance improves. This may break
+// `display_instruction_out_of_bounds_error`...
 #[inline(always)]
 pub fn next(sim: &mut Simulator, code: &[Executor], new_pc: usize) {
-    if let Some(position) = sim.memory.out_of_bounds_access {
-        display_memory_out_of_bounds_error(sim, position);
-    }
-
     let executor = code
         .get(new_pc >> 2)
         .unwrap_or_else(|| display_instruction_out_of_bounds_error(sim, new_pc));
 
     sim.pc = new_pc;
-    executor.call(sim, code);
+    (executor.0)(sim, code);
 }
 
 fn from_bool(x: bool) -> u32 {
